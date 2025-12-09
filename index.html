@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ФАРМСТИЛ - Система управления несоответствиями</title>
-    <!-- Библиотека для QR-кодов с CDN который точно работает -->
+    <!-- Библиотека для QR-кодов -->
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         /* ОСНОВНЫЕ СТИЛИ */
@@ -38,23 +38,6 @@
             text-align: center;
             position: relative;
             overflow: hidden;
-        }
-        
-        .header::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
-            background-size: 50px 50px;
-            animation: float 20s linear infinite;
-        }
-        
-        @keyframes float {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
         
         .header h1 {
@@ -92,30 +75,12 @@
             transition: all 0.3s ease;
             flex: 1;
             min-width: 120px;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .menu-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(30, 60, 114, 0.1), transparent);
-            transition: left 0.5s;
-        }
-        
-        .menu-btn:hover::before {
-            left: 100%;
         }
         
         .menu-btn:hover {
             background: #1e3c72;
             color: white;
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
         .menu-btn.active {
@@ -129,12 +94,6 @@
             display: none;
             padding: 30px;
             min-height: 600px;
-            animation: fadeIn 0.5s ease;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
         }
         
         .page.active {
@@ -164,9 +123,6 @@
             margin-bottom: 8px;
             font-weight: 600;
             color: #333;
-            display: flex;
-            align-items: center;
-            gap: 8px;
         }
         
         input, select, textarea {
@@ -175,14 +131,11 @@
             border-radius: 8px;
             font-size: 16px;
             transition: all 0.3s;
-            background: #fafafa;
         }
         
         input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #1e3c72;
-            background: white;
-            box-shadow: 0 0 0 3px rgba(30, 60, 114, 0.1);
         }
         
         /* КНОПКИ */
@@ -194,55 +147,30 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
             margin: 5px;
         }
         
         .btn-primary {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            background: #1e3c72;
             color: white;
         }
         
         .btn-primary:hover {
-            background: linear-gradient(135deg, #2a5298 0%, #1e3c72 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(30, 60, 114, 0.3);
+            background: #2a5298;
         }
         
         .btn-success {
-            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            background: #28a745;
             color: white;
         }
         
         .btn-success:hover {
-            background: linear-gradient(135deg, #20c997 0%, #28a745 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+            background: #20c997;
         }
         
         .btn-danger {
-            background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+            background: #dc3545;
             color: white;
-        }
-        
-        .btn-danger:hover {
-            background: linear-gradient(135deg, #fd7e14 0%, #dc3545 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(220, 53, 69, 0.3);
-        }
-        
-        .btn-warning {
-            background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%);
-            color: #212529;
-        }
-        
-        .btn-warning:hover {
-            background: linear-gradient(135deg, #fd7e14 0%, #ffc107 100%);
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
         }
         
         /* УВЕДОМЛЕНИЯ */
@@ -257,14 +185,8 @@
             box-shadow: 0 10px 30px rgba(0,0,0,0.15);
             display: none;
             z-index: 1000;
-            animation: slideInRight 0.3s ease;
             border-left: 5px solid #28a745;
             max-width: 400px;
-        }
-        
-        @keyframes slideInRight {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
         }
         
         /* КАРТОЧКИ НС */
@@ -281,24 +203,6 @@
             border-radius: 12px;
             padding: 20px;
             box-shadow: 0 5px 15px rgba(0,0,0,0.08);
-            transition: all 0.3s;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .ln-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 5px;
-            height: 100%;
-            background: #1e3c72;
-        }
-        
-        .ln-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
         }
         
         .ln-card-header {
@@ -322,15 +226,13 @@
             font-size: 12px;
             font-weight: bold;
             color: white;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
         }
         
-        .status-checking { background: linear-gradient(135deg, #ffc107 0%, #fd7e14 100%); }
-        .status-in_progress { background: linear-gradient(135deg, #6f42c1 0%, #9b59b6 100%); }
-        .status-decision_made { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); }
-        .status-rework { background: linear-gradient(135deg, #dc3545 0%, #e74c3c 100%); }
-        .status-closed { background: linear-gradient(135deg, #6c757d 0%, #95a5a6 100%); }
+        .status-checking { background: #ffc107; }
+        .status-in_progress { background: #6f42c1; }
+        .status-decision_made { background: #28a745; }
+        .status-rework { background: #dc3545; }
+        .status-closed { background: #6c757d; }
         
         /* QR-КОДЫ */
         .qr-preview {
@@ -339,28 +241,7 @@
             border: 3px dashed #1e3c72;
             border-radius: 15px;
             margin-top: 30px;
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { border-color: #1e3c72; }
-            50% { border-color: #4b6cb7; }
-            100% { border-color: #1e3c72; }
-        }
-        
-        #qrcode {
-            display: inline-block;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            margin: 20px 0;
-        }
-        
-        .qr-code-canvas {
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            background: #f8f9fa;
         }
         
         /* ЗАГРУЗКА ФОТО */
@@ -369,16 +250,9 @@
             border-radius: 12px;
             padding: 30px;
             text-align: center;
-            background: linear-gradient(135deg, #f8fff8 0%, #e8f5e8 100%);
+            background: #f8fff8;
             cursor: pointer;
             margin: 15px 0;
-            transition: all 0.3s;
-        }
-        
-        .photo-upload-area:hover {
-            border-color: #20c997;
-            background: linear-gradient(135deg, #e8f5e8 0%, #d0ebd0 100%);
-            transform: scale(1.01);
         }
         
         .preview-container {
@@ -393,13 +267,7 @@
             border-radius: 8px;
             overflow: hidden;
             border: 2px solid #ddd;
-            transition: all 0.3s;
             height: 120px;
-        }
-        
-        .photo-preview:hover {
-            transform: scale(1.05);
-            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
         }
         
         .photo-preview img {
@@ -421,7 +289,6 @@
             justify-content: center;
             z-index: 1001;
             padding: 20px;
-            animation: fadeIn 0.3s ease;
         }
         
         .modal-content {
@@ -433,7 +300,6 @@
             max-height: 90vh;
             overflow-y: auto;
             position: relative;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.3);
         }
         
         .modal-close {
@@ -448,25 +314,15 @@
             height: 40px;
             cursor: pointer;
             font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-        }
-        
-        .modal-close:hover {
-            background: #c82333;
-            transform: rotate(90deg);
         }
         
         /* ИНФО-БЛОКИ */
         .info-box {
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            background: #f8f9fa;
             padding: 20px;
             border-radius: 10px;
             margin: 15px 0;
             border-left: 5px solid #1e3c72;
-            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
         }
         
         .stats-box {
@@ -475,13 +331,6 @@
             border-radius: 10px;
             padding: 25px;
             text-align: center;
-            transition: all 0.3s;
-        }
-        
-        .stats-box:hover {
-            border-color: #1e3c72;
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
         }
         
         /* ЗАГОЛОВКИ */
@@ -489,9 +338,6 @@
             color: #1e3c72;
             margin-bottom: 25px;
             font-size: 28px;
-            display: flex;
-            align-items: center;
-            gap: 15px;
         }
         
         h3 {
@@ -516,7 +362,6 @@
             min-width: 20px;
             text-align: center;
             display: inline-block;
-            animation: pulse 1.5s infinite;
         }
         
         /* АКЦИОННЫЕ КНОПКИ */
@@ -538,7 +383,7 @@
         
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #1e3c72, #2a5298);
+            background: #1e3c72;
             transition: width 0.5s ease;
         }
         
@@ -569,9 +414,6 @@
             border-collapse: collapse;
             margin: 20px 0;
             background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
         }
         
         th {
@@ -584,16 +426,6 @@
         td {
             padding: 15px;
             border-bottom: 1px solid #e0e0e0;
-        }
-        
-        tr:hover {
-            background: #f8f9fa;
-        }
-        
-        /* ИКОНКИ */
-        .icon {
-            font-size: 24px;
-            margin-right: 10px;
         }
         
         /* АДАПТИВНОСТЬ */
@@ -618,40 +450,6 @@
                 width: 100%;
                 margin: 5px 0;
             }
-        }
-        
-        /* КАСТОМНЫЙ СКРОЛЛ */
-        ::-webkit-scrollbar {
-            width: 10px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 5px;
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: #1e3c72;
-            border-radius: 5px;
-        }
-        
-        ::-webkit-scrollbar-thumb:hover {
-            background: #2a5298;
-        }
-        
-        /* Email Template Preview */
-        .email-template-preview {
-            border: 3px solid #1e3c72;
-            border-radius: 10px;
-            overflow: hidden;
-            margin: 20px 0;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-        }
-        
-        .email-template-preview iframe {
-            width: 100%;
-            height: 600px;
-            border: none;
         }
     </style>
 </head>
@@ -736,15 +534,6 @@
                     <div class="form-group">
                         <label>👤 Ответственный:</label>
                         <input type="text" id="qrResponsible" placeholder="ФИО ответственного">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>📅 Срок действия:</label>
-                        <select id="qrExpiry">
-                            <option value="30">30 дней</option>
-                            <option value="90">90 дней</option>
-                            <option value="365" selected>1 год</option>
-                        </select>
                     </div>
                 </div>
                 
@@ -847,10 +636,6 @@
                                 <label>Инв. номер:</label>
                                 <input type="text" id="equipmentCode" placeholder="СТ-001">
                             </div>
-                            <div class="form-group">
-                                <label>Расположение:</label>
-                                <input type="text" id="equipmentLocation" placeholder="Цех №1">
-                            </div>
                         </div>
                         
                         <button class="btn btn-success" onclick="addEquipment()" style="width: 100%;">
@@ -869,10 +654,6 @@
                                 <div><strong>Access Key:</strong></div>
                                 <div><small><code id="web3formsKey">68e70096-0aed-4fd2-ba43-a9f06163e05b</code></small></div>
                             </div>
-                            <div>
-                                <div><strong>Лимит:</strong> 250 писем/месяц</div>
-                                <div><small>Бесплатный тариф</small></div>
-                            </div>
                         </div>
                     </div>
                     
@@ -880,10 +661,6 @@
                         <div class="form-group">
                             <label>📧 Email менеджера:</label>
                             <input type="email" id="managerEmail" value="finkart23@mail.ru">
-                        </div>
-                        <div class="form-group">
-                            <label>📧 Email ОТК:</label>
-                            <input type="email" id="qualityEmail" value="finkart23@mail.ru">
                         </div>
                     </div>
                     
@@ -893,12 +670,6 @@
                         </button>
                         <button class="btn btn-warning" onclick="testEmailConnection()">
                             🧪 Тест email
-                        </button>
-                        <button class="btn" style="background: #17a2b8; color: white;" onclick="configureWeb3Forms()">
-                            ⚙️ Настроить Web3Forms
-                        </button>
-                        <button class="btn" style="background: #9b59b6; color: white;" onclick="showEmailTemplates()">
-                            📧 Шаблоны писем
                         </button>
                     </div>
                 </div>
@@ -938,12 +709,6 @@
                     <button class="btn" style="background: #6c757d; color: white;" onclick="restoreData()">
                         🔄 Восстановить
                     </button>
-                    <button class="btn btn-danger" onclick="clearOldData()">
-                        🗑️ Очистить старые
-                    </button>
-                    <button class="btn btn-warning" onclick="showSystemInfo()">
-                        ℹ️ Информация
-                    </button>
                 </div>
                 
                 <div class="info-box" style="margin-top: 30px;">
@@ -960,10 +725,6 @@
                         <div>
                             <div style="font-size: 14px; color: #666;">QR-кодов:</div>
                             <div style="font-size: 24px; font-weight: bold; color: #17a2b8;" id="totalQRCodes">0</div>
-                        </div>
-                        <div>
-                            <div style="font-size: 14px; color: #666;">Уведомлений:</div>
-                            <div style="font-size: 24px; font-weight: bold; color: #ffc107;" id="totalNotifications">0</div>
                         </div>
                     </div>
                 </div>
@@ -997,38 +758,9 @@
         // КОНСТАНТЫ И НАСТРОЙКИ
         // ============================================
         
-        // Web3Forms настройки
         const WEB3FORMS_ACCESS_KEY = '68e70096-0aed-4fd2-ba43-a9f06163e05b';
         const WEB3FORMS_API_URL = 'https://api.web3forms.com/submit';
         
-        // Триггеры email отправки
-        const EMAIL_TRIGGERS = {
-            NEW_NS: {
-                subject: 'Новое несоответствие',
-                template: 'new_ns'
-            },
-            ASSIGNMENT: {
-                subject: 'Вам назначено несоответствие',
-                template: 'assignment'
-            },
-            REWORK: {
-                subject: 'Требуется доработка',
-                template: 'rework'
-            },
-            STATUS_CHANGE: {
-                subject: 'Изменение статуса НС',
-                template: 'status_change'
-            },
-            CLOSED: {
-                subject: 'Несоответствие закрыто',
-                template: 'closed'
-            },
-            DAILY_REPORT: {
-                subject: 'Ежедневный отчет по НС',
-                template: 'daily_report'
-            }
-        };
-
         // Глобальные переменные
         let currentQRData = null;
         let photos = [];
@@ -1041,30 +773,14 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Система ФАРМСТИЛ запускается...');
-            console.log('✅ Используется Web3Forms с ключом:', WEB3FORMS_ACCESS_KEY);
-            console.log('📄 Текущий URL:', window.location.href);
             
-            // Проверяем библиотеку QR-кодов
-            if (typeof QRCode === 'undefined') {
-                console.error('❌ Библиотека QRCode не загружена');
-                showNotification('Библиотека QR-кодов не загружена. Проверьте подключение к интернету.', 'error');
-            } else {
-                console.log('✅ Библиотека QRCode загружена');
-            }
-            
-            // Проверка параметров URL
+            // Проверка режима
             checkMode();
             
             // Загрузка данных
             loadDirectories();
             updateStats();
             updateNotificationBadge();
-            
-            // Показ начальной страницы
-            showPage('generateQR');
-            
-            // Загрузка уведомлений
-            loadNotifications();
             
             console.log('✅ Система готова к работе');
         });
@@ -1074,8 +790,6 @@
         // ============================================
         
         function showPage(pageId) {
-            console.log('📄 Переход на страницу:', pageId);
-            
             // Скрыть все страницы
             document.querySelectorAll('.page').forEach(page => {
                 page.classList.remove('active');
@@ -1118,8 +832,6 @@
         }
         
         function showNotification(message, type = 'success', duration = 3000) {
-            console.log('📢 Уведомление:', message);
-            
             const notification = document.getElementById('notification');
             if (!notification) return;
             
@@ -1140,23 +852,27 @@
         }
         
         // ============================================
-        // ИСПРАВЛЕННЫЙ РАБОЧИЙ РЕЖИМ
+        // РАБОЧИЙ РЕЖИМ
         // ============================================
         
         function checkMode() {
             const urlParams = new URLSearchParams(window.location.search);
             const qrCode = urlParams.get('qrcode');
             
-            console.log('🔍 Проверка режима:', { qrCode, url: window.location.href });
-            
             if (qrCode) {
                 // Режим рабочего
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
                 
-                // Декодируем QR код
-                const decodedQR = decodeQRCode(qrCode);
-                handleQRForWorker(decodedQR);
+                // Ищем QR-код в базе
+                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+                const qrData = qrcodes.find(qr => qr.code === qrCode);
+                
+                if (qrData) {
+                    showWorkerForm(qrData);
+                } else {
+                    showWorkerFormManual();
+                }
             } else {
                 // Режим администратора
                 document.getElementById('adminMode').style.display = 'block';
@@ -1164,67 +880,20 @@
             }
         }
         
-        function decodeQRCode(qrString) {
-            try {
-                // Если строка закодирована в URL
-                if (qrString.includes('%')) {
-                    return decodeURIComponent(qrString);
-                }
-                return qrString;
-            } catch (e) {
-                console.error('Ошибка декодирования QR:', e);
-                return qrString;
-            }
-        }
-        
-        function handleQRForWorker(qrCode) {
-            console.log('🔍 Обработка QR-кода для рабочего:', qrCode);
-            
-            // Поиск QR-кода в базе
-            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            console.log('📋 Все QR-коды в базе:', qrcodes);
-            
-            const qrData = qrcodes.find(qr => {
-                console.log('Сравниваем:', qr.code, 'с', qrCode);
-                return qr.code === qrCode;
-            });
-            
-            if (qrData) {
-                console.log('✅ Найден QR-код в базе:', qrData);
-                showWorkerForm(qrData);
-            } else {
-                console.log('⚠️ QR-код не найден, показываем ручную форму');
-                showWorkerFormManual();
-            }
-        }
-        
         function showWorkerForm(qrData = null) {
-            currentQRData = qrData;
+            console.log('Показываем форму с данными QR:', qrData);
             
             const employeeOptions = getEmployeeOptions();
             const equipmentOptions = getEquipmentOptions();
             
             const formHTML = `
-                <div class="info-box" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border-color: #2196F3;">
-                    <h4 style="color: #0d47a1; margin-top: 0;">📍 Место обнаружения</h4>
-                    ${qrData ? `
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <div><strong>Подразделение:</strong><br>${qrData.department || 'Не указано'}</div>
-                            <div><strong>Место:</strong><br>${qrData.location || 'Не указано'}</div>
-                        </div>
-                        ${qrData.responsible ? `<div style="margin-top: 10px;"><strong>Ответственный:</strong> ${qrData.responsible}</div>` : ''}
-                    ` : `
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Подразделение:</label>
-                                <input type="text" id="manualDepartment" placeholder="Введите подразделение">
-                            </div>
-                            <div class="form-group">
-                                <label>Место:</label>
-                                <input type="text" id="manualLocation" placeholder="Введите место">
-                            </div>
-                        </div>
-                    `}
+                <div class="info-box" style="background: #e3f2fd; border-color: #2196F3;">
+                    <h4 style="color: #0d47a1; margin-top: 0;">📍 Место обнаружения (из QR-кода)</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div><strong>Подразделение:</strong><br>${qrData.department || 'Не указано'}</div>
+                        <div><strong>Место:</strong><br>${qrData.location || 'Не указано'}</div>
+                        ${qrData.responsible ? `<div style="grid-column: 1 / -1;"><strong>Ответственный:</strong> ${qrData.responsible}</div>` : ''}
+                    </div>
                 </div>
                 
                 <h3 style="color: #1e3c72; margin: 30px 0 20px;">📝 Заполните форму несоответствия</h3>
@@ -1283,7 +952,7 @@
                 
                 <div class="action-buttons" style="margin-top: 40px;">
                     <button class="btn btn-success" onclick="submitWorkerForm()" style="flex: 2; padding: 18px;">
-                        📤 Отправить заявку на проверку
+                        📤 Отправить заявку
                     </button>
                     <button class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="flex: 1;">
                         ❌ Отмена
@@ -1292,10 +961,35 @@
             `;
             
             document.getElementById('workerForm').innerHTML = formHTML;
+            
+            // Заполняем подразделение и место из QR-кода
+            if (qrData) {
+                currentQRData = qrData;
+            }
         }
         
         function showWorkerFormManual() {
-            showWorkerForm(null);
+            const formHTML = `
+                <div class="info-box" style="background: #fff3cd; border-color: #ffc107;">
+                    <h4 style="color: #856404; margin-top: 0;">⚠️ QR-код не распознан</h4>
+                    <p>Заполните данные вручную:</p>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Подразделение:</label>
+                            <input type="text" id="manualDepartment" placeholder="Введите подразделение">
+                        </div>
+                        <div class="form-group">
+                            <label>Место:</label>
+                            <input type="text" id="manualLocation" placeholder="Введите место">
+                        </div>
+                    </div>
+                </div>
+                
+                ${document.getElementById('workerForm').innerHTML.replace('Показываем форму с данными QR:', '')}
+            `;
+            
+            document.getElementById('workerForm').innerHTML = formHTML;
+            currentQRData = null;
         }
         
         function fillApplicantData() {
@@ -1323,7 +1017,6 @@
             
             preview.innerHTML = '';
             
-            // Ограничение: максимум 5 фото
             const fileCount = Math.min(files.length, 5);
             
             for (let i = 0; i < fileCount; i++) {
@@ -1340,12 +1033,10 @@
                             background: rgba(220, 53, 69, 0.9); color: white; 
                             border: none; border-radius: 50%; width: 28px; 
                             height: 28px; font-size: 16px; cursor: pointer;
-                            display: flex; align-items: center; justify-content: center;
                         ">×</button>
                     `;
                     preview.appendChild(photoDiv);
                     
-                    // Сохранение фото
                     photos.push({
                         name: file.name,
                         data: e.target.result,
@@ -1361,8 +1052,6 @@
         
         function removePhoto(index) {
             photos.splice(index, 1);
-            
-            // Обновление превью
             const preview = document.getElementById('photoPreview');
             if (preview) {
                 preview.innerHTML = '';
@@ -1377,14 +1066,11 @@
                             background: rgba(220, 53, 69, 0.9); color: white; 
                             border: none; border-radius: 50%; width: 28px; 
                             height: 28px; font-size: 16px; cursor: pointer;
-                            display: flex; align-items: center; justify-content: center;
                         ">×</button>
                     `;
                     preview.appendChild(photoDiv);
                 });
             }
-            
-            showNotification('Фотография удалена', 'info');
         }
         
         function submitWorkerForm() {
@@ -1402,7 +1088,7 @@
                 }
                 
                 // Генерация номера НС
-                const nsNumber = generateNSNumber();
+                const nsNumber = 'НС-' + Math.floor(Math.random() * 9000 + 1000) + '-' + new Date().getFullYear();
                 
                 // Сбор данных
                 const nsData = {
@@ -1418,15 +1104,7 @@
                     photos: photos,
                     status: 'checking',
                     created: new Date().toISOString(),
-                    createdFromQR: !!currentQRData,
-                    assignedTo: '',
-                    comments: [],
-                    history: [{
-                        action: 'Создано',
-                        author: document.getElementById('applicant').value,
-                        date: new Date().toISOString(),
-                        status: 'checking'
-                    }]
+                    createdFromQR: !!currentQRData
                 };
                 
                 // Проверка обязательных полей
@@ -1440,11 +1118,8 @@
                 nsList.push(nsData);
                 localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
                 
-                // Добавление уведомления
-                addNotification(nsData, 'new_ns');
-                
-                // Отправка email уведомления через Web3Forms
-                sendEmailWithTrigger('NEW_NS', nsData);
+                // Отправка email уведомления
+                sendEmailNotification(nsData);
                 
                 // Очистка фото
                 photos = [];
@@ -1462,336 +1137,109 @@
                                 <div><strong>Дата:</strong><br>${new Date().toLocaleDateString()}</div>
                                 <div><strong>Заявитель:</strong><br>${nsData.applicant}</div>
                             </div>
-                            <div style="margin-top: 20px; padding: 15px; background: #e3f2fd; border-radius: 8px;">
-                                <strong>Что дальше?</strong>
-                                <p style="margin-top: 10px; color: #666;">
-                                    Менеджер СМК проверит вашу заявку и назначит ответственного.
-                                    Вы получите уведомление о статусе.
-                                </p>
-                            </div>
                         </div>
                         
-                        <div class="action-buttons" style="max-width: 400px; margin: 0 auto;">
-                            <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="flex: 1;">
-                                📝 Создать новую заявку
-                            </button>
-                            <button class="btn" style="background: #6c757d; color: white; flex: 1;" onclick="window.close()">
-                                Закрыть
-                            </button>
-                        </div>
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="padding: 16px 32px;">
+                            📝 Создать новую заявку
+                        </button>
                     </div>
                 `;
                 
-                showNotification('Несоответствие успешно отправлено на проверку!', 'success');
+                showNotification('Несоответствие успешно отправлено!', 'success');
                 
             } catch (error) {
                 console.error('Ошибка отправки:', error);
-                showNotification('Ошибка отправки заявки. Попробуйте еще раз.', 'error');
+                showNotification('Ошибка отправки заявки', 'error');
             }
         }
         
-        function generateNSNumber() {
-            const randomNum = Math.floor(Math.random() * 9000) + 1000;
-            const year = new Date().getFullYear();
-            return `НС-${randomNum}-${year}`;
-        }
-        
         // ============================================
-        // ИСПРАВЛЕННАЯ EMAIL ОТПРАВКА
+        // EMAIL УВЕДОМЛЕНИЯ
         // ============================================
         
-        async function sendEmailWithTrigger(triggerType, data, customRecipient = null) {
+        async function sendEmailNotification(nsData) {
             try {
-                console.log(`📧 Начало отправки email (${triggerType})`);
-                
-                const trigger = EMAIL_TRIGGERS[triggerType];
-                if (!trigger) {
-                    console.error('❌ Неизвестный триггер:', triggerType);
-                    return false;
-                }
-
-                // Получаем настройки email
                 const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
+                const recipient = settings.managerEmail || 'finkart23@mail.ru';
                 
-                // Определяем получателя
-                let recipient = customRecipient;
-                if (!recipient) {
-                    recipient = settings.managerEmail || 'finkart23@mail.ru';
-                }
-
-                // Генерируем HTML письма
-                const emailHTML = generateEmailHTML(trigger.template, data, triggerType);
-                
-                // Простой текстовый вариант для отладки
-                const textMessage = `
-                    ${trigger.subject}: ${data.nsNumber || 'Система ФАРМСТИЛ'}
-                    
-                    Информация о несоответствии:
-                    Номер: ${data.nsNumber}
-                    Подразделение: ${data.department}
-                    Место: ${data.location}
-                    Заявитель: ${data.applicant}
-                    Описание: ${data.description}
-                    
-                    Для работы с несоответствием перейдите в систему ФАРМСТИЛ.
-                    
-                    Это автоматическое сообщение от системы управления качеством ФАРМСТИЛ.
-                `;
-
-                // Формируем данные для отправки
-                const formData = {
+                const emailData = {
                     access_key: WEB3FORMS_ACCESS_KEY,
-                    subject: `${trigger.subject}: ${data.nsNumber || 'Система ФАРМСТИЛ'}`,
+                    subject: `Новое несоответствие: ${nsData.nsNumber}`,
                     from_name: 'Система ФАРМСТИЛ',
                     reply_to: recipient,
                     to: recipient,
-                    message: textMessage,
-                    html_message: emailHTML
+                    message: `
+                        Новое несоответствие зарегистрировано в системе ФАРМСТИЛ.
+                        
+                        Номер: ${nsData.nsNumber}
+                        Дата: ${new Date(nsData.detectionDate).toLocaleDateString()}
+                        Подразделение: ${nsData.department}
+                        Место: ${nsData.location}
+                        Заявитель: ${nsData.applicant}
+                        
+                        Описание:
+                        ${nsData.description}
+                        
+                        Для просмотра деталей перейдите в систему ФАРМСТИЛ.
+                    `
                 };
-
-                console.log(`📧 Отправка через Web3Forms:`, { 
-                    to: recipient, 
-                    subject: formData.subject 
-                });
-
-                // Отправка через Web3Forms API
+                
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData)
+                    body: JSON.stringify(emailData)
                 });
-
+                
                 const result = await response.json();
-                console.log('📧 Ответ Web3Forms:', result);
-
-                if (result.success) {
-                    console.log(`✅ Email отправлен успешно (${triggerType})`);
-                    
-                    // Логируем отправку
-                    logEmailSent(triggerType, recipient, data.nsNumber);
-                    
-                    return true;
-                } else {
-                    console.error(`❌ Ошибка отправки (${triggerType}):`, result);
-                    showNotification('Ошибка отправки email: ' + (result.message || 'Неизвестная ошибка'), 'error');
-                    return false;
-                }
-
+                console.log('Email отправлен:', result);
+                
             } catch (error) {
-                console.error(`❌ Ошибка отправки email (${triggerType}):`, error);
-                showNotification('Ошибка отправки email: ' + error.message, 'error');
-                return false;
+                console.error('Ошибка отправки email:', error);
             }
         }
         
-        function logEmailSent(triggerType, recipient, nsNumber = null) {
-            const emailLog = JSON.parse(localStorage.getItem('farmstil_email_log') || '[]');
-            
-            emailLog.push({
-                trigger: triggerType,
-                recipient: recipient,
-                nsNumber: nsNumber,
-                timestamp: new Date().toISOString(),
-                status: 'sent'
-            });
-
-            // Ограничиваем лог 1000 записей
-            if (emailLog.length > 1000) {
-                emailLog.shift();
+        async function testEmailConnection() {
+            try {
+                const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
+                const recipient = settings.managerEmail || 'finkart23@mail.ru';
+                
+                const testData = {
+                    access_key: WEB3FORMS_ACCESS_KEY,
+                    subject: 'Тестовое письмо от системы ФАРМСТИЛ',
+                    from_name: 'Система ФАРМСТИЛ',
+                    reply_to: recipient,
+                    to: recipient,
+                    message: 'Это тестовое письмо для проверки работы email уведомлений системы ФАРМСТИЛ. Если вы получили это письмо, значит система работает корректно.'
+                };
+                
+                showNotification('Отправка тестового email...', 'info');
+                
+                const response = await fetch(WEB3FORMS_API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showNotification('Тестовый email успешно отправлен!', 'success');
+                } else {
+                    showNotification('Ошибка отправки тестового email', 'error');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка тестового email:', error);
+                showNotification('Ошибка отправки тестового email', 'error');
             }
-
-            localStorage.setItem('farmstil_email_log', JSON.stringify(emailLog));
         }
         
         // ============================================
-        // ГЕНЕРАЦИЯ HTML ПИСЕМ (исправленная)
-        // ============================================
-        
-        function generateEmailHTML(template, data, triggerType) {
-            const date = new Date(data.detectionDate || data.created);
-            const time = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-            const formattedDate = date.toLocaleDateString('ru-RU');
-            
-            let statusText = '';
-            let statusClass = '';
-            
-            switch(data.status) {
-                case 'checking':
-                    statusText = 'НА ПРОВЕРКЕ';
-                    statusClass = 'checking';
-                    break;
-                case 'in_progress':
-                    statusText = 'В РАБОТЕ';
-                    statusClass = 'in_progress';
-                    break;
-                case 'rework':
-                    statusText = 'ДОРАБОТКА';
-                    statusClass = 'rework';
-                    break;
-                case 'decision_made':
-                    statusText = 'РЕШЕНИЕ';
-                    statusClass = 'decision_made';
-                    break;
-                case 'closed':
-                    statusText = 'ЗАКРЫТО';
-                    statusClass = 'closed';
-                    break;
-                default:
-                    statusText = data.status || 'СОЗДАНО';
-                    statusClass = 'checking';
-            }
-            
-            let subject = '';
-            let importantNote = '';
-            let managerInstructions = '';
-            
-            switch(triggerType) {
-                case 'NEW_NS':
-                    subject = '🚨 НОВОЕ НЕСООТВЕТСТВИЕ';
-                    importantNote = '<strong>⚠️ ТРЕБУЕТСЯ ВАШЕ ВНИМАНИЕ!</strong><p style="margin: 10px 0 0 0;">Данное несоответствие ожидает проверки. Пожалуйста, проверьте информацию и назначьте ответственного.</p>';
-                    managerInstructions = `
-                        <h4 style="color: #1e3c72; margin-top: 0;">🎯 Действия менеджера:</h4>
-                        <ol style="margin: 10px 0 0 20px;">
-                            <li>Проверьте информацию о несоответствии</li>
-                            <li>Назначьте ответственного сотрудника</li>
-                            <li>Установите сроки устранения</li>
-                            <li>Отслеживайте прогресс выполнения</li>
-                        </ol>
-                    `;
-                    break;
-                    
-                case 'ASSIGNMENT':
-                    subject = '🎯 НАЗНАЧЕНО НЕСООТВЕТСТВИЕ';
-                    importantNote = `<strong>🎯 ВАМ НАЗНАЧЕНО ЗАДАНИЕ!</strong><p style="margin: 10px 0 0 0;">Вы назначены ответственным за устранение несоответствия.</p>`;
-                    managerInstructions = `
-                        <h4 style="color: #1e3c72; margin-top: 0;">📋 Ваши действия:</h4>
-                        <ol style="margin: 10px 0 0 20px;">
-                            <li>Изучите информацию о несоответствии</li>
-                            <li>Определите причину возникновения</li>
-                            <li>Разработайте план устранения</li>
-                            <li>Выполните корректирующие действия</li>
-                            <li>Предоставьте отчет о выполнении</li>
-                        </ol>
-                    `;
-                    break;
-                    
-                case 'REWORK':
-                    subject = '🔄 ТРЕБУЕТСЯ ДОРАБОТКА';
-                    importantNote = `<strong>🔄 ТРЕБУЕТСЯ ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ!</strong><p style="margin: 10px 0 0 0;">Ваше несоответствие требует доработки. Пожалуйста, предоставьте дополнительную информацию.</p>`;
-                    managerInstructions = `
-                        <h4 style="color: #1e3c72; margin-top: 0;">💬 Комментарий менеджера:</h4>
-                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 10px 0;">
-                            <p>${data.comment || 'Требуется дополнительная информация по несоответствию'}</p>
-                        </div>
-                        <h4 style="color: #1e3c72; margin-top: 20px;">📝 Что нужно сделать:</h4>
-                        <ol style="margin: 10px 0 0 20px;">
-                            <li>Уточните детали несоответствия</li>
-                            <li>Предоставьте дополнительные фотографии (если есть)</li>
-                            <li>Укажите дополнительные характеристики оборудования</li>
-                            <li>Опишите точное время обнаружения</li>
-                        </ol>
-                    `;
-                    break;
-                    
-                case 'CLOSED':
-                    subject = '✅ НЕСООТВЕТСТВИЕ ЗАКРЫТО';
-                    importantNote = '<strong>✅ НЕСООТВЕТСТВИЕ УСПЕШНО ЗАКРЫТО!</strong><p style="margin: 10px 0 0 0;">Все корректирующие действия выполнены, несоответствие устранено.</p>';
-                    managerInstructions = `
-                        <h4 style="color: #1e3c72; margin-top: 0;">📊 Результаты:</h4>
-                        <div style="background: #d4edda; padding: 15px; border-radius: 8px; margin: 10px 0;">
-                            <p>Несоответствие успешно устранено. Все необходимые действия выполнены в полном объеме.</p>
-                        </div>
-                        <h4 style="color: #1e3c72; margin-top: 20px;">📋 Выполненные работы:</h4>
-                        <ol style="margin: 10px 0 0 20px;">
-                            <li>Проведен анализ причин возникновения</li>
-                            <li>Выполнены корректирующие действия</li>
-                            <li>Проведена проверка эффективности</li>
-                            <li>Документация обновлена</li>
-                        </ol>
-                    `;
-                    break;
-                    
-                default:
-                    subject = '📧 УВЕДОМЛЕНИЕ О НЕСООТВЕТСТВИИ';
-                    importantNote = '<strong>ℹ️ ИНФОРМАЦИЯ О НЕСООТВЕТСТВИИ</strong><p style="margin: 10px 0 0 0;">Обновлена информация по несоответствию.</p>';
-                    managerInstructions = `
-                        <h4 style="color: #1e3c72; margin-top: 0;">📋 Информация:</h4>
-                        <p>Статус несоответствия изменен на "${statusText}"</p>
-                    `;
-            }
-            
-            // Простой HTML чтобы избежать проблем с кодированием
-            return `
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <style>
-                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                        .header { background: #1e3c72; color: white; padding: 20px; text-align: center; }
-                        .content { padding: 20px; background: #f9f9f9; }
-                        .info-box { background: white; padding: 15px; margin: 15px 0; border-left: 4px solid #1e3c72; }
-                        .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-                        .status { display: inline-block; padding: 5px 10px; background: #ffc107; color: #000; border-radius: 3px; font-weight: bold; }
-                    </style>
-                </head>
-                <body>
-                    <div class="container">
-                        <div class="header">
-                            <h1>${subject}</h1>
-                            <p>ФАРМСТИЛ - Система управления качеством</p>
-                        </div>
-                        
-                        <div class="content">
-                            <h2>${data.nsNumber} <span class="status">${statusText}</span></h2>
-                            
-                            <div class="info-box">
-                                <h3>Основная информация:</h3>
-                                <p><strong>Дата:</strong> ${formattedDate} ${time}</p>
-                                <p><strong>Подразделение:</strong> ${data.department || 'Не указано'}</p>
-                                <p><strong>Место:</strong> ${data.location || 'Не указано'}</p>
-                                <p><strong>Заявитель:</strong> ${data.applicant || 'Не указан'}</p>
-                                ${data.assignedTo ? `<p><strong>Ответственный:</strong> ${data.assignedTo}</p>` : ''}
-                            </div>
-                            
-                            <div class="info-box">
-                                <h3>Оборудование:</h3>
-                                <p><strong>Наименование:</strong> ${data.productName || 'Не указано'}</p>
-                                <p><strong>Инв. номер:</strong> ${data.productCode || 'Не указан'}</p>
-                            </div>
-                            
-                            <div class="info-box">
-                                <h3>Описание несоответствия:</h3>
-                                <p>${data.description || 'Нет описания'}</p>
-                            </div>
-                            
-                            <div class="info-box" style="background: #fff3cd; border-color: #ffc107;">
-                                <h3>${importantNote.split('<strong>')[1].split('</strong>')[0]}</h3>
-                                ${importantNote.split('</strong>')[1]}
-                            </div>
-                            
-                            <div style="text-align: center; margin: 30px 0;">
-                                <p>Для работы с несоответствием перейдите в систему ФАРМСТИЛ</p>
-                            </div>
-                        </div>
-                        
-                        <div class="footer">
-                            <p>📧 Это автоматическое уведомление от системы ФАРМСТИЛ</p>
-                            <p>Не отвечайте на это письмо. Для связи используйте рабочую почту.</p>
-                            <p>© ${new Date().getFullYear()} ФАРМСТИЛ. Все права защищены.</p>
-                        </div>
-                    </div>
-                </body>
-                </html>
-            `;
-        }
-        
-        // ============================================
-        // ИСПРАВЛЕННАЯ ГЕНЕРАЦИЯ QR-КОДОВ
+        // ГЕНЕРАЦИЯ QR-КОДОВ
         // ============================================
         
         function generateQRCode() {
@@ -1800,26 +1248,17 @@
             const responsible = document.getElementById('qrResponsible').value;
             
             if (!department || !location) {
-                showNotification('Заполните обязательные поля: подразделение и место', 'error');
+                showNotification('Заполните обязательные поля', 'error');
                 return;
             }
             
             try {
                 // Генерация уникального кода
-                const timestamp = Date.now().toString(36).toUpperCase();
-                const random = Math.random().toString(36).substr(2, 4).toUpperCase();
-                const code = `FS-${timestamp}-${random}`;
+                const code = 'FS-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).substr(2, 4).toUpperCase();
                 
-                // Создаем правильный URL для QR-кода
-                // Получаем текущее имя файла
-                const currentPath = window.location.pathname;
-                const fileName = currentPath.split('/').pop() || 'index.html';
-                
-                // Создаем абсолютный URL
-                const qrUrl = `${window.location.origin}${currentPath}?qrcode=${code}`;
-                
-                console.log('🔗 Создан URL для QR:', qrUrl);
-                console.log('📄 Имя файла:', fileName);
+                // Создаем URL с параметром qrcode
+                const currentUrl = window.location.href.split('?')[0];
+                const qrUrl = `${currentUrl}?qrcode=${code}`;
                 
                 // Сохранение данных
                 currentQRData = {
@@ -1828,8 +1267,7 @@
                     location: location,
                     responsible: responsible || '',
                     url: qrUrl,
-                    created: new Date().toISOString(),
-                    expiry: document.getElementById('qrExpiry').value
+                    created: new Date().toISOString()
                 };
                 
                 // Сохранение в базу
@@ -1837,89 +1275,33 @@
                 qrcodes.push(currentQRData);
                 localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
                 
-                // Очистка предыдущего QR-кода
+                // Очистка и генерация QR-кода
                 const qrcodeDiv = document.getElementById('qrcode');
                 qrcodeDiv.innerHTML = '';
                 
-                // Проверяем библиотеку QR-кодов
-                if (typeof QRCode === 'undefined') {
-                    console.error('Библиотека QRCode не загружена');
-                    showAlternativeQRDisplay(qrUrl, code, department, location);
-                    return;
-                }
-                
-                // Создаем контейнер для QR-кода
-                const container = document.createElement('div');
-                container.id = 'qrContainer';
-                qrcodeDiv.appendChild(container);
-                
-                // Генерация QR-кода
-                try {
-                    new QRCode(container, {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrcodeDiv, {
                         text: qrUrl,
                         width: 200,
                         height: 200,
                         colorDark: "#1e3c72",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
+                        colorLight: "#ffffff"
                     });
-                    
-                    // Даем время на генерацию
-                    setTimeout(() => {
-                        // Показать превью
-                        showQRPreview(department, location, code);
-                        showNotification('QR-код успешно создан!', 'success');
-                    }, 300);
-                    
-                } catch (qrError) {
-                    console.error('Ошибка генерации QR-кода:', qrError);
-                    showAlternativeQRDisplay(qrUrl, code, department, location);
                 }
+                
+                // Показать превью
+                document.getElementById('qrPreview').style.display = 'block';
+                document.getElementById('previewDept').textContent = department;
+                document.getElementById('previewLocation').textContent = location;
+                document.getElementById('previewCode').textContent = code;
+                document.getElementById('previewDate').textContent = new Date().toLocaleDateString();
+                
+                showNotification('QR-код успешно создан!', 'success');
                 
             } catch (error) {
                 console.error('Ошибка генерации QR-кода:', error);
-                showNotification('Ошибка генерации QR-кода. Попробуйте еще раз.', 'error');
+                showNotification('Ошибка генерации QR-кода', 'error');
             }
-        }
-        
-        function showAlternativeQRDisplay(qrUrl, code, department, location) {
-            const qrcodeDiv = document.getElementById('qrcode');
-            qrcodeDiv.innerHTML = `
-                <div style="padding: 20px; text-align: center;">
-                    <div style="margin: 20px 0; color: #1e3c72; font-weight: bold; font-size: 18px;">QR-код для сканирования</div>
-                    <div style="word-break: break-all; background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0; border: 2px solid #1e3c72; font-family: monospace;">
-                        ${qrUrl}
-                    </div>
-                    <div style="color: #666; margin-top: 20px; font-size: 14px;">
-                        ⚠️ Для генерации QR-кода скопируйте ссылку выше в любой онлайн-генератор QR-кодов
-                    </div>
-                    <div style="margin-top: 15px;">
-                        <button class="btn btn-primary" onclick="copyToClipboard('${qrUrl}')">
-                            📋 Копировать ссылку
-                        </button>
-                    </div>
-                </div>
-            `;
-            
-            showQRPreview(department, location, code);
-            showNotification('Ссылка для QR-кода создана. Скопируйте ее в генератор.', 'warning');
-        }
-        
-        function showQRPreview(department, location, code) {
-            document.getElementById('qrPreview').style.display = 'block';
-            document.getElementById('previewDept').textContent = department;
-            document.getElementById('previewLocation').textContent = location;
-            document.getElementById('previewCode').textContent = code;
-            document.getElementById('previewDate').textContent = new Date().toLocaleDateString('ru-RU');
-        }
-        
-        function copyToClipboard(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                showNotification('Ссылка скопирована в буфер обмена', 'success');
-            }).catch(err => {
-                console.error('Ошибка копирования: ', err);
-                showNotification('Ошибка копирования', 'error');
-            });
         }
         
         function printQRCode() {
@@ -1929,59 +1311,37 @@
             }
             
             const printWindow = window.open('', '_blank');
-            const qrcodeDiv = document.getElementById('qrcode').innerHTML;
-            
             printWindow.document.write(`
                 <html>
                 <head>
                     <title>QR-код ${currentQRData.department}</title>
                     <style>
                         body { font-family: Arial; text-align: center; padding: 40px; }
-                        .print-container { max-width: 400px; margin: 0 auto; }
-                        .header { color: #1e3c72; margin-bottom: 30px; }
-                        .qr-code { margin: 30px auto; }
-                        .info { 
-                            text-align: left; 
-                            margin: 30px 0; 
-                            padding: 20px; 
-                            border: 2px solid #1e3c72; 
-                            border-radius: 10px; 
-                            background: #f8f9fa; 
-                        }
-                        @media print {
-                            body { padding: 20px; }
-                        }
+                        .info { text-align: left; margin: 30px 0; padding: 20px; border: 2px solid #1e3c72; border-radius: 10px; }
                     </style>
                 </head>
                 <body>
-                    <div class="print-container">
-                        <div class="header">
-                            <h1>ФАРМСТИЛ</h1>
-                            <h3>Регистрация несоответствия</h3>
-                        </div>
-                        
-                        <div class="info">
-                            <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
-                            <p><strong>Место:</strong> ${currentQRData.location}</p>
-                            <p><strong>Код:</strong> ${currentQRData.code}</p>
-                            <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString()}</p>
-                            ${currentQRData.responsible ? `<p><strong>Ответственный:</strong> ${currentQRData.responsible}</p>` : ''}
-                        </div>
-                        
-                        <div class="qr-code">
-                            ${qrcodeDiv}
-                        </div>
-                        
-                        <div style="margin-top: 30px; font-size: 14px; color: #666;">
-                            <p>Отсканируйте QR-код для регистрации несоответствия</p>
-                        </div>
+                    <h1>ФАРМСТИЛ</h1>
+                    <h3>Регистрация несоответствия</h3>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        <p><strong>Код:</strong> ${currentQRData.code}</p>
+                        <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString()}</p>
                     </div>
                     
+                    <div id="qrcode"></div>
+                    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
                     <script>
-                        setTimeout(() => {
-                            window.print();
-                            setTimeout(() => window.close(), 1000);
-                        }, 500);
+                        new QRCode(document.getElementById('qrcode'), {
+                            text: '${currentQRData.url}',
+                            width: 200,
+                            height: 200,
+                            colorDark: "#1e3c72",
+                            colorLight: "#ffffff"
+                        });
+                        setTimeout(() => window.print(), 500);
                     <\/script>
                 </body>
                 </html>
@@ -1997,16 +1357,16 @@
             
             const canvas = document.querySelector('#qrcode canvas');
             if (!canvas) {
-                showNotification('QR-код не найден. Используйте внешний генератор.', 'error');
+                showNotification('QR-код не найден', 'error');
                 return;
             }
             
             const link = document.createElement('a');
-            link.download = `QR_${currentQRData.department}_${currentQRData.code}.png`;
+            link.download = `QR_${currentQRData.code}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
             
-            showNotification('QR-код сохранен как PNG', 'success');
+            showNotification('QR-код сохранен', 'success');
         }
         
         function testQRCode() {
@@ -2016,11 +1376,10 @@
             }
             
             window.open(currentQRData.url, '_blank');
-            showNotification('Тестирование QR-кода запущено', 'info');
         }
         
         // ============================================
-        // УПРАВЛЕНИЕ НС (остается без изменений)
+        // УПРАВЛЕНИЕ НС
         // ============================================
         
         function loadNSList(filterStatus = 'all') {
@@ -2040,9 +1399,7 @@
             if (filteredNS.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 60px; color: #666;">
-                        <div style="font-size: 80px; margin-bottom: 20px;">📄</div>
-                        <h3 style="color: #1e3c72; margin-bottom: 15px;">Несоответствий нет</h3>
-                        <p>Создайте первое несоответствие через QR-код или вручную</p>
+                        <h3 style="color: #1e3c72;">Несоответствий нет</h3>
                     </div>
                 `;
                 return;
@@ -2062,27 +1419,11 @@
                             <div class="ln-status ${statusClass}">${statusText}</div>
                         </div>
                         
-                        <div style="margin: 15px 0;">
+                        <div>
                             <div><strong>📅 Дата:</strong> ${date}</div>
                             <div><strong>🏭 Подразделение:</strong> ${ns.department || 'Не указано'}</div>
                             <div><strong>🔧 Изделие:</strong> ${ns.productName || 'Не указано'}</div>
                             <div><strong>👤 Заявитель:</strong> ${ns.applicant || 'Не указан'}</div>
-                            ${ns.assignedTo ? `<div><strong>🎯 Ответственный:</strong> ${ns.assignedTo}</div>` : ''}
-                            <div style="margin-top: 15px;">
-                                <strong>📝 Описание:</strong> 
-                                <div style="font-size: 14px; color: #666; margin-top: 8px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
-                                    ${ns.description ? (ns.description.length > 120 ? ns.description.substring(0, 120) + '...' : ns.description) : 'Нет описания'}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            <button class="btn btn-primary" onclick="viewNS('${ns.id}')" style="flex: 1;">
-                                👁️ Просмотр
-                            </button>
-                            <button class="btn btn-success" onclick="manageNS('${ns.id}')" style="flex: 1;">
-                                📋 Управление
-                            </button>
                         </div>
                     </div>
                 `;
@@ -2095,31 +1436,6 @@
         function filterNS(status) {
             currentNSFilter = status;
             loadNSList(status);
-            
-            // Обновить активность кнопок фильтра
-            const filterButtons = document.querySelectorAll('#listNSPage .action-buttons .btn');
-            filterButtons.forEach(btn => {
-                btn.style.opacity = '0.6';
-                btn.style.transform = 'none';
-            });
-            
-            const buttonTexts = {
-                'all': 'Все',
-                'checking': 'На проверке',
-                'in_progress': 'В работе',
-                'decision_made': 'Решение',
-                'rework': 'Доработка',
-                'closed': 'Закрытые'
-            };
-            
-            const targetText = buttonTexts[status];
-            filterButtons.forEach(btn => {
-                if (btn.textContent.includes(targetText)) {
-                    btn.style.opacity = '1';
-                    btn.style.transform = 'translateY(-2px)';
-                    btn.style.boxShadow = '0 5px 15px rgba(0,0,0,0.2)';
-                }
-            });
         }
         
         function getStatusText(status) {
@@ -2133,318 +1449,34 @@
             return statuses[status] || status.toUpperCase();
         }
         
-        function viewNS(nsId) {
+        function exportToCSV() {
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const ns = nsList.find(n => n.id === nsId);
             
-            if (!ns) {
-                showNotification('Несоответствие не найдено', 'error');
+            if (nsList.length === 0) {
+                showNotification('Нет данных для экспорта', 'warning');
                 return;
             }
             
-            const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
-            const created = new Date(ns.created).toLocaleString();
-            const statusText = getStatusText(ns.status);
+            let csv = 'Номер;Дата;Подразделение;Место;Изделие;Статус;Заявитель;Описание\n';
             
-            let photosHTML = '';
-            if (ns.photos && ns.photos.length > 0) {
-                photosHTML = `
-                    <h4>📷 Фотографии (${ns.photos.length})</h4>
-                    <div class="preview-container">
-                        ${ns.photos.map(photo => `
-                            <div class="photo-preview" style="height: 150px;">
-                                <img src="${photo.data}" alt="${photo.name}">
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-            
-            let commentsHTML = '';
-            if (ns.comments && ns.comments.length > 0) {
-                commentsHTML = `
-                    <h4>💬 История изменений</h4>
-                    <div class="info-box">
-                        ${ns.comments.map(comment => `
-                            <div style="margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #e0e0e0;">
-                                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
-                                    <strong>${comment.author}</strong>
-                                    <small style="color: #666;">${comment.date}</small>
-                                </div>
-                                <div>${comment.text}</div>
-                                </div>
-                        `).join('')}
-                    </div>
-                `;
-            }
-            
-            const modalHTML = `
-                <div class="modal-overlay">
-                    <div class="modal-content">
-                        <button class="modal-close" onclick="closeModal()">×</button>
-                        
-                        <h2 style="color: #1e3c72; margin-bottom: 25px; display: flex; align-items: center; gap: 15px;">
-                            ${ns.nsNumber}
-                            <span class="ln-status status-${ns.status}" style="font-size: 14px; padding: 8px 15px;">${statusText}</span>
-                        </h2>
-                        
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 25px; margin-bottom: 25px;">
-                            <div>
-                                <h4>📅 Основная информация</h4>
-                                <div class="info-box">
-                                    <p><strong>Дата обнаружения:</strong> ${date}</p>
-                                    <p><strong>Подразделение:</strong> ${ns.department}</p>
-                                    <p><strong>Место:</strong> ${ns.location || 'Не указано'}</p>
-                                    <p><strong>Изделие:</strong> ${ns.productName}</p>
-                                    <p><strong>Инв. номер:</strong> ${ns.productCode || 'Не указан'}</p>
-                                    <p><strong>Ответственный:</strong> ${ns.assignedTo || 'Не назначен'}</p>
-                                    <p><strong>Создано:</strong> ${created}</p>
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <h4>👤 Информация о заявителе</h4>
-                                <div class="info-box">
-                                    <p><strong>Заявитель:</strong> ${ns.applicant}</p>
-                                    ${ns.createdFromQR ? '<p><strong>Создано через QR-код</strong></p>' : '<p><strong>Создано вручную</strong></p>'}
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 25px;">
-                            <h4>📝 Описание несоответствия</h4>
-                            <div class="info-box">
-                                ${ns.description || 'Нет описания'}
-                            </div>
-                        </div>
-                        
-                        ${photosHTML}
-                        ${commentsHTML}
-                        
-                        <div class="action-buttons" style="margin-top: 40px;">
-                            <button class="btn btn-success" onclick="manageNS('${ns.id}')" style="flex: 2;">
-                                📋 Управление НС
-                            </button>
-                            <button class="btn btn-danger" onclick="closeModal()" style="flex: 1;">
-                                Закрыть
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const modalDiv = document.createElement('div');
-            modalDiv.innerHTML = modalHTML;
-            modalDiv.id = 'modalContainer';
-            document.body.appendChild(modalDiv);
-        }
-        
-        function manageNS(nsId) {
-            // Закрываем предыдущее модальное окно
-            closeModal();
-            
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const nsIndex = nsList.findIndex(n => n.id === nsId);
-            
-            if (nsIndex === -1) {
-                showNotification('Несоответствие не найдено', 'error');
-                return;
-            }
-            
-            const ns = nsList[nsIndex];
-            const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
-            
-            let employeeOptions = '<option value="">Не назначен</option>';
-            employees.forEach(emp => {
-                employeeOptions += `<option value="${emp.name}" ${ns.assignedTo === emp.name ? 'selected' : ''}>${emp.name} - ${emp.position}</option>`;
+            nsList.forEach(ns => {
+                const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
+                const status = getStatusText(ns.status);
+                const description = (ns.description || '').replace(/"/g, '""').replace(/;/g, ',');
+                
+                csv += `"${ns.nsNumber}";"${date}";"${ns.department}";"${ns.location || ''}";"${ns.productName || ''}";"${status}";"${ns.applicant}";"${description}"\n`;
             });
             
-            const modalHTML = `
-                <div class="modal-overlay">
-                    <div class="modal-content">
-                        <button class="modal-close" onclick="closeModal()">×</button>
-                        
-                        <h2 style="color: #1e3c72; margin-bottom: 25px;">📋 Управление НС: ${ns.nsNumber}</h2>
-                        
-                        <div style="margin-bottom: 25px; background: #f8f9fa; padding: 20px; border-radius: 10px;">
-                            <h4>📊 Текущий статус: ${getStatusText(ns.status)}</h4>
-                            <p style="margin-top: 10px;"><strong>Заявитель:</strong> ${ns.applicant}</p>
-                            <p><strong>Дата создания:</strong> ${new Date(ns.created).toLocaleString()}</p>
-                        </div>
-                        
-                        <div style="margin-bottom: 25px;">
-                            <h4>👤 Назначить ответственного</h4>
-                            <select id="assignEmployee" style="width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #ddd;">
-                                ${employeeOptions}
-                            </select>
-                            <small style="color: #666; display: block; margin-top: 8px;">Только для статуса "В работе"</small>
-                        </div>
-                        
-                        <div style="margin-bottom: 25px;">
-                            <h4>🔄 Изменить статус</h4>
-                            <select id="newStatus" style="width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #ddd;" 
-                                    onchange="updateStatusHint(this.value)">
-                                <option value="checking" ${ns.status === 'checking' ? 'selected' : ''}>На проверке</option>
-                                <option value="in_progress" ${ns.status === 'in_progress' ? 'selected' : ''}>В работе (назначить ответственного)</option>
-                                <option value="rework" ${ns.status === 'rework' ? 'selected' : ''}>Доработка (требует доп. информации)</option>
-                                <option value="decision_made" ${ns.status === 'decision_made' ? 'selected' : ''}>Решение принято</option>
-                                <option value="closed" ${ns.status === 'closed' ? 'selected' : ''}>Закрыто</option>
-                            </select>
-                            <div id="statusHint" style="margin-top: 10px; padding: 10px; border-radius: 5px; background: #fff3cd; color: #856404; font-size: 14px;">
-                                💬 Комментарий будет сохранен в истории НС
-                            </div>
-                        </div>
-                        
-                        <div style="margin-bottom: 25px;">
-                            <h4>💬 Комментарий</h4>
-                            <textarea id="commentText" rows="4" style="width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: 2px solid #ddd;" 
-                                      placeholder="Укажите причину смены статуса или дополнительные инструкции..."></textarea>
-                        </div>
-                        
-                        <div class="action-buttons">
-                            <button class="btn btn-success" onclick="saveNSChanges('${nsId}')" style="flex: 2; padding: 16px;">
-                                💾 Сохранить изменения
-                            </button>
-                            <button class="btn btn-danger" onclick="closeModal()" style="flex: 1;">
-                                Отмена
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
+            const blob = new Blob(["\uFEFF" + csv], {type: 'text/csv;charset=utf-8;'});
+            const url = URL.createObjectURL(blob);
             
-            const modalDiv = document.createElement('div');
-            modalDiv.innerHTML = modalHTML;
-            modalDiv.id = 'modalContainer';
-            document.body.appendChild(modalDiv);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `НС_экспорт_${new Date().toLocaleDateString()}.csv`;
+            a.click();
             
-            // Инициализация подсказки
-            updateStatusHint(ns.status);
-        }
-        
-        function updateStatusHint(status) {
-            const hint = document.getElementById('statusHint');
-            if (!hint) return;
-            
-            switch(status) {
-                case 'rework':
-                    hint.innerHTML = '⚠️ <strong>Доработка:</strong> Этот комментарий будет отправлен заявителю по email';
-                    hint.style.background = '#f8d7da';
-                    hint.style.color = '#721c24';
-                    break;
-                case 'in_progress':
-                    hint.innerHTML = '✅ <strong>В работе:</strong> Назначьте ответственного и укажите комментарий';
-                    hint.style.background = '#d4edda';
-                    hint.style.color = '#155724';
-                    break;
-                case 'decision_made':
-                    hint.innerHTML = '📋 <strong>Решение принято:</strong> Опишите принятое решение';
-                    hint.style.background = '#d1ecf1';
-                    hint.style.color = '#0c5460';
-                    break;
-                case 'closed':
-                    hint.innerHTML = '🔒 <strong>Закрыто:</strong> Укажите причину закрытия';
-                    hint.style.background = '#e2e3e5';
-                    hint.style.color = '#383d41';
-                    break;
-                default:
-                    hint.innerHTML = '💬 Комментарий будет сохранен в истории НС';
-                    hint.style.background = '#fff3cd';
-                    hint.style.color = '#856404';
-            }
-        }
-        
-        function closeModal() {
-            const modal = document.getElementById('modalContainer');
-            if (modal) {
-                modal.remove();
-            }
-        }
-        
-        async function saveNSChanges(nsId) {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const nsIndex = nsList.findIndex(n => n.id === nsId);
-            
-            if (nsIndex === -1) {
-                showNotification('Несоответствие не найдено', 'error');
-                return;
-            }
-            
-            const assignedTo = document.getElementById('assignEmployee').value;
-            const newStatus = document.getElementById('newStatus').value;
-            const commentText = document.getElementById('commentText').value;
-            
-            // Проверки
-            if (newStatus === 'in_progress' && !assignedTo) {
-                showNotification('Для статуса "В работе" необходимо назначить ответственного', 'error');
-                return;
-            }
-            
-            if (newStatus === 'rework' && !commentText.trim()) {
-                showNotification('Для статуса "Доработка" необходим комментарий', 'error');
-                return;
-            }
-            
-            // Сохранение старого статуса
-            const oldStatus = nsList[nsIndex].status;
-            
-            // Обновление данных
-            nsList[nsIndex].assignedTo = assignedTo;
-            nsList[nsIndex].status = newStatus;
-            nsList[nsIndex].updated = new Date().toISOString();
-            
-            // Добавление комментария
-            if (commentText.trim()) {
-                if (!nsList[nsIndex].comments) {
-                    nsList[nsIndex].comments = [];
-                }
-                nsList[nsIndex].comments.push({
-                    author: 'Менеджер СМК',
-                    text: `Статус изменен: ${getStatusText(oldStatus)} → ${getStatusText(newStatus)}. ${commentText}`,
-                    date: new Date().toLocaleString()
-                });
-            }
-            
-            // Добавляем в историю
-            if (!nsList[nsIndex].history) {
-                nsList[nsIndex].history = [];
-            }
-            nsList[nsIndex].history.push({
-                action: 'Статус изменен',
-                author: 'Менеджер СМК',
-                date: new Date().toISOString(),
-                status: newStatus,
-                comment: commentText
-            });
-            
-            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
-            
-            // Добавление уведомления
-            addNotification(nsList[nsIndex], 'status_change');
-            
-            // Отправка email в зависимости от статуса
-            setTimeout(async () => {
-                if (newStatus === 'in_progress' && assignedTo) {
-                    await sendEmailWithTrigger('ASSIGNMENT', nsList[nsIndex]);
-                } else if (newStatus === 'rework') {
-                    await sendEmailWithTrigger('REWORK', {
-                        ...nsList[nsIndex],
-                        comment: commentText
-                    });
-                } else if (newStatus === 'closed') {
-                    await sendEmailWithTrigger('CLOSED', nsList[nsIndex]);
-                } else if (oldStatus !== newStatus) {
-                    await sendEmailWithTrigger('STATUS_CHANGE', nsList[nsIndex]);
-                }
-            }, 100);
-            
-            // Закрываем модальное окно
-            closeModal();
-            
-            // Обновляем список и статистику
-            loadNSList(currentNSFilter);
-            updateStats();
-            showNotification('Изменения сохранены', 'success');
+            URL.revokeObjectURL(url);
+            showNotification(`Экспортировано ${nsList.length} несоответствий`, 'success');
         }
         
         // ============================================
@@ -2471,19 +1503,16 @@
             let html = '';
             employees.forEach((emp, index) => {
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; background: white; margin-bottom: 8px; border-radius: 8px; transition: all 0.3s;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; margin-bottom: 8px;">
                         <div>
                             <strong>${emp.name}</strong><br>
                             <small>${emp.position}</small>
-                            ${emp.email ? `<br><small style="color: #666;">${emp.email}</small>` : ''}
                         </div>
                         <button onclick="deleteEmployee(${index})" style="
                             background: #dc3545; color: white; border: none; 
                             border-radius: 50%; width: 30px; height: 30px; 
-                            font-size: 16px; cursor: pointer; display: flex; 
-                            align-items: center; justify-content: center;
-                            transition: all 0.3s;
-                        " onmouseover="this.style.transform='scale(1.1)'" onmouseout="this.style.transform='scale(1)'">
+                            font-size: 16px; cursor: pointer;
+                        ">
                             ×
                         </button>
                     </div>
@@ -2516,7 +1545,6 @@
             employees.push({ name, position, email });
             localStorage.setItem('farmstil_employees', JSON.stringify(employees));
             
-            // Очистка полей
             document.getElementById('employeeName').value = '';
             document.getElementById('employeePosition').value = '';
             document.getElementById('employeeEmail').value = '';
@@ -2526,7 +1554,7 @@
         }
         
         function deleteEmployee(index) {
-            if (confirm('Удалить сотрудника из справочника?')) {
+            if (confirm('Удалить сотрудника?')) {
                 const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
                 employees.splice(index, 1);
                 localStorage.setItem('farmstil_employees', JSON.stringify(employees));
@@ -2549,16 +1577,15 @@
             let html = '';
             equipment.forEach((eq, index) => {
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; background: white; margin-bottom: 8px; border-radius: 8px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; margin-bottom: 8px;">
                         <div>
                             <strong>${eq.name}</strong><br>
-                            <small>${eq.code}${eq.location ? ` - ${eq.location}` : ''}</small>
+                            <small>${eq.code}</small>
                         </div>
                         <button onclick="deleteEquipment(${index})" style="
                             background: #dc3545; color: white; border: none; 
                             border-radius: 50%; width: 30px; height: 30px; 
-                            font-size: 16px; cursor: pointer; display: flex; 
-                            align-items: center; justify-content: center;
+                            font-size: 16px; cursor: pointer;
                         ">
                             ×
                         </button>
@@ -2573,8 +1600,7 @@
             const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
             let options = '<option value="">Выберите оборудование</option>';
             equipment.forEach(eq => {
-                const display = eq.location ? `${eq.name} (${eq.code}) - ${eq.location}` : `${eq.name} (${eq.code})`;
-                options += `<option value="${eq.name}|${eq.code}">${display}</option>`;
+                options += `<option value="${eq.name}|${eq.code}">${eq.name} (${eq.code})</option>`;
             });
             return options;
         }
@@ -2582,7 +1608,6 @@
         function addEquipment() {
             const name = document.getElementById('equipmentName').value.trim();
             const code = document.getElementById('equipmentCode').value.trim();
-            const location = document.getElementById('equipmentLocation').value.trim();
             
             if (!name || !code) {
                 showNotification('Заполните наименование и инвентарный номер', 'error');
@@ -2590,20 +1615,18 @@
             }
             
             const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
-            equipment.push({ name, code, location });
+            equipment.push({ name, code });
             localStorage.setItem('farmstil_equipment', JSON.stringify(equipment));
             
-            // Очистка полей
             document.getElementById('equipmentName').value = '';
             document.getElementById('equipmentCode').value = '';
-            document.getElementById('equipmentLocation').value = '';
             
             loadEquipment();
             showNotification('Оборудование добавлено', 'success');
         }
         
         function deleteEquipment(index) {
-            if (confirm('Удалить оборудование из справочника?')) {
+            if (confirm('Удалить оборудование?')) {
                 const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
                 equipment.splice(index, 1);
                 localStorage.setItem('farmstil_equipment', JSON.stringify(equipment));
@@ -2617,255 +1640,19 @@
             if (settings.managerEmail) {
                 document.getElementById('managerEmail').value = settings.managerEmail;
             }
-            if (settings.qualityEmail) {
-                document.getElementById('qualityEmail').value = settings.qualityEmail;
-            }
         }
         
         function saveEmailSettings() {
             const settings = {
-                managerEmail: document.getElementById('managerEmail').value,
-                qualityEmail: document.getElementById('qualityEmail').value
+                managerEmail: document.getElementById('managerEmail').value
             };
             localStorage.setItem('farmstil_email_settings', JSON.stringify(settings));
             showNotification('Настройки email сохранены', 'success');
         }
         
-        async function testEmailConnection() {
-            try {
-                const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
-                const testEmail = settings.managerEmail || 'finkart23@mail.ru';
-                
-                const testData = {
-                    nsNumber: 'ТЕСТ-9999-' + new Date().getFullYear(),
-                    department: 'Тестовое подразделение',
-                    location: 'Тестовое место',
-                    applicant: 'Тестовый заявитель',
-                    description: 'Это тестовое письмо для проверки работы системы email уведомлений ФАРМСТИЛ. Если вы получили это письмо, значит система работает корректно.',
-                    productName: 'Тестовое оборудование',
-                    productCode: 'ТЕСТ-001',
-                    detectionDate: new Date().toISOString(),
-                    created: new Date().toISOString(),
-                    status: 'checking'
-                };
-
-                showNotification('Отправка тестового email...', 'info');
-                
-                const result = await sendEmailWithTrigger('NEW_NS', testData, testEmail);
-                
-                if (result) {
-                    showNotification('Тестовый email успешно отправлен! Проверьте вашу почту.', 'success');
-                } else {
-                    showNotification('Ошибка отправки тестового email', 'error');
-                }
-                
-            } catch (error) {
-                console.error('❌ Ошибка тестового email:', error);
-                showNotification('Ошибка отправки тестового email: ' + error.message, 'error');
-            }
-        }
-        
-        function configureWeb3Forms() {
-            const modalHTML = `
-                <div class="modal-overlay">
-                    <div class="modal-content">
-                        <button class="modal-close" onclick="closeModal()">×</button>
-                        
-                        <h2 style="color: #1e3c72; margin-bottom: 25px;">⚙️ Настройка Web3Forms</h2>
-                        
-                        <div class="info-box">
-                            <h4>Инструкция по настройке:</h4>
-                            <ol style="margin: 15px 0 0 25px;">
-                                <li>Зарегистрируйтесь на <a href="https://web3forms.com" target="_blank">Web3Forms.com</a></li>
-                                <li>Получите ваш <strong>Access Key</strong></li>
-                                <li>В личном кабинете настройте email получателя</li>
-                                <li>Вставьте Access Key в поле ниже</li>
-                                <li>Сохраните настройки</li>
-                            </ol>
-                        </div>
-                        
-                        <div class="form-grid" style="margin-top: 25px;">
-                            <div class="form-group">
-                                <label>Access Key:</label>
-                                <input type="text" id="web3formsKeyInput" value="${WEB3FORMS_ACCESS_KEY}">
-                            </div>
-                            <div class="form-group">
-                                <label>API URL:</label>
-                                <input type="text" id="web3formsApiUrl" value="${WEB3FORMS_API_URL}" readonly>
-                            </div>
-                        </div>
-                        
-                        <div class="info-box" style="margin-top: 20px; background: #d4edda; border-color: #28a745;">
-                            <h4 style="color: #155724;">✅ Текущий ключ настроен</h4>
-                            <p>Ключ: <code>${WEB3FORMS_ACCESS_KEY.substring(0, 8)}...${WEB3FORMS_ACCESS_KEY.substring(WEB3FORMS_ACCESS_KEY.length - 4)}</code></p>
-                            <p>Для изменения ключа обновите код приложения</p>
-                        </div>
-                        
-                        <div class="action-buttons" style="margin-top: 30px;">
-                            <button class="btn btn-primary" onclick="saveWeb3FormsConfig()">
-                                💾 Сохранить настройки
-                            </button>
-                            <button class="btn btn-danger" onclick="closeModal()">
-                                Отмена
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const modalDiv = document.createElement('div');
-            modalDiv.innerHTML = modalHTML;
-            modalDiv.id = 'modalContainer';
-            document.body.appendChild(modalDiv);
-        }
-        
-        function saveWeb3FormsConfig() {
-            showNotification('Для изменения Web3Forms конфигурации необходимо обновить код приложения', 'info');
-        }
-        
-        function showEmailTemplates() {
-            const modalHTML = `
-                <div class="modal-overlay">
-                    <div class="modal-content">
-                        <button class="modal-close" onclick="closeModal()">×</button>
-                        
-                        <h2 style="color: #1e3c72; margin-bottom: 25px;">📧 Шаблоны писем</h2>
-                        
-                        <div class="info-box">
-                            <h4>📋 Доступные шаблоны:</h4>
-                            <div style="margin-top: 15px;">
-                                ${Object.keys(EMAIL_TRIGGERS).map(trigger => `
-                                    <div style="padding: 10px; margin-bottom: 10px; background: white; border-radius: 8px; border-left: 5px solid #1e3c72;">
-                                        <strong>${EMAIL_TRIGGERS[trigger].subject}</strong>
-                                        <div style="font-size: 12px; color: #666;">Тип: ${trigger}</div>
-                                        <button class="btn btn-primary" onclick="previewEmailTemplate('${trigger}')" style="margin-top: 10px; padding: 8px 16px; font-size: 14px;">
-                                            👁️ Просмотреть
-                                        </button>
-                                        <button class="btn btn-success" onclick="testEmailTemplate('${trigger}')" style="margin-top: 10px; padding: 8px 16px; font-size: 14px;">
-                                            🧪 Тестировать
-                                        </button>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                        
-                        <div id="emailTemplatePreview" class="email-template-preview" style="display: none;">
-                            <!-- Preview will be loaded here -->
-                        </div>
-                        
-                        <div class="action-buttons" style="margin-top: 30px;">
-                            <button class="btn btn-danger" onclick="closeModal()">
-                                Закрыть
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const modalDiv = document.createElement('div');
-            modalDiv.innerHTML = modalHTML;
-            modalDiv.id = 'modalContainer';
-            document.body.appendChild(modalDiv);
-        }
-        
-        function previewEmailTemplate(triggerType) {
-            const trigger = EMAIL_TRIGGERS[triggerType];
-            if (!trigger) return;
-            
-            const testData = {
-                nsNumber: 'НС-9999-2024',
-                department: 'Тестовое подразделение',
-                location: 'Тестовое место',
-                applicant: 'Тестовый заявитель',
-                description: 'Это тестовое описание несоответствия для предпросмотра шаблона письма.',
-                productName: 'Тестовое оборудование',
-                productCode: 'ТЕСТ-001',
-                detectionDate: new Date().toISOString(),
-                created: new Date().toISOString(),
-                status: 'checking',
-                assignedTo: triggerType === 'ASSIGNMENT' ? 'Иванов И.И.' : null,
-                comment: triggerType === 'REWORK' ? 'Требуется дополнительная информация по несоответствию.' : null
-            };
-            
-            const emailHTML = generateEmailHTML(trigger.template, testData, triggerType);
-            
-            const previewDiv = document.getElementById('emailTemplatePreview');
-            if (previewDiv) {
-                previewDiv.style.display = 'block';
-                
-                // Создаем iframe для предпросмотра
-                const iframe = document.createElement('iframe');
-                iframe.srcdoc = emailHTML;
-                previewDiv.innerHTML = '';
-                previewDiv.appendChild(iframe);
-                
-                // Прокручиваем к предпросмотру
-                previewDiv.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-        
-        async function testEmailTemplate(triggerType) {
-            const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
-            const testEmail = settings.managerEmail || 'finkart23@mail.ru';
-            
-            const testData = {
-                nsNumber: 'ТЕСТ-9999-2024',
-                department: 'Тестовое подразделение',
-                location: 'Тестовое место',
-                applicant: 'Тестовый заявитель',
-                description: 'Это тестовое письмо для проверки работы шаблона email.',
-                productName: 'Тестовое оборудование',
-                productCode: 'ТЕСТ-001',
-                detectionDate: new Date().toISOString(),
-                created: new Date().toISOString(),
-                status: 'checking',
-                assignedTo: triggerType === 'ASSIGNMENT' ? 'Иванов И.И.' : null,
-                comment: triggerType === 'REWORK' ? 'Требуется дополнительная информация по несоответствию.' : null
-            };
-            
-            showNotification(`Отправка тестового письма (${EMAIL_TRIGGERS[triggerType].subject})...`, 'info');
-            
-            const result = await sendEmailWithTrigger(triggerType, testData, testEmail);
-            
-            if (result) {
-                showNotification(`Тестовое письмо "${EMAIL_TRIGGERS[triggerType].subject}" успешно отправлено!`, 'success');
-            } else {
-                showNotification('Ошибка отправки тестового письма', 'error');
-            }
-        }
-        
         // ============================================
         // УВЕДОМЛЕНИЯ
         // ============================================
-        
-        function addNotification(nsData, type) {
-            const notification = {
-                id: Date.now(),
-                type: type,
-                nsNumber: nsData.nsNumber,
-                department: nsData.department,
-                description: nsData.description ? (nsData.description.substring(0, 80) + '...') : 'Нет описания',
-                time: new Date().toLocaleString(),
-                read: false,
-                status: nsData.status,
-                assignedTo: nsData.assignedTo || null,
-                applicant: nsData.applicant || null
-            };
-            
-            notifications.unshift(notification);
-            
-            // Ограничение на 100 уведомлений
-            if (notifications.length > 100) {
-                notifications.pop();
-            }
-            
-            localStorage.setItem('farmstil_notifications', JSON.stringify(notifications));
-            updateNotificationBadge();
-            
-            if (document.getElementById('notificationsPage').classList.contains('active')) {
-                loadNotifications();
-            }
-        }
         
         function loadNotifications() {
             const container = document.getElementById('notificationsContainer');
@@ -2874,9 +1661,7 @@
             if (notifications.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 60px; color: #666;">
-                        <div style="font-size: 80px; margin-bottom: 20px;">🔔</div>
-                        <h3 style="color: #1e3c72; margin-bottom: 15px;">Уведомлений нет</h3>
-                        <p>Здесь будут появляться уведомления о новых НС и изменениях статусов</p>
+                        <h3 style="color: #1e3c72;">Уведомлений нет</h3>
                     </div>
                 `;
                 return;
@@ -2884,33 +1669,15 @@
             
             let html = '';
             notifications.forEach(notif => {
-                const icon = notif.type === 'new_ns' ? '📝' : '🔄';
-                const statusClass = `status-${notif.status}`;
-                
                 html += `
-                    <div style="
-                        background: ${notif.read ? 'white' : '#e3f2fd'}; 
-                        padding: 20px; border-radius: 10px; margin-bottom: 15px; 
-                        border-left: 5px solid #1e3c72; box-shadow: 0 3px 10px rgba(0,0,0,0.05);
-                        transition: all 0.3s; cursor: pointer;
-                    " onmouseover="this.style.transform='translateX(5px)'" onmouseout="this.style.transform='none'">
-                        <div style="display: flex; justify-content: space-between; align-items: start;">
-                            <div style="flex: 1;">
-                                <div style="font-weight: bold; color: #1e3c72; font-size: 16px; margin-bottom: 8px;">
-                                    ${icon} ${notif.nsNumber}
-                                    <span class="ln-status ${statusClass}" style="font-size: 10px; padding: 3px 8px; margin-left: 10px;">
-                                        ${getStatusText(notif.status)}
-                                    </span>
-                                </div>
-                                <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
-                                    ${notif.department} • ${notif.time}
-                                </div>
-                                <div style="font-size: 14px; margin-top: 10px;">${notif.description}</div>
-                                ${notif.applicant ? `<div style="font-size: 12px; color: #666; margin-top: 8px;"><strong>Заявитель:</strong> ${notif.applicant}</div>` : ''}
-                                ${notif.assignedTo ? `<div style="font-size: 12px; color: #1e3c72; margin-top: 5px;"><strong>Назначено:</strong> ${notif.assignedTo}</div>` : ''}
-                            </div>
-                            ${!notif.read ? '<span style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold;">НОВОЕ</span>' : ''}
+                    <div style="background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; border-left: 5px solid #1e3c72;">
+                        <div style="font-weight: bold; color: #1e3c72; font-size: 16px; margin-bottom: 8px;">
+                            ${notif.nsNumber}
                         </div>
+                        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">
+                            ${notif.department} • ${notif.time}
+                        </div>
+                        <div style="font-size: 14px;">${notif.description}</div>
                     </div>
                 `;
             });
@@ -2932,11 +1699,11 @@
             localStorage.setItem('farmstil_notifications', JSON.stringify(notifications));
             loadNotifications();
             updateNotificationBadge();
-            showNotification('Все уведомления отмечены как прочитанные', 'success');
+            showNotification('Все уведомления прочитаны', 'success');
         }
         
         function clearAllNotifications() {
-            if (confirm('Удалить все уведомления? Это действие нельзя отменить.')) {
+            if (confirm('Удалить все уведомления?')) {
                 notifications = [];
                 localStorage.removeItem('farmstil_notifications');
                 loadNotifications();
@@ -2946,7 +1713,7 @@
         }
         
         // ============================================
-        // СТАТИСТИКА И АДМИНИСТРИРОВАНИЕ
+        // СТАТИСТИКА
         // ============================================
         
         function updateStats() {
@@ -2961,13 +1728,6 @@
             document.getElementById('checkingNS').textContent = checkingNS;
             document.getElementById('inProgressNS').textContent = inProgressNS;
             document.getElementById('closedNS').textContent = closedNS;
-            
-            // Прогресс-бар
-            const progressBar = document.getElementById('progressBar');
-            if (progressBar && totalNS > 0) {
-                const progressPercent = (closedNS / totalNS) * 100;
-                progressBar.style.width = `${progressPercent}%`;
-            }
         }
         
         function updateAdminStats() {
@@ -2978,7 +1738,6 @@
             document.getElementById('totalEmployees').textContent = employees.length;
             document.getElementById('totalEquipment').textContent = equipment.length;
             document.getElementById('totalQRCodes').textContent = qrcodes.length;
-            document.getElementById('totalNotifications').textContent = notifications.length;
         }
         
         function backupData() {
@@ -2987,10 +1746,8 @@
                 qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
                 employees: JSON.parse(localStorage.getItem('farmstil_employees') || '[]'),
                 equipment: JSON.parse(localStorage.getItem('farmstil_equipment') || '[]'),
-                notifications: notifications,
                 settings: JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}'),
-                date: new Date().toISOString(),
-                version: '1.0'
+                date: new Date().toISOString()
             };
             
             const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
@@ -3002,7 +1759,7 @@
             a.click();
             
             URL.revokeObjectURL(url);
-            showNotification('Резервная копия создана и скачана', 'success');
+            showNotification('Резервная копия создана', 'success');
         }
         
         function restoreData() {
@@ -3019,30 +1776,25 @@
                     try {
                         const data = JSON.parse(event.target.result);
                         
-                        if (confirm(`Восстановить ${data.ns?.length || 0} НС, ${data.employees?.length || 0} сотрудников и другие данные?`)) {
+                        if (confirm('Восстановить данные?')) {
                             if (data.ns) localStorage.setItem('farmstil_ns', JSON.stringify(data.ns));
                             if (data.qrcodes) localStorage.setItem('farmstil_qrcodes', JSON.stringify(data.qrcodes));
                             if (data.employees) localStorage.setItem('farmstil_employees', JSON.stringify(data.employees));
                             if (data.equipment) localStorage.setItem('farmstil_equipment', JSON.stringify(data.equipment));
-                            if (data.notifications) {
-                                notifications = data.notifications;
-                                localStorage.setItem('farmstil_notifications', JSON.stringify(notifications));
-                            }
                             if (data.settings) {
                                 localStorage.setItem('farmstil_email_settings', JSON.stringify(data.settings));
                             }
                             
                             loadNSList(currentNSFilter);
                             loadDirectories();
-                            loadNotifications();
                             updateStats();
                             updateAdminStats();
                             
-                            showNotification('Данные успешно восстановлены', 'success');
+                            showNotification('Данные восстановлены', 'success');
                         }
                     } catch (error) {
                         console.error('Ошибка восстановления:', error);
-                        showNotification('Ошибка восстановления данных. Проверьте файл.', 'error');
+                        showNotification('Ошибка восстановления данных', 'error');
                     }
                 };
                 
@@ -3052,127 +1804,8 @@
             input.click();
         }
         
-        function clearOldData() {
-            if (confirm('Удалить НС старше 6 месяцев со статусом "Закрыто"?')) {
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                const sixMonthsAgo = new Date();
-                sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-                
-                const filtered = nsList.filter(ns => {
-                    const nsDate = new Date(ns.created);
-                    return !(nsDate < sixMonthsAgo && ns.status === 'closed');
-                });
-                
-                const removedCount = nsList.length - filtered.length;
-                localStorage.setItem('farmstil_ns', JSON.stringify(filtered));
-                
-                loadNSList(currentNSFilter);
-                updateStats();
-                
-                showNotification(`Удалено ${removedCount} старых закрытых НС`, 'success');
-            }
-        }
-        
-        function exportToCSV() {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            
-            if (nsList.length === 0) {
-                showNotification('Нет данных для экспорта', 'warning');
-                return;
-            }
-            
-            let csv = 'Номер;Дата;Подразделение;Место;Изделие;Статус;Заявитель;Ответственный;Описание\n';
-            
-            nsList.forEach(ns => {
-                const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
-                const status = getStatusText(ns.status);
-                const description = (ns.description || '').replace(/"/g, '""').replace(/;/g, ',');
-                
-                csv += `"${ns.nsNumber}";"${date}";"${ns.department}";"${ns.location || ''}";"${ns.productName || ''}";"${status}";"${ns.applicant}";"${ns.assignedTo || ''}";"${description}"\n`;
-            });
-            
-            const blob = new Blob(["\uFEFF" + csv], {type: 'text/csv;charset=utf-8;'});
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `НС_экспорт_${new Date().toLocaleDateString()}.csv`;
-            a.click();
-            
-            URL.revokeObjectURL(url);
-            showNotification(`Экспортировано ${nsList.length} несоответствий`, 'success');
-        }
-        
-        function showSystemInfo() {
-            const modalHTML = `
-                <div class="modal-overlay">
-                    <div class="modal-content">
-                        <button class="modal-close" onclick="closeModal()">×</button>
-                        
-                        <h2 style="color: #1e3c72; margin-bottom: 25px;">ℹ️ Информация о системе</h2>
-                        
-                        <div class="info-box">
-                            <h4>📊 Статистика системы</h4>
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
-                                <div><strong>Несоответствий:</strong> <span id="infoTotalNS">0</span></div>
-                                <div><strong>Сотрудников:</strong> <span id="infoTotalEmployees">0</span></div>
-                                <div><strong>QR-кодов:</strong> <span id="infoTotalQRCodes">0</span></div>
-                                <div><strong>Оборудования:</strong> <span id="infoTotalEquipment">0</span></div>
-                                <div><strong>Уведомлений:</strong> <span id="infoTotalNotifications">0</span></div>
-                                <div><strong>Версия:</strong> 2.0</div>
-                            </div>
-                        </div>
-                        
-                        <div class="info-box">
-                            <h4>⚙️ Настройки Web3Forms</h4>
-                            <div style="margin-top: 15px;">
-                                <div><strong>Access Key:</strong> <code>${WEB3FORMS_ACCESS_KEY.substring(0, 8)}...${WEB3FORMS_ACCESS_KEY.substring(WEB3FORMS_ACCESS_KEY.length - 4)}</code></div>
-                                <div><strong>API URL:</strong> <code>${WEB3FORMS_API_URL}</code></div>
-                                <div><strong>Лимит:</strong> 250 писем/месяц (бесплатно)</div>
-                                <div><strong>Статус:</strong> Настроено ✅</div>
-                            </div>
-                        </div>
-                        
-                        <div class="info-box">
-                            <h4>💾 Хранилище</h4>
-                            <div style="margin-top: 15px;">
-                                <div>Используется localStorage браузера</div>
-                                <div>Все данные хранятся локально</div>
-                                <div>Рекомендуется регулярно делать резервные копии</div>
-                            </div>
-                        </div>
-                        
-                        <div class="action-buttons" style="margin-top: 30px;">
-                            <button class="btn btn-primary" onclick="closeModal()">
-                                Закрыть
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            const modalDiv = document.createElement('div');
-            modalDiv.innerHTML = modalHTML;
-            modalDiv.id = 'modalContainer';
-            document.body.appendChild(modalDiv);
-            
-            // Обновить статистику в модальном окне
-            setTimeout(() => {
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
-                const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
-                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-                
-                document.getElementById('infoTotalNS').textContent = nsList.length;
-                document.getElementById('infoTotalEmployees').textContent = employees.length;
-                document.getElementById('infoTotalEquipment').textContent = equipment.length;
-                document.getElementById('infoTotalQRCodes').textContent = qrcodes.length;
-                document.getElementById('infoTotalNotifications').textContent = notifications.length;
-            }, 100);
-        }
-        
         // ============================================
-        // ЭКСПОРТ ФУНКЦИЙ В ГЛОБАЛЬНУЮ ОБЛАСТЬ ВИДИМОСТИ
+        // ЭКСПОРТ ФУНКЦИЙ
         // ============================================
         
         window.showPage = showPage;
@@ -3181,39 +1814,23 @@
         window.saveQRAsImage = saveQRAsImage;
         window.testQRCode = testQRCode;
         window.filterNS = filterNS;
-        window.viewNS = viewNS;
-        window.manageNS = manageNS;
-        window.saveNSChanges = saveNSChanges;
+        window.exportToCSV = exportToCSV;
         window.addEmployee = addEmployee;
         window.deleteEmployee = deleteEmployee;
         window.addEquipment = addEquipment;
         window.deleteEquipment = deleteEquipment;
         window.saveEmailSettings = saveEmailSettings;
         window.testEmailConnection = testEmailConnection;
-        window.configureWeb3Forms = configureWeb3Forms;
-        window.saveWeb3FormsConfig = saveWeb3FormsConfig;
-        window.showEmailTemplates = showEmailTemplates;
-        window.previewEmailTemplate = previewEmailTemplate;
-        window.testEmailTemplate = testEmailTemplate;
         window.submitWorkerForm = submitWorkerForm;
         window.fillApplicantData = fillApplicantData;
         window.fillProductData = fillProductData;
         window.handlePhotoUpload = handlePhotoUpload;
         window.removePhoto = removePhoto;
-        window.updateStatusHint = updateStatusHint;
         window.loadNotifications = loadNotifications;
         window.markAllNotificationsAsRead = markAllNotificationsAsRead;
         window.clearAllNotifications = clearAllNotifications;
         window.backupData = backupData;
         window.restoreData = restoreData;
-        window.clearOldData = clearOldData;
-        window.exportToCSV = exportToCSV;
-        window.showSystemInfo = showSystemInfo;
-        window.copyToClipboard = copyToClipboard;
-        window.closeModal = closeModal;
-        window.decodeQRCode = decodeQRCode;
-        window.showAlternativeQRDisplay = showAlternativeQRDisplay;
-        window.showQRPreview = showQRPreview;
     </script>
 </body>
 </html>
