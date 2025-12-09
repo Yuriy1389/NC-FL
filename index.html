@@ -161,6 +161,11 @@
             color: #212529;
         }
         
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+        
         /* ГОЛОСОВОЙ ВВОД */
         .voice-input-buttons {
             display: flex;
@@ -343,6 +348,72 @@
         .status-rework { background: #dc3545; }
         .status-closed { background: #6c757d; }
         
+        /* МОДАЛЬНОЕ ОКНО */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            color: #1e3c72;
+            font-weight: bold;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        /* СТАТУС БАДЖИ */
+        .status-badges {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 15px 0;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+        
+        .status-badge.active {
+            border-color: #1e3c72;
+            font-weight: bold;
+        }
+        
         /* QR-КОДЫ */
         .qr-preview {
             text-align: center;
@@ -432,6 +503,19 @@
 <body>
     <!-- УВЕДОМЛЕНИЯ -->
     <div class="notification" id="notification"></div>
+    
+    <!-- МОДАЛЬНОЕ ОКНО ДЛЯ ИЗМЕНЕНИЯ СТАТУСА -->
+    <div class="modal" id="statusModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">Изменение статуса НС</div>
+                <button class="modal-close" onclick="closeModal()">×</button>
+            </div>
+            <div id="modalContent">
+                <!-- Контент загружается динамически -->
+            </div>
+        </div>
+    </div>
     
     <!-- РЕЖИМ РАБОЧЕГО -->
     <div id="workerMode" style="display: none;">
@@ -636,6 +720,10 @@
                         <div style="font-size: 32px; font-weight: bold; color: #6f42c1;" id="inProgressNS">0</div>
                         <div style="color: #666; font-size: 14px;">В работе</div>
                     </div>
+                    <div class="info-box" style="text-align: center;">
+                        <div style="font-size: 32px; font-weight: bold; color: #28a745;" id="closedNS">0</div>
+                        <div style="color: #666; font-size: 14px;">Закрытые</div>
+                    </div>
                 </div>
                 
                 <div class="voice-input-buttons">
@@ -644,6 +732,9 @@
                     </button>
                     <button class="btn" style="background: #6c757d; color: white;" onclick="restoreData()">
                         🔄 Восстановить
+                    </button>
+                    <button class="btn btn-info" onclick="clearAllData()">
+                        🗑️ Очистить все данные
                     </button>
                 </div>
             </div>
@@ -661,10 +752,10 @@
         // Глобальные переменные
         let currentQRData = null;
         let photos = [];
-        let notifications = JSON.parse(localStorage.getItem('farmstil_notifications')) || [];
         let currentNSFilter = 'all';
         let speechRecognition = null;
         let isListening = false;
+        let currentEditingNS = null;
         
         // ============================================
         // ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ
@@ -676,18 +767,12 @@
             // Инициализация распознавания речи
             initSpeechRecognition();
             
-            // Проверка режима с задержкой для iPhone
-            setTimeout(checkMode, 100);
+            // Проверка режима
+            checkMode();
             
             // Загрузка данных
             loadDirectories();
             updateStats();
-            
-            // Показываем форму рабочего если нужно
-            if (window.location.search.includes('qrcode')) {
-                document.getElementById('adminMode').style.display = 'none';
-                document.getElementById('workerMode').style.display = 'block';
-            }
             
             console.log('✅ Система готова к работе');
         });
@@ -802,53 +887,54 @@
         }
         
         // ============================================
-        // РАБОЧИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ ДЛЯ IPHONE
+        // ПРОВЕРКА РЕЖИМА РАБОТЫ
         // ============================================
         
         function checkMode() {
             const urlParams = new URLSearchParams(window.location.search);
             const qrCode = urlParams.get('qrcode');
             
-            console.log('🔍 Проверка QR-кода:', qrCode);
-            console.log('📱 User Agent:', navigator.userAgent);
-            
             if (qrCode) {
-                // Для iPhone декодируем специально
-                let decodedQR = qrCode;
-                if (navigator.userAgent.includes('iPhone')) {
-                    try {
-                        decodedQR = decodeURIComponent(qrCode);
-                    } catch (e) {
-                        console.log('Ошибка декодирования, используем как есть');
-                    }
-                }
+                // Переключаемся в режим рабочего
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
                 
-                console.log('🔍 Декодированный QR:', decodedQR);
-                
-                // Ищем QR в базе
-                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-                console.log('📋 Все QR в базе:', qrcodes);
-                
-                // Пробуем разные варианты поиска для iPhone
-                const qrData = qrcodes.find(qr => {
-                    // Прямое сравнение
-                    if (qr.code === decodedQR) return true;
-                    // Без регистра
-                    if (qr.code.toLowerCase() === decodedQR.toLowerCase()) return true;
-                    // Частичное совпадение
-                    if (decodedQR.includes(qr.code) || qr.code.includes(decodedQR)) return true;
-                    return false;
-                });
-                
-                if (qrData) {
-                    console.log('✅ Найден QR в базе:', qrData);
-                    showWorkerForm(qrData);
-                } else {
-                    console.log('⚠️ QR не найден в базе, показываем ручную форму');
-                    showWorkerFormManual(decodedQR);
-                }
+                // Обрабатываем QR-код
+                processQRCode(qrCode);
+            } else {
+                // Показываем админский интерфейс
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
             }
         }
+        
+        function processQRCode(qrCode) {
+            console.log('🔍 Обработка QR-кода:', qrCode);
+            
+            // Декодируем URL если нужно
+            let decodedQR = qrCode;
+            try {
+                decodedQR = decodeURIComponent(qrCode);
+            } catch (e) {
+                console.log('Не удалось декодировать QR-код, используем как есть');
+            }
+            
+            // Ищем QR в базе
+            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            const qrData = qrcodes.find(qr => qr.code === decodedQR);
+            
+            if (qrData) {
+                console.log('✅ Найден QR в базе:', qrData);
+                showWorkerForm(qrData);
+            } else {
+                console.log('⚠️ QR не найден в базе, показываем ручную форму');
+                showWorkerFormManual(decodedQR);
+            }
+        }
+        
+        // ============================================
+        // РАБОЧИЙ РЕЖИМ
+        // ============================================
         
         function showWorkerForm(qrData) {
             console.log('📝 Показываем полную форму с данными QR:', qrData);
@@ -934,7 +1020,7 @@
                         <button type="submit" class="btn btn-success" style="flex: 2;">
                             📤 Отправить заявку
                         </button>
-                        <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="flex: 1;">
+                        <button type="button" class="btn btn-danger" onclick="window.location.href = '${window.location.pathname}'" style="flex: 1;">
                             ❌ Отмена
                         </button>
                     </div>
@@ -1044,7 +1130,7 @@
                         <button type="submit" class="btn btn-success" style="flex: 2;">
                             📤 Отправить заявку
                         </button>
-                        <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="flex: 1;">
+                        <button type="button" class="btn btn-danger" onclick="window.location.href = '${window.location.pathname}'" style="flex: 1;">
                             ❌ Отмена
                         </button>
                     </div>
@@ -1207,7 +1293,7 @@
                             </div>
                         </div>
                         
-                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="padding: 14px 28px;">
+                        <button class="btn btn-primary" onclick="window.location.href = '${window.location.pathname}'" style="padding: 14px 28px;">
                             📝 Создать новую заявку
                         </button>
                     </div>
@@ -1312,7 +1398,7 @@
         }
         
         // ============================================
-        // ГЕНЕРАЦИЯ QR-КОДОВ (ИСПРАВЛЕННАЯ ДЛЯ IPHONE)
+        // ГЕНЕРАЦИЯ QR-КОДОВ
         // ============================================
         
         function generateQRCode() {
@@ -1326,7 +1412,7 @@
             }
             
             try {
-                // Генерация простого кода для iPhone
+                // Генерация простого кода
                 const timestamp = Date.now().toString().slice(-6);
                 const random = Math.random().toString(36).substr(2, 4).toUpperCase();
                 const code = `FS-${timestamp}-${random}`;
@@ -1515,7 +1601,7 @@
             
             let html = '<div class="ln-list">';
             
-            filteredNS.forEach(ns => {
+            filteredNS.forEach((ns, index) => {
                 const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
                 const statusText = getStatusText(ns.status);
                 const statusClass = `status-${ns.status}`;
@@ -1533,6 +1619,21 @@
                             <div><strong>👤 Заявитель:</strong> ${ns.applicant || 'Не указан'}</div>
                             <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 13px;">
                                 ${ns.description ? (ns.description.length > 100 ? ns.description.substring(0, 100) + '...' : ns.description) : 'Нет описания'}
+                            </div>
+                            
+                            ${ns.photos && ns.photos.length > 0 ? `
+                                <div style="margin-top: 10px;">
+                                    <strong>📷 Фото:</strong> ${ns.photos.length} шт.
+                                </div>
+                            ` : ''}
+                            
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button class="btn btn-info" onclick="viewNSDetails(${index})" style="flex: 1; padding: 8px; font-size: 13px;">
+                                    👁️ Просмотр
+                                </button>
+                                <button class="btn btn-warning" onclick="changeNSStatus(${index})" style="flex: 1; padding: 8px; font-size: 13px;">
+                                    📝 Изменить статус
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -1557,6 +1658,209 @@
                 'closed': 'ЗАКРЫТО'
             };
             return statuses[status] || status.toUpperCase();
+        }
+        
+        function viewNSDetails(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            if (index < 0 || index >= nsList.length) return;
+            
+            const ns = nsList[index];
+            const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
+            const statusText = getStatusText(ns.status);
+            
+            let photosHTML = '';
+            if (ns.photos && ns.photos.length > 0) {
+                photosHTML = `
+                    <div style="margin-top: 15px;">
+                        <h4>📷 Фотографии (${ns.photos.length}):</h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px;">
+                `;
+                
+                ns.photos.forEach((photo, i) => {
+                    photosHTML += `
+                        <div class="photo-preview">
+                            <img src="${photo.data}" alt="Фото ${i + 1}" onclick="showFullPhoto('${photo.data}')">
+                        </div>
+                    `;
+                });
+                
+                photosHTML += '</div></div>';
+            }
+            
+            const modalContent = `
+                <h3 style="color: #1e3c72; margin-bottom: 20px;">${ns.nsNumber}</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div><strong>Дата обнаружения:</strong><br>${date}</div>
+                    <div><strong>Статус:</strong><br><span class="ln-status status-${ns.status}">${statusText}</span></div>
+                    <div><strong>Подразделение:</strong><br>${ns.department || 'Не указано'}</div>
+                    <div><strong>Место:</strong><br>${ns.location || 'Не указано'}</div>
+                    <div><strong>Заявитель:</strong><br>${ns.applicant || 'Не указан'}</div>
+                    <div><strong>Создано:</strong><br>${new Date(ns.created).toLocaleDateString()}</div>
+                </div>
+                
+                ${ns.productName ? `<div><strong>Оборудование:</strong> ${ns.productName} ${ns.productCode ? '(' + ns.productCode + ')' : ''}</div>` : ''}
+                
+                <div style="margin-top: 15px;">
+                    <h4>📋 Описание:</h4>
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 10px;">
+                        ${ns.description || 'Нет описания'}
+                    </div>
+                </div>
+                
+                ${photosHTML}
+                
+                <div style="margin-top: 25px; text-align: center;">
+                    <button class="btn btn-primary" onclick="closeModal()">
+                        Закрыть
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Детали несоответствия';
+            document.getElementById('modalContent').innerHTML = modalContent;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function changeNSStatus(index) {
+            currentEditingNS = index;
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            if (index < 0 || index >= nsList.length) return;
+            
+            const ns = nsList[index];
+            
+            const modalContent = `
+                <h3 style="color: #1e3c72; margin-bottom: 15px;">${ns.nsNumber}</h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <strong>Текущий статус:</strong> <span class="ln-status status-${ns.status}">${getStatusText(ns.status)}</span>
+                </div>
+                
+                <h4>Выберите новый статус:</h4>
+                
+                <div class="status-badges">
+                    <div class="status-badge ${ns.status === 'checking' ? 'active' : ''}" style="background: #ffc107;" onclick="selectStatus('checking')">
+                        На проверке
+                    </div>
+                    <div class="status-badge ${ns.status === 'in_progress' ? 'active' : ''}" style="background: #6f42c1; color: white;" onclick="selectStatus('in_progress')">
+                        В работе
+                    </div>
+                    <div class="status-badge ${ns.status === 'decision_made' ? 'active' : ''}" style="background: #17a2b8; color: white;" onclick="selectStatus('decision_made')">
+                        Решение принято
+                    </div>
+                    <div class="status-badge ${ns.status === 'rework' ? 'active' : ''}" style="background: #dc3545; color: white;" onclick="selectStatus('rework')">
+                        Доработка
+                    </div>
+                    <div class="status-badge ${ns.status === 'closed' ? 'active' : ''}" style="background: #28a745; color: white;" onclick="selectStatus('closed')">
+                        Закрыто
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <label>Комментарий (необязательно):</label>
+                    <textarea id="statusComment" rows="3" placeholder="Добавьте комментарий к изменению статуса..." style="width: 100%; margin-top: 5px;"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button class="btn btn-success" onclick="saveStatusChange()" style="flex: 2;">
+                        💾 Сохранить изменения
+                    </button>
+                    <button class="btn btn-danger" onclick="closeModal()" style="flex: 1;">
+                        ❌ Отмена
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Изменение статуса';
+            document.getElementById('modalContent').innerHTML = modalContent;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function selectStatus(status) {
+            // Убираем активный класс у всех
+            document.querySelectorAll('.status-badge').forEach(badge => {
+                badge.classList.remove('active');
+            });
+            
+            // Добавляем активный класс выбранному
+            const badges = document.querySelectorAll('.status-badge');
+            const statusMap = {
+                'checking': 0,
+                'in_progress': 1,
+                'decision_made': 2,
+                'rework': 3,
+                'closed': 4
+            };
+            
+            if (statusMap[status] !== undefined) {
+                badges[statusMap[status]].classList.add('active');
+            }
+        }
+        
+        function saveStatusChange() {
+            if (currentEditingNS === null) return;
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            if (currentEditingNS < 0 || currentEditingNS >= nsList.length) return;
+            
+            // Находим выбранный статус
+            let newStatus = 'checking';
+            document.querySelectorAll('.status-badge').forEach((badge, index) => {
+                if (badge.classList.contains('active')) {
+                    const statusMap = ['checking', 'in_progress', 'decision_made', 'rework', 'closed'];
+                    newStatus = statusMap[index];
+                }
+            });
+            
+            // Обновляем статус
+            nsList[currentEditingNS].status = newStatus;
+            
+            // Добавляем комментарий если есть
+            const comment = document.getElementById('statusComment').value;
+            if (comment) {
+                if (!nsList[currentEditingNS].history) {
+                    nsList[currentEditingNS].history = [];
+                }
+                nsList[currentEditingNS].history.push({
+                    date: new Date().toISOString(),
+                    status: newStatus,
+                    comment: comment
+                });
+            }
+            
+            // Сохраняем
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // Обновляем список
+            loadNSList(currentNSFilter);
+            updateStats();
+            
+            // Закрываем модальное окно
+            closeModal();
+            
+            showNotification('Статус успешно изменен', 'success');
+        }
+        
+        function showFullPhoto(photoData) {
+            const modalContent = `
+                <div style="text-align: center;">
+                    <img src="${photoData}" alt="Фото" style="max-width: 100%; max-height: 60vh; border-radius: 10px;">
+                    <div style="margin-top: 20px;">
+                        <button class="btn btn-primary" onclick="closeModal()">
+                            Закрыть
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Просмотр фотографии';
+            document.getElementById('modalContent').innerHTML = modalContent;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function closeModal() {
+            document.getElementById('statusModal').style.display = 'none';
+            currentEditingNS = null;
         }
         
         // ============================================
@@ -1740,10 +2044,12 @@
             const inProgressNS = nsList.filter(ns => ns.status === 'in_progress').length;
             const closedNS = nsList.filter(ns => ns.status === 'closed').length;
             
-            document.getElementById('totalNS').textContent = totalNS;
-            document.getElementById('checkingNS').textContent = checkingNS;
-            document.getElementById('inProgressNS').textContent = inProgressNS;
-            document.getElementById('closedNS').textContent = closedNS;
+            if (document.getElementById('totalNS')) {
+                document.getElementById('totalNS').textContent = totalNS;
+                document.getElementById('checkingNS').textContent = checkingNS;
+                document.getElementById('inProgressNS').textContent = inProgressNS;
+                document.getElementById('closedNS').textContent = closedNS;
+            }
         }
         
         function backupData() {
@@ -1809,6 +2115,22 @@
             input.click();
         }
         
+        function clearAllData() {
+            if (confirm('Вы уверены? Это удалит ВСЕ данные системы!')) {
+                localStorage.removeItem('farmstil_ns');
+                localStorage.removeItem('farmstil_qrcodes');
+                localStorage.removeItem('farmstil_employees');
+                localStorage.removeItem('farmstil_equipment');
+                localStorage.removeItem('farmstil_email_settings');
+                
+                loadNSList('all');
+                loadDirectories();
+                updateStats();
+                
+                showNotification('Все данные очищены', 'success');
+            }
+        }
+        
         // ============================================
         // ЭКСПОРТ ФУНКЦИЙ
         // ============================================
@@ -1820,6 +2142,11 @@
         window.testQRCode = testQRCode;
         window.copyToClipboard = copyToClipboard;
         window.filterNS = filterNS;
+        window.viewNSDetails = viewNSDetails;
+        window.changeNSStatus = changeNSStatus;
+        window.selectStatus = selectStatus;
+        window.saveStatusChange = saveStatusChange;
+        window.closeModal = closeModal;
         window.addEmployee = addEmployee;
         window.deleteEmployee = deleteEmployee;
         window.addEquipment = addEquipment;
@@ -1834,6 +2161,7 @@
         window.startVoiceInput = startVoiceInput;
         window.backupData = backupData;
         window.restoreData = restoreData;
+        window.clearAllData = clearAllData;
     </script>
 </body>
 </html>
