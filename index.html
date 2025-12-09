@@ -756,6 +756,7 @@
         let speechRecognition = null;
         let isListening = false;
         let currentEditingNS = null;
+        let selectedStatus = 'checking'; // По умолчанию
         
         // ============================================
         // ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ
@@ -774,60 +775,103 @@
             loadDirectories();
             updateStats();
             
+            // Инициализация справочников
+            if (!localStorage.getItem('farmstil_employees')) {
+                const defaultEmployees = [
+                    { name: "Иванов И.И.", position: "Мастер цеха" },
+                    { name: "Петров П.П.", position: "Инженер" },
+                    { name: "Сидоров С.С.", position: "Технолог" }
+                ];
+                localStorage.setItem('farmstil_employees', JSON.stringify(defaultEmployees));
+            }
+            
+            if (!localStorage.getItem('farmstil_equipment')) {
+                const defaultEquipment = [
+                    { name: "Станок ЧПУ", code: "СТ-001" },
+                    { name: "Пресс гидравлический", code: "ПГ-002" },
+                    { name: "Сварочный аппарат", code: "СА-003" }
+                ];
+                localStorage.setItem('farmstil_equipment', JSON.stringify(defaultEquipment));
+            }
+            
             console.log('✅ Система готова к работе');
         });
         
         // ============================================
-        // ГОЛОСОВОЙ ВВОД
+        // ГОЛОСОВОЙ ВВОД - ИСПРАВЛЕННЫЙ
         // ============================================
         
         function initSpeechRecognition() {
-            if ('webkitSpeechRecognition' in window) {
+            console.log('🎤 Инициализация распознавания речи...');
+            
+            if ('SpeechRecognition' in window) {
+                speechRecognition = new SpeechRecognition();
+            } else if ('webkitSpeechRecognition' in window) {
                 speechRecognition = new webkitSpeechRecognition();
-                speechRecognition.lang = 'ru-RU';
-                speechRecognition.continuous = false;
-                speechRecognition.interimResults = true;
-                
-                speechRecognition.onstart = function() {
-                    isListening = true;
-                    console.log('🎤 Распознавание речи началось');
-                };
-                
-                speechRecognition.onresult = function(event) {
-                    let finalTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; i++) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        }
-                    }
-                    
-                    if (finalTranscript) {
-                        const descriptionField = document.getElementById('description');
-                        if (descriptionField) {
-                            descriptionField.value = finalTranscript;
-                        }
-                        console.log('✅ Распознано:', finalTranscript);
-                        showNotification('Текст распознан', 'success');
-                    }
-                };
-                
-                speechRecognition.onerror = function(event) {
-                    console.error('❌ Ошибка распознавания:', event.error);
-                    isListening = false;
-                    showNotification('Ошибка распознавания речи', 'error');
-                };
-                
-                speechRecognition.onend = function() {
-                    isListening = false;
-                    console.log('🎤 Распознавание речи завершено');
-                };
-                
             } else {
                 console.warn('⚠️ Браузер не поддерживает распознавание речи');
+                return;
             }
+            
+            speechRecognition.lang = 'ru-RU';
+            speechRecognition.continuous = false;
+            speechRecognition.interimResults = false;
+            
+            speechRecognition.onstart = function() {
+                isListening = true;
+                console.log('🎤 Распознавание речи началось');
+                showNotification('Говорите сейчас...', 'info');
+                
+                // Обновляем текст кнопки
+                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
+                if (voiceBtn) {
+                    voiceBtn.innerHTML = '🛑 Остановить';
+                }
+            };
+            
+            speechRecognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                console.log('✅ Распознано:', transcript);
+                
+                const descriptionField = document.getElementById('description');
+                if (descriptionField) {
+                    // Добавляем к существующему тексту
+                    const currentText = descriptionField.value;
+                    descriptionField.value = currentText + (currentText ? ' ' : '') + transcript;
+                    showNotification('Текст добавлен', 'success');
+                }
+            };
+            
+            speechRecognition.onerror = function(event) {
+                console.error('❌ Ошибка распознавания:', event.error);
+                isListening = false;
+                
+                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
+                if (voiceBtn) {
+                    voiceBtn.innerHTML = '🎤 Голосом';
+                }
+                
+                if (event.error === 'not-allowed') {
+                    showNotification('Разрешите доступ к микрофону', 'error');
+                } else {
+                    showNotification('Ошибка распознавания речи', 'error');
+                }
+            };
+            
+            speechRecognition.onend = function() {
+                console.log('🎤 Распознавание речи завершено');
+                isListening = false;
+                
+                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
+                if (voiceBtn) {
+                    voiceBtn.innerHTML = '🎤 Голосом';
+                }
+            };
         }
         
         function startVoiceInput() {
+            console.log('🎤 Запуск голосового ввода...');
+            
             if (!speechRecognition) {
                 showNotification('Голосовой ввод не поддерживается', 'error');
                 return;
@@ -839,10 +883,9 @@
             } else {
                 try {
                     speechRecognition.start();
-                    showNotification('Говорите сейчас...', 'info');
                 } catch (error) {
                     console.error('Ошибка запуска распознавания:', error);
-                    showNotification('Ошибка доступа к микрофону', 'error');
+                    showNotification('Ошибка доступа к микрофону. Проверьте разрешения.', 'error');
                 }
             }
         }
@@ -894,6 +937,9 @@
             const urlParams = new URLSearchParams(window.location.search);
             const qrCode = urlParams.get('qrcode');
             
+            console.log('🔍 Проверка параметров URL:', window.location.search);
+            console.log('🔍 QR код из URL:', qrCode);
+            
             if (qrCode) {
                 // Переключаемся в режим рабочего
                 document.getElementById('adminMode').style.display = 'none';
@@ -921,7 +967,17 @@
             
             // Ищем QR в базе
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            const qrData = qrcodes.find(qr => qr.code === decodedQR);
+            console.log('📋 QR коды в базе:', qrcodes);
+            
+            // Пробуем найти совпадение
+            let qrData = null;
+            for (const qr of qrcodes) {
+                console.log('Сравниваем:', qr.code, 'с', decodedQR);
+                if (qr.code === decodedQR) {
+                    qrData = qr;
+                    break;
+                }
+            }
             
             if (qrData) {
                 console.log('✅ Найден QR в базе:', qrData);
@@ -933,7 +989,7 @@
         }
         
         // ============================================
-        // РАБОЧИЙ РЕЖИМ
+        // РАБОЧИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ
         // ============================================
         
         function showWorkerForm(qrData) {
@@ -943,18 +999,22 @@
             const equipmentOptions = getEquipmentOptions();
             
             const formHTML = `
-                <form class="worker-form" onsubmit="event.preventDefault(); submitWorkerForm();">
+                <form class="worker-form" id="workerFormElement" onsubmit="event.preventDefault(); submitWorkerForm();">
                     <!-- Информация из QR-кода -->
                     <div class="qr-info-box">
                         <h4 style="color: #0d47a1; margin-top: 0;">📍 Данные из QR-кода:</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>Подразделение:</strong><br>${qrData.department || 'Не указано'}</div>
-                            <div><strong>Место:</strong><br>${qrData.location || 'Не указано'}</div>
+                            <div><strong>Подразделение:</strong><br><span id="qrDeptDisplay">${qrData.department || 'Не указано'}</span></div>
+                            <div><strong>Место:</strong><br><span id="qrLocDisplay">${qrData.location || 'Не указано'}</span></div>
                             ${qrData.responsible ? `<div style="grid-column: 1 / -1;"><strong>Ответственный:</strong> ${qrData.responsible}</div>` : ''}
                         </div>
                     </div>
                     
                     <h3 style="color: #1e3c72; margin-bottom: 15px;">📝 Заполните форму несоответствия</h3>
+                    
+                    <!-- Скрытые поля для QR данных -->
+                    <input type="hidden" id="qrDepartmentValue" value="${qrData.department || ''}">
+                    <input type="hidden" id="qrLocationValue" value="${qrData.location || ''}">
                     
                     <!-- Основные поля -->
                     <div class="form-group">
@@ -998,7 +1058,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <label>📋 Описание несоответствия:</label>
                             <button type="button" class="btn btn-warning" onclick="startVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
-                                🎤 ${isListening ? 'Остановить' : 'Голосом'}
+                                🎤 Голосом
                             </button>
                         </div>
                         <textarea id="description" rows="4" placeholder="Опишите проблему подробно..." required></textarea>
@@ -1020,7 +1080,7 @@
                         <button type="submit" class="btn btn-success" style="flex: 2;">
                             📤 Отправить заявку
                         </button>
-                        <button type="button" class="btn btn-danger" onclick="window.location.href = '${window.location.pathname}'" style="flex: 1;">
+                        <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="flex: 1;">
                             ❌ Отмена
                         </button>
                     </div>
@@ -1035,6 +1095,13 @@
             
             document.getElementById('workerForm').innerHTML = formHTML;
             currentQRData = qrData;
+            
+            // Устанавливаем значения из QR-кода
+            setTimeout(() => {
+                const deptValue = document.getElementById('qrDepartmentValue');
+                const locValue = document.getElementById('qrLocationValue');
+                console.log('QR данные для формы:', deptValue?.value, locValue?.value);
+            }, 100);
         }
         
         function showWorkerFormManual(qrCode) {
@@ -1044,7 +1111,7 @@
             const equipmentOptions = getEquipmentOptions();
             
             const formHTML = `
-                <form class="worker-form" onsubmit="event.preventDefault(); submitWorkerForm();">
+                <form class="worker-form" id="workerFormElement" onsubmit="event.preventDefault(); submitWorkerForm();">
                     <!-- Ручной ввод данных -->
                     <div class="manual-input-box">
                         <h4 style="color: #856404; margin-top: 0;">⚠️ QR-код не распознан</h4>
@@ -1108,7 +1175,7 @@
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <label>📋 Описание несоответствия:</label>
                             <button type="button" class="btn btn-warning" onclick="startVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
-                                🎤 ${isListening ? 'Остановить' : 'Голосом'}
+                                🎤 Голосом
                             </button>
                         </div>
                         <textarea id="description" rows="4" placeholder="Опишите проблему подробно..." required></textarea>
@@ -1130,7 +1197,7 @@
                         <button type="submit" class="btn btn-success" style="flex: 2;">
                             📤 Отправить заявку
                         </button>
-                        <button type="button" class="btn btn-danger" onclick="window.location.href = '${window.location.pathname}'" style="flex: 1;">
+                        <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="flex: 1;">
                             ❌ Отмена
                         </button>
                     </div>
@@ -1232,16 +1299,45 @@
         
         function submitWorkerForm() {
             try {
-                // Получение данных подразделения
+                console.log('📤 Отправка формы рабочего...');
+                
+                // Получение данных подразделения ИСПРАВЛЕННОЕ
                 let department = '';
                 let location = '';
                 
                 if (currentQRData) {
-                    department = currentQRData.department || '';
-                    location = currentQRData.location || '';
+                    // Используем данные из скрытых полей
+                    department = document.getElementById('qrDepartmentValue')?.value || currentQRData.department || '';
+                    location = document.getElementById('qrLocationValue')?.value || currentQRData.location || '';
+                    console.log('Используем данные QR:', { department, location });
                 } else {
+                    // Используем ручной ввод
                     department = document.getElementById('manualDepartment')?.value || '';
                     location = document.getElementById('manualLocation')?.value || '';
+                    console.log('Используем ручной ввод:', { department, location });
+                }
+                
+                // Получаем данные из формы
+                const detectionDate = document.getElementById('detectionDate')?.value || new Date().toISOString().split('T')[0];
+                const applicant = document.getElementById('applicant')?.value || '';
+                const productName = document.getElementById('productName')?.value || '';
+                const productCode = document.getElementById('productCode')?.value || '';
+                const description = document.getElementById('description')?.value || '';
+                
+                // Проверка обязательных полей
+                if (!applicant.trim()) {
+                    showNotification('Введите ФИО заявителя', 'error');
+                    return;
+                }
+                
+                if (!description.trim()) {
+                    showNotification('Введите описание несоответствия', 'error');
+                    return;
+                }
+                
+                if (!department.trim() || !location.trim()) {
+                    showNotification('Заполните данные подразделения и места', 'error');
+                    return;
                 }
                 
                 // Генерация номера НС
@@ -1251,24 +1347,20 @@
                 const nsData = {
                     id: 'ns_' + Date.now(),
                     nsNumber: nsNumber,
-                    detectionDate: document.getElementById('detectionDate').value,
+                    detectionDate: detectionDate,
                     department: department,
                     location: location,
-                    applicant: document.getElementById('applicant').value,
-                    productName: document.getElementById('productName').value,
-                    productCode: document.getElementById('productCode').value,
-                    description: document.getElementById('description').value,
+                    applicant: applicant,
+                    productName: productName,
+                    productCode: productCode,
+                    description: description,
                     photos: photos,
                     status: 'checking',
                     created: new Date().toISOString(),
                     createdFromQR: !!currentQRData
                 };
                 
-                // Проверка обязательных полей
-                if (!nsData.applicant || !nsData.description) {
-                    showNotification('Заполните обязательные поля: ФИО заявителя и описание', 'error');
-                    return;
-                }
+                console.log('Данные НС для сохранения:', nsData);
                 
                 // Сохранение НС
                 const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
@@ -1288,12 +1380,13 @@
                             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: left;">
                                 <div><strong>Номер НС:</strong><br>${nsData.nsNumber}</div>
                                 <div><strong>Статус:</strong><br>На проверке</div>
-                                <div><strong>Дата:</strong><br>${new Date().toLocaleDateString()}</div>
+                                <div><strong>Дата:</strong><br>${new Date(nsData.detectionDate).toLocaleDateString('ru-RU')}</div>
                                 <div><strong>Заявитель:</strong><br>${nsData.applicant}</div>
+                                <div style="grid-column: 1 / -1;"><strong>Подразделение:</strong><br>${nsData.department} - ${nsData.location}</div>
                             </div>
                         </div>
                         
-                        <button class="btn btn-primary" onclick="window.location.href = '${window.location.pathname}'" style="padding: 14px 28px;">
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="padding: 14px 28px;">
                             📝 Создать новую заявку
                         </button>
                     </div>
@@ -1302,19 +1395,23 @@
                 showNotification('Несоответствие успешно отправлено!', 'success');
                 
             } catch (error) {
-                console.error('Ошибка отправки:', error);
-                showNotification('Ошибка отправки заявки. Проверьте заполнение полей.', 'error');
+                console.error('❌ Ошибка отправки:', error);
+                showNotification('Ошибка отправки заявки: ' + error.message, 'error');
             }
         }
         
         // ============================================
-        // EMAIL УВЕДОМЛЕНИЯ
+        // EMAIL УВЕДОМЛЕНИЯ - ИСПРАВЛЕННЫЕ
         // ============================================
         
         async function sendEmailNotification(nsData) {
             try {
+                console.log('📧 Отправка email уведомления...');
+                
                 const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
+                
+                console.log('Получатель:', recipient);
                 
                 const emailData = {
                     access_key: WEB3FORMS_ACCESS_KEY,
@@ -1323,20 +1420,29 @@
                     reply_to: recipient,
                     to: recipient,
                     message: `
-                        Новое несоответствие зарегистрировано в системе ФАРМСТИЛ.
-                        
-                        Номер: ${nsData.nsNumber}
-                        Дата: ${new Date(nsData.detectionDate).toLocaleDateString()}
-                        Подразделение: ${nsData.department}
-                        Место: ${nsData.location}
-                        Заявитель: ${nsData.applicant}
-                        
-                        Описание:
-                        ${nsData.description}
-                        
-                        Для просмотра деталей перейдите в систему ФАРМСТИЛ.
+Новое несоответствие зарегистрировано в системе ФАРМСТИЛ.
+
+Детали:
+• Номер: ${nsData.nsNumber}
+• Дата обнаружения: ${new Date(nsData.detectionDate).toLocaleDateString('ru-RU')}
+• Подразделение: ${nsData.department}
+• Место: ${nsData.location}
+• Заявитель: ${nsData.applicant}
+• Оборудование: ${nsData.productName || 'Не указано'} ${nsData.productCode ? '(' + nsData.productCode + ')' : ''}
+
+Описание:
+${nsData.description}
+
+${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотографий: ${nsData.photos.length}` : ''}
+
+Дата создания: ${new Date(nsData.created).toLocaleString('ru-RU')}
+Статус: На проверке
+
+Для просмотра деталей перейдите в систему ФАРМСТИЛ.
                     `
                 };
+                
+                console.log('Данные для отправки:', emailData);
                 
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
@@ -1347,20 +1453,25 @@
                 });
                 
                 const result = await response.json();
-                console.log('Email отправлен:', result);
+                console.log('Результат отправки email:', result);
                 
                 if (result.success) {
                     showNotification('Email уведомление отправлено менеджеру', 'success');
+                } else {
+                    console.error('Ошибка Web3Forms:', result.message);
+                    showNotification('Email отправлен, но есть ошибка в API', 'warning');
                 }
                 
             } catch (error) {
-                console.error('Ошибка отправки email:', error);
-                // Не показываем ошибку пользователю, чтобы не мешать
+                console.error('❌ Ошибка отправки email:', error);
+                // Не показываем ошибку пользователю, чтобы не мешать процессу
             }
         }
         
         async function testEmailConnection() {
             try {
+                showNotification('Отправка тестового email...', 'info');
+                
                 const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
                 
@@ -1370,10 +1481,8 @@
                     from_name: 'Система ФАРМСТИЛ',
                     reply_to: recipient,
                     to: recipient,
-                    message: 'Это тестовое письмо для проверки работы email уведомлений системы ФАРМСТИЛ. Если вы получили это письмо, значит система работает корректно.'
+                    message: 'Это тестовое письмо для проверки работы email уведомлений системы ФАРМСТИЛ. Если вы получили это письмо, значит система работает корректно.\n\nДата отправки: ' + new Date().toLocaleString('ru-RU')
                 };
-                
-                showNotification('Отправка тестового email...', 'info');
                 
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
@@ -1386,14 +1495,14 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    showNotification('Тестовый email успешно отправлен!', 'success');
+                    showNotification('✅ Тестовый email успешно отправлен!', 'success');
                 } else {
-                    showNotification('Ошибка отправки тестового email', 'error');
+                    showNotification('❌ Ошибка отправки тестового email: ' + (result.message || 'Неизвестная ошибка'), 'error');
                 }
                 
             } catch (error) {
-                console.error('Ошибка тестового email:', error);
-                showNotification('Ошибка отправки тестового email', 'error');
+                console.error('❌ Ошибка тестового email:', error);
+                showNotification('❌ Ошибка отправки тестового email: ' + error.message, 'error');
             }
         }
         
@@ -1419,7 +1528,7 @@
                 
                 // Создаем абсолютный URL для QR-кода
                 const currentUrl = window.location.origin + window.location.pathname;
-                const qrUrl = `${currentUrl}?qrcode=${code}`;
+                const qrUrl = `${currentUrl}?qrcode=${encodeURIComponent(code)}`;
                 
                 console.log('🔗 Создан URL для QR:', qrUrl);
                 
@@ -1469,7 +1578,7 @@
                 document.getElementById('previewDept').textContent = department;
                 document.getElementById('previewLocation').textContent = location;
                 document.getElementById('previewCode').textContent = code;
-                document.getElementById('previewDate').textContent = new Date().toLocaleDateString();
+                document.getElementById('previewDate').textContent = new Date().toLocaleDateString('ru-RU');
                 
                 showNotification('QR-код успешно создан!', 'success');
                 
@@ -1514,7 +1623,7 @@
                         <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
                         <p><strong>Место:</strong> ${currentQRData.location}</p>
                         <p><strong>Код:</strong> ${currentQRData.code}</p>
-                        <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString()}</p>
+                        <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString('ru-RU')}</p>
                     </div>
                     
                     <div style="margin: 20px 0;">
@@ -1602,7 +1711,7 @@
             let html = '<div class="ln-list">';
             
             filteredNS.forEach((ns, index) => {
-                const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
+                const date = new Date(ns.detectionDate || ns.created).toLocaleDateString('ru-RU');
                 const statusText = getStatusText(ns.status);
                 const statusClass = `status-${ns.status}`;
                 
@@ -1616,6 +1725,7 @@
                         <div style="font-size: 14px;">
                             <div><strong>📅 Дата:</strong> ${date}</div>
                             <div><strong>🏭 Подразделение:</strong> ${ns.department || 'Не указано'}</div>
+                            <div><strong>📍 Место:</strong> ${ns.location || 'Не указано'}</div>
                             <div><strong>👤 Заявитель:</strong> ${ns.applicant || 'Не указан'}</div>
                             <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 13px;">
                                 ${ns.description ? (ns.description.length > 100 ? ns.description.substring(0, 100) + '...' : ns.description) : 'Нет описания'}
@@ -1665,7 +1775,7 @@
             if (index < 0 || index >= nsList.length) return;
             
             const ns = nsList[index];
-            const date = new Date(ns.detectionDate || ns.created).toLocaleDateString();
+            const date = new Date(ns.detectionDate || ns.created).toLocaleDateString('ru-RU');
             const statusText = getStatusText(ns.status);
             
             let photosHTML = '';
@@ -1696,7 +1806,7 @@
                     <div><strong>Подразделение:</strong><br>${ns.department || 'Не указано'}</div>
                     <div><strong>Место:</strong><br>${ns.location || 'Не указано'}</div>
                     <div><strong>Заявитель:</strong><br>${ns.applicant || 'Не указан'}</div>
-                    <div><strong>Создано:</strong><br>${new Date(ns.created).toLocaleDateString()}</div>
+                    <div><strong>Создано:</strong><br>${new Date(ns.created).toLocaleDateString('ru-RU')}</div>
                 </div>
                 
                 ${ns.productName ? `<div><strong>Оборудование:</strong> ${ns.productName} ${ns.productCode ? '(' + ns.productCode + ')' : ''}</div>` : ''}
@@ -1728,6 +1838,7 @@
             if (index < 0 || index >= nsList.length) return;
             
             const ns = nsList[index];
+            selectedStatus = ns.status; // Устанавливаем текущий статус
             
             const modalContent = `
                 <h3 style="color: #1e3c72; margin-bottom: 15px;">${ns.nsNumber}</h3>
@@ -1739,19 +1850,19 @@
                 <h4>Выберите новый статус:</h4>
                 
                 <div class="status-badges">
-                    <div class="status-badge ${ns.status === 'checking' ? 'active' : ''}" style="background: #ffc107;" onclick="selectStatus('checking')">
+                    <div class="status-badge ${ns.status === 'checking' ? 'active' : ''}" style="background: #ffc107;" onclick="selectStatus('checking')" data-status="checking">
                         На проверке
                     </div>
-                    <div class="status-badge ${ns.status === 'in_progress' ? 'active' : ''}" style="background: #6f42c1; color: white;" onclick="selectStatus('in_progress')">
+                    <div class="status-badge ${ns.status === 'in_progress' ? 'active' : ''}" style="background: #6f42c1; color: white;" onclick="selectStatus('in_progress')" data-status="in_progress">
                         В работе
                     </div>
-                    <div class="status-badge ${ns.status === 'decision_made' ? 'active' : ''}" style="background: #17a2b8; color: white;" onclick="selectStatus('decision_made')">
+                    <div class="status-badge ${ns.status === 'decision_made' ? 'active' : ''}" style="background: #17a2b8; color: white;" onclick="selectStatus('decision_made')" data-status="decision_made">
                         Решение принято
                     </div>
-                    <div class="status-badge ${ns.status === 'rework' ? 'active' : ''}" style="background: #dc3545; color: white;" onclick="selectStatus('rework')">
+                    <div class="status-badge ${ns.status === 'rework' ? 'active' : ''}" style="background: #dc3545; color: white;" onclick="selectStatus('rework')" data-status="rework">
                         Доработка
                     </div>
-                    <div class="status-badge ${ns.status === 'closed' ? 'active' : ''}" style="background: #28a745; color: white;" onclick="selectStatus('closed')">
+                    <div class="status-badge ${ns.status === 'closed' ? 'active' : ''}" style="background: #28a745; color: white;" onclick="selectStatus('closed')" data-status="closed">
                         Закрыто
                     </div>
                 </div>
@@ -1777,23 +1888,17 @@
         }
         
         function selectStatus(status) {
+            selectedStatus = status;
+            
             // Убираем активный класс у всех
             document.querySelectorAll('.status-badge').forEach(badge => {
                 badge.classList.remove('active');
             });
             
             // Добавляем активный класс выбранному
-            const badges = document.querySelectorAll('.status-badge');
-            const statusMap = {
-                'checking': 0,
-                'in_progress': 1,
-                'decision_made': 2,
-                'rework': 3,
-                'closed': 4
-            };
-            
-            if (statusMap[status] !== undefined) {
-                badges[statusMap[status]].classList.add('active');
+            const selectedBadge = document.querySelector(`.status-badge[data-status="${status}"]`);
+            if (selectedBadge) {
+                selectedBadge.classList.add('active');
             }
         }
         
@@ -1803,30 +1908,24 @@
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             if (currentEditingNS < 0 || currentEditingNS >= nsList.length) return;
             
-            // Находим выбранный статус
-            let newStatus = 'checking';
-            document.querySelectorAll('.status-badge').forEach((badge, index) => {
-                if (badge.classList.contains('active')) {
-                    const statusMap = ['checking', 'in_progress', 'decision_made', 'rework', 'closed'];
-                    newStatus = statusMap[index];
-                }
-            });
-            
             // Обновляем статус
-            nsList[currentEditingNS].status = newStatus;
+            nsList[currentEditingNS].status = selectedStatus;
             
             // Добавляем комментарий если есть
-            const comment = document.getElementById('statusComment').value;
-            if (comment) {
+            const comment = document.getElementById('statusComment')?.value;
+            if (comment && comment.trim()) {
                 if (!nsList[currentEditingNS].history) {
                     nsList[currentEditingNS].history = [];
                 }
                 nsList[currentEditingNS].history.push({
                     date: new Date().toISOString(),
-                    status: newStatus,
-                    comment: comment
+                    status: selectedStatus,
+                    comment: comment.trim()
                 });
             }
+            
+            // Добавляем дату изменения
+            nsList[currentEditingNS].statusChanged = new Date().toISOString();
             
             // Сохраняем
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
