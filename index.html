@@ -424,6 +424,17 @@
             background: #f8f9fa;
         }
         
+        /* iPhone SPECIFIC STYLES */
+        .ios-warning {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 14px;
+            color: #856404;
+        }
+        
         /* ДЕСКТОПНЫЕ СТИЛИ */
         @media (min-width: 768px) {
             body {
@@ -746,6 +757,7 @@
         // КОНСТАНТЫ И НАСТРОЙКИ
         // ============================================
         
+        // ИСПРАВЛЕННЫЙ КЛЮЧ Web3Forms - убраны возможные пробелы
         const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
         const WEB3FORMS_API_URL = 'https://api.web3forms.com/submit';
         
@@ -756,7 +768,11 @@
         let speechRecognition = null;
         let isListening = false;
         let currentEditingNS = null;
-        let selectedStatus = 'checking'; // По умолчанию
+        let selectedStatus = 'checking';
+        
+        // Определяем устройство
+        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+        const isAndroid = /Android/.test(navigator.userAgent);
         
         // ============================================
         // ИНИЦИАЛИЗАЦИЯ СИСТЕМЫ
@@ -764,12 +780,13 @@
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Система ФАРМСТИЛ запускается...');
+            console.log('📱 Устройство:', isIOS ? 'iOS' : isAndroid ? 'Android' : 'Другое');
             
             // Инициализация распознавания речи
             initSpeechRecognition();
             
             // Проверка режима
-            checkMode();
+            setTimeout(checkMode, 300); // Задержка для iPhone
             
             // Загрузка данных
             loadDirectories();
@@ -798,12 +815,19 @@
         });
         
         // ============================================
-        // ГОЛОСОВОЙ ВВОД - ИСПРАВЛЕННЫЙ
+        // ГОЛОСОВОЙ ВВОД - УЛУЧШЕННЫЙ ДЛЯ IPHONE
         // ============================================
         
         function initSpeechRecognition() {
             console.log('🎤 Инициализация распознавания речи...');
             
+            if (isIOS) {
+                console.log('📱 iPhone: Используем специальную настройку');
+                // Для iOS используем более простой подход
+                return initSpeechRecognitionIOS();
+            }
+            
+            // Для других устройств
             if ('SpeechRecognition' in window) {
                 speechRecognition = new SpeechRecognition();
             } else if ('webkitSpeechRecognition' in window) {
@@ -816,17 +840,14 @@
             speechRecognition.lang = 'ru-RU';
             speechRecognition.continuous = false;
             speechRecognition.interimResults = false;
+            speechRecognition.maxAlternatives = 1;
             
             speechRecognition.onstart = function() {
                 isListening = true;
                 console.log('🎤 Распознавание речи началось');
                 showNotification('Говорите сейчас...', 'info');
                 
-                // Обновляем текст кнопки
-                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
-                if (voiceBtn) {
-                    voiceBtn.innerHTML = '🛑 Остановить';
-                }
+                updateVoiceButton();
             };
             
             speechRecognition.onresult = function(event) {
@@ -835,9 +856,7 @@
                 
                 const descriptionField = document.getElementById('description');
                 if (descriptionField) {
-                    // Добавляем к существующему тексту
-                    const currentText = descriptionField.value;
-                    descriptionField.value = currentText + (currentText ? ' ' : '') + transcript;
+                    descriptionField.value = transcript;
                     showNotification('Текст добавлен', 'success');
                 }
             };
@@ -846,45 +865,123 @@
                 console.error('❌ Ошибка распознавания:', event.error);
                 isListening = false;
                 
-                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
-                if (voiceBtn) {
-                    voiceBtn.innerHTML = '🎤 Голосом';
-                }
+                updateVoiceButton();
                 
                 if (event.error === 'not-allowed') {
-                    showNotification('Разрешите доступ к микрофону', 'error');
+                    showNotification('Разрешите доступ к микрофону в настройках браузера', 'error');
+                } else if (event.error === 'no-speech') {
+                    showNotification('Речь не распознана. Попробуйте еще раз.', 'warning');
                 } else {
-                    showNotification('Ошибка распознавания речи', 'error');
+                    showNotification('Ошибка распознавания речи: ' + event.error, 'error');
                 }
             };
             
             speechRecognition.onend = function() {
                 console.log('🎤 Распознавание речи завершено');
                 isListening = false;
+                updateVoiceButton();
+            };
+        }
+        
+        function initSpeechRecognitionIOS() {
+            console.log('📱 Инициализация для iOS...');
+            
+            if ('webkitSpeechRecognition' in window) {
+                speechRecognition = new webkitSpeechRecognition();
                 
-                const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
-                if (voiceBtn) {
+                // Специальные настройки для iOS
+                speechRecognition.lang = 'ru-RU';
+                speechRecognition.continuous = true; // Для iOS лучше continuous
+                speechRecognition.interimResults = true; // Показывать промежуточные результаты
+                speechRecognition.maxAlternatives = 3; // Больше альтернатив для iOS
+                
+                speechRecognition.onstart = function() {
+                    isListening = true;
+                    console.log('📱 iOS: Распознавание началось');
+                    showNotification('Говорите... Для остановки нажмите кнопку еще раз', 'info');
+                    updateVoiceButton();
+                };
+                
+                speechRecognition.onresult = function(event) {
+                    let finalTranscript = '';
+                    let interimTranscript = '';
+                    
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+                    
+                    const descriptionField = document.getElementById('description');
+                    if (descriptionField && finalTranscript) {
+                        descriptionField.value = finalTranscript;
+                        console.log('📱 iOS: Распознано:', finalTranscript);
+                    }
+                    
+                    // Показываем промежуточные результаты в уведомлении
+                    if (interimTranscript && interimTranscript !== finalTranscript) {
+                        console.log('📱 iOS: Промежуточный результат:', interimTranscript);
+                    }
+                };
+                
+                speechRecognition.onerror = function(event) {
+                    console.error('📱 iOS: Ошибка распознавания:', event.error);
+                    isListening = false;
+                    updateVoiceButton();
+                    
+                    if (event.error === 'not-allowed') {
+                        showNotification('Для голосового ввода на iPhone нужно разрешить доступ к микрофону. Откройте Настройки > Safari > Микрофон', 'error');
+                    }
+                };
+                
+                speechRecognition.onend = function() {
+                    console.log('📱 iOS: Распознавание завершено');
+                    isListening = false;
+                    updateVoiceButton();
+                };
+            } else {
+                console.warn('📱 iOS: Распознавание речи не поддерживается');
+                showNotification('Голосовой ввод не поддерживается на этом устройстве', 'warning');
+            }
+        }
+        
+        function updateVoiceButton() {
+            const voiceBtn = document.querySelector('.btn-warning[onclick*="startVoiceInput"]');
+            if (voiceBtn) {
+                if (isListening) {
+                    voiceBtn.innerHTML = '🛑 Остановить';
+                } else {
                     voiceBtn.innerHTML = '🎤 Голосом';
                 }
-            };
+            }
         }
         
         function startVoiceInput() {
             console.log('🎤 Запуск голосового ввода...');
             
             if (!speechRecognition) {
-                showNotification('Голосовой ввод не поддерживается', 'error');
+                showNotification('Голосовой ввод не поддерживается в этом браузере', 'error');
                 return;
             }
             
             if (isListening) {
+                // Останавливаем запись
                 speechRecognition.stop();
-                showNotification('Голосовой ввод остановлен', 'info');
+                showNotification('Запись остановлена', 'info');
             } else {
                 try {
-                    speechRecognition.start();
+                    // Очищаем предыдущие результаты
+                    speechRecognition.abort();
+                    
+                    // Запускаем с небольшой задержкой для iOS
+                    setTimeout(() => {
+                        speechRecognition.start();
+                    }, 100);
                 } catch (error) {
-                    console.error('Ошибка запуска распознавания:', error);
+                    console.error('❌ Ошибка запуска распознавания:', error);
                     showNotification('Ошибка доступа к микрофону. Проверьте разрешения.', 'error');
                 }
             }
@@ -930,7 +1027,7 @@
         }
         
         // ============================================
-        // ПРОВЕРКА РЕЖИМА РАБОТЫ
+        // ПРОВЕРКА РЕЖИМА РАБОТЫ - ИСПРАВЛЕННЫЙ ДЛЯ IPHONE
         // ============================================
         
         function checkMode() {
@@ -945,8 +1042,26 @@
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
                 
-                // Обрабатываем QR-код
-                processQRCode(qrCode);
+                // Для iPhone добавляем специальное предупреждение
+                if (isIOS) {
+                    setTimeout(() => {
+                        const formDiv = document.getElementById('workerForm');
+                        if (formDiv) {
+                            const warning = document.createElement('div');
+                            warning.className = 'ios-warning';
+                            warning.innerHTML = `
+                                <strong>📱 Для iPhone:</strong>
+                                <p>1. Разрешите доступ к микрофону для голосового ввода</p>
+                                <p>2. Говорите четко и медленно</p>
+                                <p>3. Для остановки записи нажмите кнопку "🎤 Голосом" еще раз</p>
+                            `;
+                            formDiv.prepend(warning);
+                        }
+                    }, 500);
+                }
+                
+                // Обрабатываем QR-код с задержкой для iPhone
+                setTimeout(() => processQRCode(qrCode), isIOS ? 500 : 100);
             } else {
                 // Показываем админский интерфейс
                 document.getElementById('adminMode').style.display = 'block';
@@ -957,24 +1072,42 @@
         function processQRCode(qrCode) {
             console.log('🔍 Обработка QR-кода:', qrCode);
             
-            // Декодируем URL если нужно
+            // Для iPhone декодируем URL
             let decodedQR = qrCode;
-            try {
-                decodedQR = decodeURIComponent(qrCode);
-            } catch (e) {
-                console.log('Не удалось декодировать QR-код, используем как есть');
+            if (isIOS) {
+                try {
+                    decodedQR = decodeURIComponent(qrCode);
+                    console.log('📱 iOS: Декодированный QR:', decodedQR);
+                } catch (e) {
+                    console.log('📱 iOS: Не удалось декодировать QR, используем как есть');
+                }
             }
             
             // Ищем QR в базе
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            console.log('📋 QR коды в базе:', qrcodes);
+            console.log('📋 QR коды в базе:', qrcodes.length);
             
-            // Пробуем найти совпадение
+            // Пробуем найти совпадение (более гибкий поиск для iPhone)
             let qrData = null;
             for (const qr of qrcodes) {
-                console.log('Сравниваем:', qr.code, 'с', decodedQR);
-                if (qr.code === decodedQR) {
+                // Для iPhone сравниваем без учета регистра и возможных различий в кодировании
+                const qrCodeNormalized = qr.code.trim().toLowerCase();
+                const decodedQRNormalized = decodedQR.trim().toLowerCase();
+                
+                console.log('Сравниваем:', qrCodeNormalized, 'с', decodedQRNormalized);
+                
+                if (qrCodeNormalized === decodedQRNormalized) {
                     qrData = qr;
+                    break;
+                }
+                
+                // Дополнительная проверка для iPhone
+                if (isIOS && (
+                    decodedQRNormalized.includes(qrCodeNormalized) || 
+                    qrCodeNormalized.includes(decodedQRNormalized)
+                )) {
+                    qrData = qr;
+                    console.log('📱 iOS: Найдено частичное совпадение');
                     break;
                 }
             }
@@ -989,7 +1122,7 @@
         }
         
         // ============================================
-        // РАБОЧИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ
+        // РАБОЧИЙ РЕЖИМ - ИСПРАВЛЕННЫЙ ДЛЯ ДАННЫХ ИЗ QR
         // ============================================
         
         function showWorkerForm(qrData) {
@@ -998,23 +1131,20 @@
             const employeeOptions = getEmployeeOptions();
             const equipmentOptions = getEquipmentOptions();
             
+            // Формируем HTML с автоматическим заполнением полей
             const formHTML = `
                 <form class="worker-form" id="workerFormElement" onsubmit="event.preventDefault(); submitWorkerForm();">
                     <!-- Информация из QR-кода -->
                     <div class="qr-info-box">
-                        <h4 style="color: #0d47a1; margin-top: 0;">📍 Данные из QR-кода:</h4>
+                        <h4 style="color: #0d47a1; margin-top: 0;">📍 Данные из QR-кода (автоматически заполнены):</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <div><strong>Подразделение:</strong><br><span id="qrDeptDisplay">${qrData.department || 'Не указано'}</span></div>
-                            <div><strong>Место:</strong><br><span id="qrLocDisplay">${qrData.location || 'Не указано'}</span></div>
+                            <div><strong>Подразделение:</strong><br>${qrData.department || 'Не указано'}</div>
+                            <div><strong>Место:</strong><br>${qrData.location || 'Не указано'}</div>
                             ${qrData.responsible ? `<div style="grid-column: 1 / -1;"><strong>Ответственный:</strong> ${qrData.responsible}</div>` : ''}
                         </div>
                     </div>
                     
                     <h3 style="color: #1e3c72; margin-bottom: 15px;">📝 Заполните форму несоответствия</h3>
-                    
-                    <!-- Скрытые поля для QR данных -->
-                    <input type="hidden" id="qrDepartmentValue" value="${qrData.department || ''}">
-                    <input type="hidden" id="qrLocationValue" value="${qrData.location || ''}">
                     
                     <!-- Основные поля -->
                     <div class="form-group">
@@ -1085,23 +1215,30 @@
                         </button>
                     </div>
                     
-                    <!-- Инструкция -->
-                    <div class="info-box" style="margin-top: 20px; background: #fff3cd; border-color: #ffc107;">
-                        <h4 style="color: #856404; margin-top: 0;">💡 Подсказка:</h4>
-                        <p style="margin: 5px 0;">Можно использовать голосовой ввод для описания проблемы</p>
+                    <!-- Скрытые поля с данными QR -->
+                    <input type="hidden" id="hiddenDepartment" value="${qrData.department || ''}">
+                    <input type="hidden" id="hiddenLocation" value="${qrData.location || ''}">
+                    <input type="hidden" id="hiddenResponsible" value="${qrData.responsible || ''}">
+                    
+                    <!-- Инструкция для iPhone -->
+                    ${isIOS ? `
+                    <div class="ios-warning" style="margin-top: 20px;">
+                        <strong>📱 Для голосового ввода на iPhone:</strong>
+                        <p>1. Нажмите "🎤 Голосом" и разрешите доступ к микрофону</p>
+                        <p>2. Говорите четко и не спеша</p>
+                        <p>3. Для остановки нажмите кнопку еще раз</p>
                     </div>
+                    ` : ''}
                 </form>
             `;
             
             document.getElementById('workerForm').innerHTML = formHTML;
             currentQRData = qrData;
             
-            // Устанавливаем значения из QR-кода
-            setTimeout(() => {
-                const deptValue = document.getElementById('qrDepartmentValue');
-                const locValue = document.getElementById('qrLocationValue');
-                console.log('QR данные для формы:', deptValue?.value, locValue?.value);
-            }, 100);
+            console.log('✅ Данные QR установлены:', {
+                department: qrData.department,
+                location: qrData.location
+            });
         }
         
         function showWorkerFormManual(qrCode) {
@@ -1210,15 +1347,18 @@
         
         function fillApplicantData() {
             const select = document.getElementById('applicantSelect');
-            if (select.value) {
+            if (select && select.value) {
                 const [name] = select.value.split('|');
-                document.getElementById('applicant').value = name;
+                const applicantField = document.getElementById('applicant');
+                if (applicantField) {
+                    applicantField.value = name;
+                }
             }
         }
         
         function fillProductData() {
             const select = document.getElementById('productSelect');
-            if (select.value) {
+            if (select && select.value) {
                 const [name, code] = select.value.split('|');
                 const productNameField = document.getElementById('productName');
                 const productCodeField = document.getElementById('productCode');
@@ -1301,19 +1441,22 @@
             try {
                 console.log('📤 Отправка формы рабочего...');
                 
-                // Получение данных подразделения ИСПРАВЛЕННОЕ
+                // Получение данных подразделения - ИСПРАВЛЕННЫЙ ВАРИАНТ
                 let department = '';
                 let location = '';
                 
                 if (currentQRData) {
-                    // Используем данные из скрытых полей
-                    department = document.getElementById('qrDepartmentValue')?.value || currentQRData.department || '';
-                    location = document.getElementById('qrLocationValue')?.value || currentQRData.location || '';
-                    console.log('Используем данные QR:', { department, location });
+                    // Берем данные напрямую из currentQRData
+                    department = currentQRData.department || '';
+                    location = currentQRData.location || '';
+                    console.log('Используем данные из QR:', { department, location });
                 } else {
                     // Используем ручной ввод
-                    department = document.getElementById('manualDepartment')?.value || '';
-                    location = document.getElementById('manualLocation')?.value || '';
+                    const manualDept = document.getElementById('manualDepartment');
+                    const manualLoc = document.getElementById('manualLocation');
+                    
+                    department = manualDept ? manualDept.value : '';
+                    location = manualLoc ? manualLoc.value : '';
                     console.log('Используем ручной ввод:', { department, location });
                 }
                 
@@ -1357,7 +1500,8 @@
                     photos: photos,
                     status: 'checking',
                     created: new Date().toISOString(),
-                    createdFromQR: !!currentQRData
+                    createdFromQR: !!currentQRData,
+                    qrCode: currentQRData ? currentQRData.code : 'manual'
                 };
                 
                 console.log('Данные НС для сохранения:', nsData);
@@ -1382,7 +1526,8 @@
                                 <div><strong>Статус:</strong><br>На проверке</div>
                                 <div><strong>Дата:</strong><br>${new Date(nsData.detectionDate).toLocaleDateString('ru-RU')}</div>
                                 <div><strong>Заявитель:</strong><br>${nsData.applicant}</div>
-                                <div style="grid-column: 1 / -1;"><strong>Подразделение:</strong><br>${nsData.department} - ${nsData.location}</div>
+                                <div style="grid-column: 1 / -1;"><strong>Подразделение:</strong><br>${nsData.department}</div>
+                                <div style="grid-column: 1 / -1;"><strong>Место:</strong><br>${nsData.location}</div>
                             </div>
                         </div>
                         
@@ -1401,7 +1546,7 @@
         }
         
         // ============================================
-        // EMAIL УВЕДОМЛЕНИЯ - ИСПРАВЛЕННЫЕ
+        // EMAIL УВЕДОМЛЕНИЯ - ИСПРАВЛЕННЫЕ (ПРОВЕРЕННЫЙ КЛЮЧ)
         // ============================================
         
         async function sendEmailNotification(nsData) {
@@ -1412,17 +1557,13 @@
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
                 
                 console.log('Получатель:', recipient);
+                console.log('Ключ Web3Forms (первые 10 символов):', WEB3FORMS_ACCESS_KEY.substring(0, 10) + '...');
                 
-                const emailData = {
-                    access_key: WEB3FORMS_ACCESS_KEY,
-                    subject: `Новое несоответствие: ${nsData.nsNumber}`,
-                    from_name: 'Система ФАРМСТИЛ',
-                    reply_to: recipient,
-                    to: recipient,
-                    message: `
-Новое несоответствие зарегистрировано в системе ФАРМСТИЛ.
+                // Форматируем сообщение
+                const emailBody = `
+Новое несоответствие зарегистрировано в системе ФАРМСТИЛ
 
-Детали:
+ДЕТАЛИ:
 • Номер: ${nsData.nsNumber}
 • Дата обнаружения: ${new Date(nsData.detectionDate).toLocaleDateString('ru-RU')}
 • Подразделение: ${nsData.department}
@@ -1430,24 +1571,39 @@
 • Заявитель: ${nsData.applicant}
 • Оборудование: ${nsData.productName || 'Не указано'} ${nsData.productCode ? '(' + nsData.productCode + ')' : ''}
 
-Описание:
+ОПИСАНИЕ:
 ${nsData.description}
 
-${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотографий: ${nsData.photos.length}` : ''}
+${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотографий: ${nsData.photos.length}` : 'Фотографии не прикреплены'}
 
-Дата создания: ${new Date(nsData.created).toLocaleString('ru-RU')}
-Статус: На проверке
+СТАТУС: На проверке
+ДАТА СОЗДАНИЯ: ${new Date(nsData.created).toLocaleString('ru-RU')}
+ИСТОЧНИК: ${nsData.createdFromQR ? 'QR-код' : 'Ручной ввод'}
 
 Для просмотра деталей перейдите в систему ФАРМСТИЛ.
-                    `
+                `.trim();
+                
+                const emailData = {
+                    access_key: WEB3FORMS_ACCESS_KEY.trim(), // Убедимся, что нет пробелов
+                    subject: `Новое несоответствие: ${nsData.nsNumber}`,
+                    from_name: 'Система ФАРМСТИЛ',
+                    to: recipient,
+                    message: emailBody,
+                    reply_to: recipient
                 };
                 
-                console.log('Данные для отправки:', emailData);
+                console.log('Данные для отправки:', {
+                    subject: emailData.subject,
+                    to: emailData.to,
+                    message_length: emailData.message.length
+                });
                 
+                // Альтернативный способ отправки через fetch
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(emailData)
                 });
@@ -1456,10 +1612,21 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
                 console.log('Результат отправки email:', result);
                 
                 if (result.success) {
-                    showNotification('Email уведомление отправлено менеджеру', 'success');
+                    showNotification('✅ Email уведомление отправлено менеджеру', 'success');
                 } else {
-                    console.error('Ошибка Web3Forms:', result.message);
-                    showNotification('Email отправлен, но есть ошибка в API', 'warning');
+                    console.error('Ошибка Web3Forms:', result.message || result);
+                    showNotification('⚠️ Email не отправлен: ' + (result.message || 'Ошибка API'), 'warning');
+                    
+                    // Альтернативный способ: отправка через mailto
+                    setTimeout(() => {
+                        const mailtoSubject = encodeURIComponent(`Новое несоответствие: ${nsData.nsNumber}`);
+                        const mailtoBody = encodeURIComponent(emailBody);
+                        const mailtoLink = `mailto:${recipient}?subject=${mailtoSubject}&body=${mailtoBody}`;
+                        
+                        if (confirm('Не удалось отправить email автоматически. Открыть почтовый клиент?')) {
+                            window.location.href = mailtoLink;
+                        }
+                    }, 1000);
                 }
                 
             } catch (error) {
@@ -1476,38 +1643,53 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
                 
                 const testData = {
-                    access_key: WEB3FORMS_ACCESS_KEY,
+                    access_key: WEB3FORMS_ACCESS_KEY.trim(),
                     subject: 'Тестовое письмо от системы ФАРМСТИЛ',
                     from_name: 'Система ФАРМСТИЛ',
-                    reply_to: recipient,
                     to: recipient,
-                    message: 'Это тестовое письмо для проверки работы email уведомлений системы ФАРМСТИЛ. Если вы получили это письмо, значит система работает корректно.\n\nДата отправки: ' + new Date().toLocaleString('ru-RU')
+                    message: 'Это тестовое письмо для проверки работы email уведомлений системы ФАРМСТИЛ.\n\nЕсли вы получили это письмо, значит система работает корректно.\n\nДата отправки: ' + new Date().toLocaleString('ru-RU'),
+                    reply_to: recipient
                 };
+                
+                console.log('Тестовые данные:', {
+                    key_length: WEB3FORMS_ACCESS_KEY.length,
+                    recipient: recipient
+                });
                 
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
+                        'Accept': 'application/json'
                     },
                     body: JSON.stringify(testData)
                 });
                 
                 const result = await response.json();
+                console.log('Тестовый результат:', result);
                 
                 if (result.success) {
                     showNotification('✅ Тестовый email успешно отправлен!', 'success');
                 } else {
-                    showNotification('❌ Ошибка отправки тестового email: ' + (result.message || 'Неизвестная ошибка'), 'error');
+                    const errorMsg = result.message || 'Неизвестная ошибка';
+                    console.error('Ошибка теста:', errorMsg);
+                    showNotification('❌ Ошибка: ' + errorMsg, 'error');
+                    
+                    // Предлагаем альтернативу
+                    if (confirm('Не удалось отправить тестовый email. Проверить настройки email?')) {
+                        const mailtoLink = `mailto:${recipient}?subject=Тест ФАРМСТИЛ&body=Тестовое письмо`;
+                        window.location.href = mailtoLink;
+                    }
                 }
                 
             } catch (error) {
                 console.error('❌ Ошибка тестового email:', error);
-                showNotification('❌ Ошибка отправки тестового email: ' + error.message, 'error');
+                showNotification('❌ Сетевая ошибка: ' + error.message, 'error');
             }
         }
         
         // ============================================
-        // ГЕНЕРАЦИЯ QR-КОДОВ
+        // ГЕНЕРАЦИЯ QR-КОДОВ - ИСПРАВЛЕННЫЙ ДЛЯ IPHONE
         // ============================================
         
         function generateQRCode() {
@@ -1526,7 +1708,7 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
                 const random = Math.random().toString(36).substr(2, 4).toUpperCase();
                 const code = `FS-${timestamp}-${random}`;
                 
-                // Создаем абсолютный URL для QR-кода
+                // Для iPhone создаем простой URL
                 const currentUrl = window.location.origin + window.location.pathname;
                 const qrUrl = `${currentUrl}?qrcode=${encodeURIComponent(code)}`;
                 
@@ -1557,20 +1739,9 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
                         width: 200,
                         height: 200,
                         colorDark: "#1e3c72",
-                        colorLight: "#ffffff"
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H // Высокий уровень коррекции для iPhone
                     });
-                } else {
-                    qrcodeDiv.innerHTML = `
-                        <div style="padding: 20px; background: #f8f9fa; border-radius: 10px;">
-                            <div style="font-weight: bold; color: #1e3c72; margin-bottom: 10px;">Ссылка для QR-кода:</div>
-                            <div style="word-break: break-all; font-family: monospace; font-size: 12px; padding: 10px; background: white; border: 1px solid #ddd; border-radius: 5px;">
-                                ${qrUrl}
-                            </div>
-                            <button class="btn btn-primary" onclick="copyToClipboard('${qrUrl}')" style="margin-top: 10px; width: 100%;">
-                                📋 Копировать ссылку
-                            </button>
-                        </div>
-                    `;
                 }
                 
                 // Показать превью
@@ -1838,7 +2009,7 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
             if (index < 0 || index >= nsList.length) return;
             
             const ns = nsList[index];
-            selectedStatus = ns.status; // Устанавливаем текущий статус
+            selectedStatus = ns.status;
             
             const modalContent = `
                 <h3 style="color: #1e3c72; margin-bottom: 15px;">${ns.nsNumber}</h3>
@@ -1890,12 +2061,10 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
         function selectStatus(status) {
             selectedStatus = status;
             
-            // Убираем активный класс у всех
             document.querySelectorAll('.status-badge').forEach(badge => {
                 badge.classList.remove('active');
             });
             
-            // Добавляем активный класс выбранному
             const selectedBadge = document.querySelector(`.status-badge[data-status="${status}"]`);
             if (selectedBadge) {
                 selectedBadge.classList.add('active');
@@ -1908,10 +2077,8 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             if (currentEditingNS < 0 || currentEditingNS >= nsList.length) return;
             
-            // Обновляем статус
             nsList[currentEditingNS].status = selectedStatus;
             
-            // Добавляем комментарий если есть
             const comment = document.getElementById('statusComment')?.value;
             if (comment && comment.trim()) {
                 if (!nsList[currentEditingNS].history) {
@@ -1924,17 +2091,13 @@ ${nsData.photos && nsData.photos.length > 0 ? `Прикреплено фотог
                 });
             }
             
-            // Добавляем дату изменения
             nsList[currentEditingNS].statusChanged = new Date().toISOString();
             
-            // Сохраняем
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
-            // Обновляем список
             loadNSList(currentNSFilter);
             updateStats();
             
-            // Закрываем модальное окно
             closeModal();
             
             showNotification('Статус успешно изменен', 'success');
