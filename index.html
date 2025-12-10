@@ -912,7 +912,7 @@
                     <div class="form-group">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <label>📋 Описание несоответствия:</label>
-                            <button type="button" class="btn btn-warning" onclick="startVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
+                            <button type="button" id="voiceButton" class="btn btn-warning" onclick="toggleVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
                                 🎤 Голосом
                             </button>
                         </div>
@@ -1032,7 +1032,7 @@
                     <div class="form-group">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <label>📋 Описание несоответствия:</label>
-                            <button type="button" class="btn btn-warning" onclick="startVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
+                            <button type="button" id="voiceButton" class="btn btn-warning" onclick="toggleVoiceInput()" style="padding: 8px 12px; font-size: 14px;">
                                 🎤 Голосом
                             </button>
                         </div>
@@ -1096,8 +1096,8 @@
                 const recognition = new SpeechRecognition();
                 
                 recognition.lang = 'ru-RU';
-                recognition.continuous = false; // Для iOS false работает лучше
-                recognition.interimResults = false;
+                recognition.continuous = true; // Исправлено: true для непрерывной записи
+                recognition.interimResults = true; // Исправлено: true для промежуточных результатов
                 recognition.maxAlternatives = 1;
                 
                 return recognition;
@@ -1107,14 +1107,18 @@
             }
         }
         
-        function startVoiceInput() {
-            console.log('🎤 Запуск голосового ввода...');
+        function toggleVoiceInput() {
+            const voiceButton = document.getElementById('voiceButton');
+            const voiceIndicator = document.getElementById('voiceIndicator');
             
             // Если уже слушаем - останавливаем
             if (isListening && speechRecognition) {
                 speechRecognition.stop();
                 isListening = false;
-                document.getElementById('voiceIndicator').classList.remove('active');
+                voiceIndicator.classList.remove('active');
+                voiceButton.textContent = '🎤 Голосом';
+                voiceButton.classList.remove('btn-danger');
+                voiceButton.classList.add('btn-warning');
                 showNotification('Запись остановлена', 'info');
                 return;
             }
@@ -1130,50 +1134,72 @@
             speechRecognition.onstart = function() {
                 isListening = true;
                 console.log('🎤 Распознавание началось');
-                document.getElementById('voiceIndicator').classList.add('active');
+                voiceIndicator.classList.add('active');
+                voiceButton.textContent = '⏹️ Остановить';
+                voiceButton.classList.remove('btn-warning');
+                voiceButton.classList.add('btn-danger');
             };
             
             speechRecognition.onresult = function(event) {
-                const transcript = event.results[0][0].transcript;
-                console.log('✅ Распознано:', transcript);
+                let finalTranscript = '';
+                let interimTranscript = '';
+                
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    
+                    if (event.results[i].isFinal) {
+                        finalTranscript += transcript + ' ';
+                    } else {
+                        interimTranscript += transcript;
+                    }
+                }
                 
                 const descriptionField = document.getElementById('description');
                 if (descriptionField) {
-                    // Добавляем текст к существующему
-                    const currentText = descriptionField.value;
-                    descriptionField.value = currentText + (currentText ? ' ' : '') + transcript;
-                    showNotification('Текст добавлен', 'success');
+                    if (finalTranscript) {
+                        // Добавляем финальный текст
+                        descriptionField.value += finalTranscript;
+                        showNotification('Текст добавлен', 'success', 1000);
+                    } else if (interimTranscript) {
+                        // Показываем промежуточный результат
+                        const currentText = descriptionField.value;
+                        const lastSpaceIndex = currentText.lastIndexOf(' ');
+                        const baseText = lastSpaceIndex > 0 ? currentText.substring(0, lastSpaceIndex + 1) : currentText;
+                        descriptionField.value = baseText + interimTranscript;
+                    }
                 }
             };
             
             speechRecognition.onerror = function(event) {
                 console.error('❌ Ошибка распознавания:', event.error);
                 isListening = false;
-                document.getElementById('voiceIndicator').classList.remove('active');
+                voiceIndicator.classList.remove('active');
+                voiceButton.textContent = '🎤 Голосом';
+                voiceButton.classList.remove('btn-danger');
+                voiceButton.classList.add('btn-warning');
                 
                 if (event.error === 'not-allowed') {
                     showNotification('Разрешите доступ к микрофону в настройках браузера', 'error');
                 } else if (event.error === 'network') {
                     showNotification('Проверьте интернет соединение', 'error');
+                } else {
+                    showNotification('Ошибка распознавания речи: ' + event.error, 'error');
                 }
             };
             
             speechRecognition.onend = function() {
                 console.log('🎤 Распознавание завершено');
                 isListening = false;
-                document.getElementById('voiceIndicator').classList.remove('active');
-                
-                // Для iOS предлагаем продолжить
-                if (isIOS && confirm('Продолжить голосовой ввод?')) {
-                    setTimeout(() => {
-                        startVoiceInput();
-                    }, 300);
-                }
+                voiceIndicator.classList.remove('active');
+                voiceButton.textContent = '🎤 Голосом';
+                voiceButton.classList.remove('btn-danger');
+                voiceButton.classList.add('btn-warning');
             };
             
             // Запуск распознавания
             try {
                 speechRecognition.start();
+                showNotification('Говорите сейчас...', 'info', 1000);
             } catch (error) {
                 console.error('❌ Ошибка запуска распознавания:', error);
                 showNotification('Ошибка доступа к микрофону', 'error');
@@ -1381,8 +1407,8 @@
                 
                 console.log('✅ НС сохранено. Всего в базе:', nsList.length);
                 
-                // ОТПРАВКА EMAIL БЕЗ ФОТОГРАФИЙ (чтобы избежать quote exceeded)
-                sendEmailNotificationWithoutPhotos(nsData);
+                // ОТПРАВКА EMAIL
+                sendEmailNotification(nsData);
                 
                 // Очистка и показ успешного экрана
                 photos = [];
@@ -1397,9 +1423,9 @@
             }
         }
         
-        // ========== EMAIL БЕЗ ФОТОГРАФИЙ ==========
+        // ========== EMAIL ОТПРАВКА ==========
         
-        async function sendEmailNotificationWithoutPhotos(nsData) {
+        async function sendEmailNotification(nsData) {
             try {
                 const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
@@ -1472,6 +1498,8 @@
                     reply_to: recipient
                 };
                 
+                console.log('📧 Отправка email:', emailData);
+                
                 const response = await fetch(WEB3FORMS_API_URL, {
                     method: 'POST',
                     headers: {
@@ -1485,14 +1513,15 @@
                 
                 if (result.success) {
                     console.log('✅ Email успешно отправлен');
+                    showNotification('Email уведомление отправлено', 'success');
                 } else {
                     console.warn('⚠️ Ошибка отправки email:', result.message || result);
-                    // Не показываем ошибку пользователю - данные сохранены локально
+                    showNotification('Email не отправлен, но данные сохранены', 'warning');
                 }
                 
             } catch (error) {
                 console.error('❌ Ошибка отправки email:', error);
-                // Не показываем ошибку пользователю
+                showNotification('Ошибка отправки email, но данные сохранены', 'warning');
             }
         }
         
@@ -1526,7 +1555,7 @@
             showNotification('Несоответствие успешно сохранено!', 'success');
         }
         
-        // ========== ОСТАЛЬНЫЕ ФУНКЦИИ (без изменений) ==========
+        // ========== ОСТАЛЬНЫЕ ФУНКЦИИ ==========
         
         function fillApplicantData() {
             const select = document.getElementById('applicantSelect');
@@ -2317,7 +2346,7 @@
         window.fillProductData = fillProductData;
         window.handlePhotoUpload = handlePhotoUpload;
         window.removePhoto = removePhoto;
-        window.startVoiceInput = startVoiceInput;
+        window.toggleVoiceInput = toggleVoiceInput;
         window.cancelWorkerForm = cancelWorkerForm;
         window.backupData = backupData;
         window.restoreData = restoreData;
