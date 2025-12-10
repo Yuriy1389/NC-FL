@@ -831,18 +831,16 @@
         });
         
         // ============================================
-        // ГОЛОСОВОЙ ВВОД - КАРДИНАЛЬНО ИСПРАВЛЕННЫЙ ДЛЯ IPHONE
+        // ГОЛОСОВОЙ ВВОД
         // ============================================
         
         function initSpeechRecognition() {
             console.log('🎤 Инициализация распознавания речи...');
             
-            // Полностью новый подход для iOS
             if (isIOS) {
                 return initSpeechRecognitionIOS();
             }
             
-            // Для других устройств
             if ('SpeechRecognition' in window) {
                 speechRecognition = new SpeechRecognition();
             } else if ('webkitSpeechRecognition' in window) {
@@ -908,12 +906,10 @@
         function initSpeechRecognitionIOS() {
             console.log('📱 Инициализация для iOS с новым подходом...');
             
-            // Простейший подход для iOS
             if ('webkitSpeechRecognition' in window) {
                 try {
                     speechRecognition = new webkitSpeechRecognition();
                     
-                    // Минимальные настройки для iOS
                     speechRecognition.lang = 'ru-RU';
                     speechRecognition.continuous = false;
                     speechRecognition.interimResults = false;
@@ -1030,15 +1026,12 @@
                 showNotification('Запись остановлена', 'info');
             } else {
                 try {
-                    // Для iOS используем другой подход
                     if (isIOS) {
-                        // Сначала проверяем доступ к микрофону
                         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                             navigator.mediaDevices.getUserMedia({ audio: true })
                                 .then(stream => {
                                     stream.getTracks().forEach(track => track.stop());
                                     
-                                    // Небольшая задержка для iOS
                                     setTimeout(() => {
                                         speechRecognition.start();
                                     }, 300);
@@ -1048,11 +1041,9 @@
                                     showIOSMicrophoneInstructions();
                                 });
                         } else {
-                            // Старые версии iOS
                             speechRecognition.start();
                         }
                     } else {
-                        // Для Android и других
                         speechRecognition.start();
                     }
                 } catch (error) {
@@ -1161,7 +1152,392 @@
         }
         
         // ============================================
-        // РАБОЧИЙ РЕЖИМ - ИСПРАВЛЕНО: ДАННЫЕ АВТОМАТИЧЕСКИ ПОДСТАВЛЯЮТСЯ
+        // ГЕНЕРАЦИЯ QR-КОДОВ - ИСПРАВЛЕННАЯ ФУНКЦИЯ
+        // ============================================
+        
+        function generateQRCode() {
+            console.log('🎯 Начинаем генерацию QR-кода...');
+            
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocationInput').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            console.log('📝 Получены данные:', { department, location, responsible });
+            
+            if (!department || !location) {
+                showNotification('Заполните обязательные поля: Подразделение и Место', 'error');
+                return;
+            }
+            
+            try {
+                // Генерация уникального кода
+                const timestamp = Date.now().toString().slice(-6);
+                const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+                const code = `FS-${timestamp}-${random}`;
+                
+                // Создаем URL для QR-кода
+                const currentUrl = window.location.origin + window.location.pathname;
+                const qrUrl = `${currentUrl}?qrcode=${encodeURIComponent(code)}`;
+                
+                console.log('🔗 Создан URL для QR:', qrUrl);
+                console.log('🔗 Текущий origin:', window.location.origin);
+                console.log('🔗 Текущий pathname:', window.location.pathname);
+                
+                // Сохранение данных
+                currentQRData = {
+                    code: code,
+                    department: department,
+                    location: location,
+                    responsible: responsible || '',
+                    url: qrUrl,
+                    created: new Date().toISOString()
+                };
+                
+                // Сохранение в базу
+                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+                qrcodes.push(currentQRData);
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+                
+                console.log('💾 QR-код сохранен в базу. Всего QR-кодов:', qrcodes.length);
+                
+                // Очистка и генерация QR-кода
+                const qrcodeDiv = document.getElementById('qrcode');
+                if (!qrcodeDiv) {
+                    console.error('❌ Элемент #qrcode не найден');
+                    showNotification('Ошибка: элемент для QR-кода не найден', 'error');
+                    return;
+                }
+                
+                qrcodeDiv.innerHTML = '';
+                
+                // Проверяем наличие библиотеки QRCode
+                if (typeof QRCode === 'undefined') {
+                    console.error('❌ Библиотека QRCode не загружена');
+                    showNotification('Ошибка: библиотека QR-кодов не загружена', 'error');
+                    return;
+                }
+                
+                console.log('✅ Библиотека QRCode доступна, создаем QR-код...');
+                
+                // Создаем QR-код
+                try {
+                    new QRCode(qrcodeDiv, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1e3c72",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                    
+                    console.log('✅ QR-код успешно создан');
+                } catch (qrError) {
+                    console.error('❌ Ошибка создания QR-кода:', qrError);
+                    showNotification('Ошибка создания QR-кода: ' + qrError.message, 'error');
+                    return;
+                }
+                
+                // Показать превью
+                const qrPreview = document.getElementById('qrPreview');
+                if (qrPreview) {
+                    qrPreview.style.display = 'block';
+                    
+                    // Заполняем информацию о QR-коде
+                    const previewDept = document.getElementById('previewDept');
+                    const previewLocation = document.getElementById('previewLocation');
+                    const previewCode = document.getElementById('previewCode');
+                    const previewDate = document.getElementById('previewDate');
+                    
+                    if (previewDept) previewDept.textContent = department;
+                    if (previewLocation) previewLocation.textContent = location;
+                    if (previewCode) previewCode.textContent = code;
+                    if (previewDate) previewDate.textContent = new Date().toLocaleDateString('ru-RU');
+                }
+                
+                showNotification('QR-код успешно создан!', 'success');
+                
+                // Прокрутка к результату
+                setTimeout(() => {
+                    qrPreview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }, 300);
+                
+            } catch (error) {
+                console.error('❌ Критическая ошибка генерации QR-кода:', error);
+                showNotification('Ошибка генерации QR-кода: ' + error.message, 'error');
+            }
+        }
+        
+        function printQRCode() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            try {
+                const printWindow = window.open('', '_blank');
+                if (!printWindow) {
+                    showNotification('Разрешите всплывающие окна для печати', 'error');
+                    return;
+                }
+                
+                printWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>QR-код ${currentQRData.department}</title>
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                text-align: center; 
+                                padding: 20px; 
+                                margin: 0;
+                            }
+                            .info { 
+                                text-align: left; 
+                                margin: 20px auto; 
+                                padding: 15px; 
+                                border: 2px solid #1e3c72; 
+                                border-radius: 10px;
+                                max-width: 400px;
+                            }
+                            @media print { 
+                                body { padding: 0; margin: 0; }
+                                .no-print { display: none; }
+                            }
+                            h1 { color: #1e3c72; margin: 20px 0; }
+                            h3 { color: #333; margin-bottom: 30px; }
+                        </style>
+                    </head>
+                    <body>
+                        <h1>ФАРМСТИЛ</h1>
+                        <h3>Регистрация несоответствия</h3>
+                        
+                        <div class="info">
+                            <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                            <p><strong>Место:</strong> ${currentQRData.location}</p>
+                            <p><strong>Код:</strong> ${currentQRData.code}</p>
+                            <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString('ru-RU')}</p>
+                        </div>
+                        
+                        <div style="margin: 30px 0;">
+                            <strong>Отсканируйте QR-код для регистрации несоответствия</strong>
+                        </div>
+                        
+                        <div id="qrcode" style="margin: 20px auto; width: 200px; height: 200px;"></div>
+                        
+                        <div class="no-print" style="margin-top: 30px;">
+                            <button onclick="window.print()" style="
+                                padding: 10px 20px;
+                                background: #1e3c72;
+                                color: white;
+                                border: none;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 16px;
+                            ">
+                                🖨️ Печать
+                            </button>
+                            <button onclick="window.close()" style="
+                                padding: 10px 20px;
+                                background: #666;
+                                color: white;
+                                border: none;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 16px;
+                                margin-left: 10px;
+                            ">
+                                Закрыть
+                            </button>
+                        </div>
+                        
+                        <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                if (typeof QRCode !== 'undefined') {
+                                    new QRCode(document.getElementById('qrcode'), {
+                                        text: '${currentQRData.url}',
+                                        width: 200,
+                                        height: 200,
+                                        colorDark: "#1e3c72",
+                                        colorLight: "#ffffff"
+                                    });
+                                }
+                            });
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                printWindow.document.close();
+                
+            } catch (error) {
+                console.error('Ошибка печати:', error);
+                showNotification('Ошибка печати', 'error');
+            }
+        }
+        
+        function saveQRAsImage() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            try {
+                const canvas = document.querySelector('#qrcode canvas');
+                if (!canvas) {
+                    showNotification('QR-код не найден', 'error');
+                    return;
+                }
+                
+                // Создаем ссылку для скачивания
+                const link = document.createElement('a');
+                
+                // Формируем имя файла без специальных символов
+                const safeDept = currentQRData.department.replace(/[^a-zа-яё0-9]/gi, '_');
+                const safeLoc = currentQRData.location.replace(/[^a-zа-яё0-9]/gi, '_');
+                const filename = `QR_${safeDept}_${safeLoc}_${currentQRData.code}.png`;
+                
+                link.download = filename;
+                link.href = canvas.toDataURL('image/png');
+                
+                // Добавляем ссылку в документ и кликаем
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showNotification('QR-код сохранен как ' + filename, 'success');
+                
+            } catch (error) {
+                console.error('Ошибка сохранения QR-кода:', error);
+                showNotification('Ошибка сохранения QR-кода', 'error');
+            }
+        }
+        
+        function testQRCode() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            try {
+                // Открываем QR-код в новом окне для тестирования
+                const testWindow = window.open('', '_blank');
+                if (!testWindow) {
+                    showNotification('Разрешите всплывающие окна для тестирования', 'error');
+                    return;
+                }
+                
+                testWindow.document.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Тест QR-кода: ${currentQRData.department}</title>
+                        <style>
+                            body { 
+                                font-family: Arial, sans-serif; 
+                                text-align: center; 
+                                padding: 40px 20px; 
+                                background: #f5f5f5;
+                            }
+                            .container {
+                                max-width: 400px;
+                                margin: 0 auto;
+                                background: white;
+                                padding: 30px;
+                                border-radius: 15px;
+                                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+                            }
+                            h2 { color: #1e3c72; margin-bottom: 20px; }
+                            .info {
+                                text-align: left;
+                                margin: 20px 0;
+                                padding: 15px;
+                                background: #f8f9fa;
+                                border-radius: 10px;
+                                border-left: 4px solid #1e3c72;
+                            }
+                            .test-button {
+                                display: block;
+                                width: 100%;
+                                padding: 12px;
+                                margin: 10px 0;
+                                background: #28a745;
+                                color: white;
+                                border: none;
+                                border-radius: 8px;
+                                font-size: 16px;
+                                cursor: pointer;
+                                text-decoration: none;
+                                text-align: center;
+                            }
+                            .test-button:hover {
+                                background: #218838;
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <h2>📱 Тест QR-кода</h2>
+                            
+                            <div class="info">
+                                <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                                <p><strong>Место:</strong> ${currentQRData.location}</p>
+                                <p><strong>Код:</strong> ${currentQRData.code}</p>
+                            </div>
+                            
+                            <p style="margin: 20px 0; color: #666;">
+                                Для тестирования QR-кода отсканируйте его или нажмите кнопку ниже:
+                            </p>
+                            
+                            <a href="${currentQRData.url}" class="test-button">
+                                📝 Открыть форму рабочего
+                            </a>
+                            
+                            <div id="qrcode" style="margin: 30px auto; width: 200px; height: 200px;"></div>
+                            
+                            <button onclick="window.close()" style="
+                                padding: 10px 20px;
+                                background: #666;
+                                color: white;
+                                border: none;
+                                border-radius: 5px;
+                                cursor: pointer;
+                                font-size: 14px;
+                                margin-top: 20px;
+                            ">
+                                Закрыть
+                            </button>
+                        </div>
+                        
+                        <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+                        <script>
+                            document.addEventListener('DOMContentLoaded', function() {
+                                if (typeof QRCode !== 'undefined') {
+                                    new QRCode(document.getElementById('qrcode'), {
+                                        text: '${currentQRData.url}',
+                                        width: 200,
+                                        height: 200,
+                                        colorDark: "#1e3c72",
+                                        colorLight: "#ffffff"
+                                    });
+                                }
+                            });
+                        <\/script>
+                    </body>
+                    </html>
+                `);
+                testWindow.document.close();
+                
+                showNotification('Тестовое окно открыто', 'info');
+                
+            } catch (error) {
+                console.error('Ошибка тестирования QR-кода:', error);
+                showNotification('Ошибка тестирования QR-кода', 'error');
+            }
+        }
+        
+        // ============================================
+        // РАБОЧИЙ РЕЖИМ
         // ============================================
         
         function showWorkerForm(qrData) {
@@ -1170,10 +1546,9 @@
             const employeeOptions = getEmployeeOptions();
             const equipmentOptions = getEquipmentOptions();
             
-            // Формируем HTML с автоматической подстановкой
             const formHTML = `
                 <form class="worker-form" id="workerFormElement" onsubmit="event.preventDefault(); submitWorkerForm();">
-                    <!-- Информация о цехе и месте - ВСТАВЛЯЕТСЯ АВТОМАТИЧЕСКИ -->
+                    <!-- Информация о цехе и месте -->
                     <div class="department-info">
                         <h4 style="color: #0d47a1; margin-top: 0;">🏭 Место несоответствия (автоматически заполнено):</h4>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
@@ -1250,7 +1625,7 @@
                         <textarea id="description" rows="4" placeholder="Опишите проблему подробно..." required></textarea>
                     </div>
                     
-                    <!-- Загрузка фото - ИСПРАВЛЕНО: фото добавляются по порядку -->
+                    <!-- Загрузка фото -->
                     <div class="form-group">
                         <label>📷 Фотографии (до 3 штук):</label>
                         <div class="photo-upload-area" onclick="document.getElementById('photoInput').click()">
@@ -1437,7 +1812,7 @@
         }
         
         // ============================================
-        // ЗАГРУЗКА ФОТО - ИСПРАВЛЕНО: фото добавляются по порядку
+        // ЗАГРУЗКА ФОТО
         // ============================================
         
         function handlePhotoUpload(event) {
@@ -1446,7 +1821,6 @@
             
             if (!preview) return;
             
-            // Ограничение: максимум 3 фото
             const remainingSlots = 3 - photos.length;
             if (remainingSlots <= 0) {
                 showNotification('Максимум 3 фотографии', 'error');
@@ -1458,7 +1832,6 @@
             for (let i = 0; i < fileCount; i++) {
                 const file = files[i];
                 
-                // Проверяем размер файла
                 if (file.size > 2 * 1024 * 1024) {
                     showNotification(`Файл "${file.name}" слишком большой (макс. 2MB)`, 'error');
                     continue;
@@ -1467,7 +1840,6 @@
                 const reader = new FileReader();
                 
                 reader.onload = function(e) {
-                    // Сжимаем изображение
                     compressImage(e.target.result, 800, 800, 0.8)
                         .then(compressedData => {
                             const photoIndex = photos.length;
@@ -1494,7 +1866,6 @@
                 reader.readAsDataURL(file);
             }
             
-            // Сбрасываем input чтобы можно было загрузить те же файлы снова
             event.target.value = '';
         }
         
@@ -1504,7 +1875,6 @@
             
             preview.innerHTML = '';
             
-            // Сортируем фото по индексу
             const sortedPhotos = [...photos].sort((a, b) => a.index - b.index);
             
             sortedPhotos.forEach((photo, i) => {
@@ -1558,10 +1928,8 @@
         }
         
         function removePhoto(indexToRemove) {
-            // Удаляем фото по индексу
             photos = photos.filter(photo => photo.index !== indexToRemove);
             
-            // Перенумеровываем оставшиеся фото
             photos.forEach((photo, i) => {
                 photo.index = i;
             });
@@ -1572,26 +1940,23 @@
         }
         
         // ============================================
-        // ОТПРАВКА ФОРМЫ - ИСПРАВЛЕНО: данные цеха/места берутся правильно
+        // ОТПРАВКА ФОРМЫ
         // ============================================
         
         function submitWorkerForm() {
             try {
                 console.log('📤 Отправка формы рабочего...');
                 
-                // Получение данных подразделения - КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ
                 let department = '';
                 let location = '';
                 let responsible = '';
                 
                 if (currentQRData) {
-                    // Берем данные напрямую из currentQRData
                     department = currentQRData.department || '';
                     location = currentQRData.location || '';
                     responsible = currentQRData.responsible || '';
                     console.log('✅ Используем данные из QR:', { department, location, responsible });
                 } else {
-                    // Используем ручной ввод
                     const manualDept = document.getElementById('manualDepartment');
                     const manualLoc = document.getElementById('manualLocation');
                     
@@ -1600,14 +1965,12 @@
                     console.log('✅ Используем ручной ввод:', { department, location });
                 }
                 
-                // Получаем данные из формы
                 const detectionDate = document.getElementById('detectionDate')?.value || new Date().toISOString().split('T')[0];
                 const applicant = document.getElementById('applicant')?.value.trim() || '';
                 const productName = document.getElementById('productName')?.value.trim() || '';
                 const productCode = document.getElementById('productCode')?.value.trim() || '';
                 const description = document.getElementById('description')?.value.trim() || '';
                 
-                // Проверка обязательных полей
                 if (!applicant) {
                     showNotification('Введите ФИО заявителя', 'error');
                     return;
@@ -1623,10 +1986,8 @@
                     return;
                 }
                 
-                // Генерация номера НС
                 const nsNumber = 'НС-' + Math.floor(Math.random() * 9000 + 1000) + '-' + new Date().getFullYear();
                 
-                // Сбор данных
                 const nsData = {
                     id: 'ns_' + Date.now(),
                     nsNumber: nsNumber,
@@ -1647,15 +2008,12 @@
                 
                 console.log('✅ Данные НС для сохранения:', nsData);
                 
-                // Сохранение НС
                 const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
                 nsList.push(nsData);
                 localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
                 
-                // Отправка email уведомления
                 sendEmailNotification(nsData);
                 
-                // Показать успех
                 showSuccessScreen(nsData);
                 
             } catch (error) {
@@ -1727,7 +2085,6 @@
                 const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
                 const recipient = settings.managerEmail || 'finkart23@mail.ru';
                 
-                // HTML формат письма
                 const emailBody = `
 <h2>🚨 Новое несоответствие зарегистрировано</h2>
 <p><strong>Система:</strong> ФАРМСТИЛ</p>
@@ -1796,7 +2153,6 @@
                     reply_to: recipient
                 };
                 
-                // Текстовая версия для почтовых клиентов
                 const textBody = `
 НОВОЕ НЕСООТВЕТСТВИЕ В СИСТЕМЕ ФАРМСТИЛ
 
@@ -1845,7 +2201,6 @@ ${nsData.description}
             }
         }
         
-        // Остальные функции (loadNSList, filterNS, viewNSDetails и т.д.) остаются без изменений
         // ============================================
         // УПРАВЛЕНИЕ НС
         // ============================================
@@ -1893,7 +2248,7 @@ ${nsData.description}
                             <div><strong>📍 Место:</strong> ${ns.location || 'Не указано'}</div>
                             <div><strong>👤 Заявитель:</strong> ${ns.applicant || 'Не указан'}</div>
                             <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 13px;">
-                                ${ns.description ? (ns.description.length > 100 ? nsDescription.substring(0, 100) + '...' : ns.description) : 'Нет описания'}
+                                ${ns.description ? (ns.description.length > 100 ? ns.description.substring(0, 100) + '...' : ns.description) : 'Нет описания'}
                             </div>
                             
                             ${ns.photos && ns.photos.length > 0 ? `
@@ -1951,7 +2306,6 @@ ${nsData.description}
                         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; margin-top: 10px;">
                 `;
                 
-                // Сортируем фото по индексу
                 const sortedPhotos = [...ns.photos].sort((a, b) => (a.index || 0) - (b.index || 0));
                 
                 sortedPhotos.forEach((photo, i) => {
@@ -2004,7 +2358,6 @@ ${nsData.description}
             document.getElementById('statusModal').style.display = 'flex';
         }
         
-        // Остальные функции (changeNSStatus, selectStatus, saveStatusChange и т.д.) без изменений
         function changeNSStatus(index) {
             currentEditingNS = index;
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
@@ -2404,7 +2757,6 @@ ${nsData.description}
         window.printQRCode = printQRCode;
         window.saveQRAsImage = saveQRAsImage;
         window.testQRCode = testQRCode;
-        window.copyToClipboard = copyToClipboard;
         window.filterNS = filterNS;
         window.viewNSDetails = viewNSDetails;
         window.changeNSStatus = changeNSStatus;
