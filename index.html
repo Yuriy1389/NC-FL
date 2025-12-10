@@ -1108,9 +1108,657 @@
         }
         
         // ============================================
-        // [ВСЕ ОСТАЛЬНЫЕ ФУНКЦИИ ОСТАЮТСЯ ТАКИМИ ЖЕ]
+        // ГЕНЕРАЦИЯ QR-КОДОВ - ИСПРАВЛЕННАЯ
         // ============================================
-        // ... все остальные функции без изменений ...
+        function generateQRCode() {
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocationInput').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            if (!department || !location) {
+                showNotification('Заполните обязательные поля', 'error');
+                return;
+            }
+            
+            try {
+                // Генерация кода
+                const timestamp = Date.now().toString().slice(-6);
+                const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+                const code = `FS-${timestamp}-${random}`;
+                
+                // Создаем URL
+                const currentUrl = window.location.origin + window.location.pathname;
+                const qrUrl = `${currentUrl}?qrcode=${encodeURIComponent(code)}`;
+                
+                console.log('🔗 Создан URL для QR:', qrUrl);
+                
+                // Сохранение данных
+                currentQRData = {
+                    code: code,
+                    department: department,
+                    location: location,
+                    responsible: responsible || '',
+                    url: qrUrl,
+                    created: new Date().toISOString()
+                };
+                
+                // Очистка и генерация QR-кода
+                const qrcodeDiv = document.getElementById('qrcode');
+                qrcodeDiv.innerHTML = '';
+                
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrcodeDiv, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1e3c72",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                }
+                
+                // Показать превью
+                document.getElementById('qrPreview').style.display = 'block';
+                document.getElementById('previewDept').textContent = department;
+                document.getElementById('previewLocation').textContent = location;
+                document.getElementById('previewCode').textContent = code;
+                document.getElementById('previewDate').textContent = new Date().toLocaleDateString('ru-RU');
+                
+                showNotification('QR-код успешно создан!', 'success');
+                
+            } catch (error) {
+                console.error('Ошибка генерации QR-кода:', error);
+                showNotification('Ошибка генерации QR-кода', 'error');
+            }
+        }
+        
+        function printQRCode() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR-код ${currentQRData.department}</title>
+                    <style>
+                        body { font-family: Arial; text-align: center; padding: 20px; }
+                        .info { text-align: left; margin: 20px 0; padding: 15px; border: 2px solid #1e3c72; border-radius: 10px; }
+                        @media print { body { padding: 10px; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>ФАРМСТИЛ</h1>
+                    <h3>Регистрация несоответствия</h3>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        <p><strong>Код:</strong> ${currentQRData.code}</p>
+                        <p><strong>Создан:</strong> ${new Date(currentQRData.created).toLocaleDateString('ru-RU')}</p>
+                    </div>
+                    
+                    <div style="margin: 20px 0;">
+                        <strong>Отсканируйте QR-код для регистрации несоответствия</strong>
+                    </div>
+                    
+                    <div id="qrcode"></div>
+                    
+                    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+                    <script>
+                        new QRCode(document.getElementById('qrcode'), {
+                            text: '${currentQRData.url}',
+                            width: 200,
+                            height: 200,
+                            colorDark: "#1e3c72",
+                            colorLight: "#ffffff"
+                        });
+                        setTimeout(() => {
+                            window.print();
+                        }, 500);
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+        
+        function saveQRAsImage() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            const canvas = document.querySelector('#qrcode canvas');
+            if (!canvas) {
+                showNotification('QR-код не найден', 'error');
+                return;
+            }
+            
+            const link = document.createElement('a');
+            link.download = `QR_${currentQRData.department}_${currentQRData.code}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            showNotification('QR-код сохранен', 'success');
+        }
+        
+        function testQRCode() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            window.open(currentQRData.url, '_blank');
+        }
+        
+        // ============================================
+        // УПРАВЛЕНИЕ НС
+        // ============================================
+        function loadNSList(filterStatus = 'all') {
+            currentNSFilter = filterStatus;
+            const container = document.getElementById('nsListContainer');
+            if (!container) return;
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            
+            let filteredNS = nsList;
+            if (filterStatus !== 'all') {
+                filteredNS = nsList.filter(ns => ns.status === filterStatus);
+            }
+            
+            filteredNS.sort((a, b) => new Date(b.created) - new Date(a.created));
+            
+            if (filteredNS.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <h3 style="color: #1e3c72;">Несоответствий нет</h3>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '<div class="ln-list">';
+            
+            filteredNS.forEach((ns, index) => {
+                const date = new Date(ns.detectionDate || ns.created).toLocaleDateString('ru-RU');
+                const statusText = getStatusText(ns.status);
+                const statusClass = `status-${ns.status}`;
+                
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status ${statusClass}">${statusText}</div>
+                        </div>
+                        
+                        <div style="font-size: 14px;">
+                            <div><strong>📅 Дата:</strong> ${date}</div>
+                            <div><strong>🏭 Подразделение:</strong> ${ns.department || 'Не указано'}</div>
+                            <div><strong>📍 Место:</strong> ${ns.location || 'Не указано'}</div>
+                            <div><strong>👤 Заявитель:</strong> ${ns.applicant || 'Не указан'}</div>
+                            <div style="margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 5px; font-size: 13px;">
+                                ${ns.description ? (ns.description.length > 100 ? ns.description.substring(0, 100) + '...' : ns.description) : 'Нет описания'}
+                            </div>
+                            
+                            ${ns.photoCount > 0 ? `
+                                <div style="margin-top: 10px;">
+                                    <strong>📷 Фото:</strong> ${ns.photoCount} шт.
+                                </div>
+                            ` : ''}
+                            
+                            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                                <button class="btn btn-info" onclick="viewNSDetails('${ns.id}')" style="flex: 1; padding: 8px; font-size: 13px;">
+                                    👁️ Просмотр
+                                </button>
+                                <button class="btn btn-warning" onclick="changeNSStatus('${ns.id}')" style="flex: 1; padding: 8px; font-size: 13px;">
+                                    📝 Изменить статус
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function filterNS(status) {
+            currentNSFilter = status;
+            loadNSList(status);
+        }
+        
+        function getStatusText(status) {
+            const statuses = {
+                'checking': 'НА ПРОВЕРКЕ',
+                'in_progress': 'В РАБОТЕ',
+                'decision_made': 'РЕШЕНИЕ',
+                'rework': 'ДОРАБОТКА',
+                'closed': 'ЗАКРЫТО'
+            };
+            return statuses[status] || status.toUpperCase();
+        }
+        
+        function viewNSDetails(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList.find(n => n.id === id);
+            if (!ns) return;
+            
+            const date = new Date(ns.detectionDate || ns.created).toLocaleDateString('ru-RU');
+            const statusText = getStatusText(ns.status);
+            
+            const modalContent = `
+                <h3 style="color: #1e3c72; margin-bottom: 20px;">${ns.nsNumber}</h3>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div><strong>Дата обнаружения:</strong><br>${date}</div>
+                    <div><strong>Статус:</strong><br><span class="ln-status status-${ns.status}">${statusText}</span></div>
+                    <div><strong>Подразделение:</strong><br>${ns.department || 'Не указано'}</div>
+                    <div><strong>Место:</strong><br>${ns.location || 'Не указано'}</div>
+                    <div><strong>Заявитель:</strong><br>${ns.applicant || 'Не указан'}</div>
+                    <div><strong>Создано:</strong><br>${new Date(ns.created).toLocaleDateString('ru-RU')}</div>
+                </div>
+                
+                ${ns.productName ? `<div><strong>Оборудование:</strong> ${ns.productName} ${ns.productCode ? '(' + ns.productCode + ')' : ''}</div>` : ''}
+                
+                <div style="margin-top: 15px;">
+                    <h4>📋 Описание:</h4>
+                    <div style="padding: 15px; background: #f8f9fa; border-radius: 8px; margin-top: 10px;">
+                        ${ns.description || 'Нет описания'}
+                    </div>
+                </div>
+                
+                ${ns.photoCount > 0 ? `
+                    <div style="margin-top: 15px;">
+                        <h4>📷 Фотографии:</h4>
+                        <p>Прикреплено фотографий: ${ns.photoCount}</p>
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 25px; text-align: center;">
+                    <button class="btn btn-primary" onclick="closeModal()">
+                        Закрыть
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Детали несоответствия';
+            document.getElementById('modalContent').innerHTML = modalContent;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function changeNSStatus(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const nsIndex = nsList.findIndex(n => n.id === id);
+            if (nsIndex === -1) return;
+            
+            const ns = nsList[nsIndex];
+            selectedStatus = ns.status;
+            
+            const modalContent = `
+                <h3 style="color: #1e3c72; margin-bottom: 15px;">${ns.nsNumber}</h3>
+                
+                <div style="margin-bottom: 20px;">
+                    <strong>Текущий статус:</strong> <span class="ln-status status-${ns.status}">${getStatusText(ns.status)}</span>
+                </div>
+                
+                <h4>Выберите новый статус:</h4>
+                
+                <div class="status-badges">
+                    <div class="status-badge ${ns.status === 'checking' ? 'active' : ''}" style="background: #ffc107;" onclick="selectStatus('checking')" data-status="checking">
+                        На проверке
+                    </div>
+                    <div class="status-badge ${ns.status === 'in_progress' ? 'active' : ''}" style="background: #6f42c1; color: white;" onclick="selectStatus('in_progress')" data-status="in_progress">
+                        В работе
+                    </div>
+                    <div class="status-badge ${ns.status === 'decision_made' ? 'active' : ''}" style="background: #17a2b8; color: white;" onclick="selectStatus('decision_made')" data-status="decision_made">
+                        Решение принято
+                    </div>
+                    <div class="status-badge ${ns.status === 'rework' ? 'active' : ''}" style="background: #dc3545; color: white;" onclick="selectStatus('rework')" data-status="rework">
+                        Доработка
+                    </div>
+                    <div class="status-badge ${ns.status === 'closed' ? 'active' : ''}" style="background: #28a745; color: white;" onclick="selectStatus('closed')" data-status="closed">
+                        Закрыто
+                    </div>
+                </div>
+                
+                <div style="margin-top: 25px;">
+                    <label>Комментарий (необязательно):</label>
+                    <textarea id="statusComment" rows="3" placeholder="Добавьте комментарий к изменению статуса..." style="width: 100%; margin-top: 5px;"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 25px;">
+                    <button class="btn btn-success" onclick="saveStatusChange('${id}')" style="flex: 2;">
+                        💾 Сохранить изменения
+                    </button>
+                    <button class="btn btn-danger" onclick="closeModal()" style="flex: 1;">
+                        ❌ Отмена
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Изменение статуса';
+            document.getElementById('modalContent').innerHTML = modalContent;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function selectStatus(status) {
+            selectedStatus = status;
+            
+            document.querySelectorAll('.status-badge').forEach(badge => {
+                badge.classList.remove('active');
+            });
+            
+            const selectedBadge = document.querySelector(`.status-badge[data-status="${status}"]`);
+            if (selectedBadge) {
+                selectedBadge.classList.add('active');
+            }
+        }
+        
+        function saveStatusChange(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const nsIndex = nsList.findIndex(n => n.id === id);
+            if (nsIndex === -1) return;
+            
+            nsList[nsIndex].status = selectedStatus;
+            
+            const comment = document.getElementById('statusComment')?.value;
+            if (comment && comment.trim()) {
+                if (!nsList[nsIndex].history) {
+                    nsList[nsIndex].history = [];
+                }
+                nsList[nsIndex].history.push({
+                    date: new Date().toISOString(),
+                    status: selectedStatus,
+                    comment: comment.trim()
+                });
+            }
+            
+            nsList[nsIndex].statusChanged = new Date().toISOString();
+            
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            loadNSList(currentNSFilter);
+            updateStats();
+            
+            closeModal();
+            
+            showNotification('Статус успешно изменен', 'success');
+        }
+        
+        function closeModal() {
+            document.getElementById('statusModal').style.display = 'none';
+        }
+        
+        // ============================================
+        // СПРАВОЧНИКИ
+        // ============================================
+        function loadDirectories() {
+            loadEmployees();
+            loadEquipment();
+            loadEmailSettings();
+        }
+        
+        function loadEmployees() {
+            const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
+            const container = document.getElementById('employeesList');
+            
+            if (!container) return;
+            
+            if (employees.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Нет сотрудников</div>';
+                return;
+            }
+            
+            let html = '';
+            employees.forEach((emp, index) => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                        <div>
+                            <strong>${emp.name}</strong><br>
+                            <small style="color: #666;">${emp.position}</small>
+                        </div>
+                        <button onclick="deleteEmployee(${index})" style="
+                            background: #dc3545; color: white; border: none; 
+                            border-radius: 50%; width: 26px; height: 26px; 
+                            font-size: 14px; cursor: pointer;
+                        ">
+                            ×
+                        </button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function getEmployeeOptions() {
+            const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
+            let options = '<option value="">Выберите сотрудника</option>';
+            employees.forEach(emp => {
+                options += `<option value="${emp.name}|${emp.position}">${emp.name} - ${emp.position}</option>`;
+            });
+            return options;
+        }
+        
+        function addEmployee() {
+            const name = document.getElementById('employeeName').value.trim();
+            const position = document.getElementById('employeePosition').value.trim();
+            
+            if (!name || !position) {
+                showNotification('Заполните ФИО и должность', 'error');
+                return;
+            }
+            
+            const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
+            employees.push({ name, position });
+            localStorage.setItem('farmstil_employees', JSON.stringify(employees));
+            
+            document.getElementById('employeeName').value = '';
+            document.getElementById('employeePosition').value = '';
+            
+            loadEmployees();
+            showNotification('Сотрудник добавлен', 'success');
+        }
+        
+        function deleteEmployee(index) {
+            if (confirm('Удалить сотрудника?')) {
+                const employees = JSON.parse(localStorage.getItem('farmstil_employees') || '[]');
+                employees.splice(index, 1);
+                localStorage.setItem('farmstil_employees', JSON.stringify(employees));
+                loadEmployees();
+                showNotification('Сотрудник удален', 'success');
+            }
+        }
+        
+        function loadEquipment() {
+            const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
+            const container = document.getElementById('equipmentList');
+            
+            if (!container) return;
+            
+            if (equipment.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 20px; color: #666;">Нет оборудования</div>';
+                return;
+            }
+            
+            let html = '';
+            equipment.forEach((eq, index) => {
+                html += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee;">
+                        <div>
+                            <strong>${eq.name}</strong><br>
+                            <small style="color: #666;">${eq.code}</small>
+                        </div>
+                        <button onclick="deleteEquipment(${index})" style="
+                            background: #dc3545; color: white; border: none; 
+                            border-radius: 50%; width: 26px; height: 26px; 
+                            font-size: 14px; cursor: pointer;
+                        ">
+                            ×
+                        </button>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+        
+        function getEquipmentOptions() {
+            const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
+            let options = '<option value="">Выберите оборудование</option>';
+            equipment.forEach(eq => {
+                options += `<option value="${eq.name}|${eq.code}">${eq.name} (${eq.code})</option>`;
+            });
+            return options;
+        }
+        
+        function addEquipment() {
+            const name = document.getElementById('equipmentName').value.trim();
+            const code = document.getElementById('equipmentCode').value.trim();
+            
+            if (!name || !code) {
+                showNotification('Заполните наименование и инвентарный номер', 'error');
+                return;
+            }
+            
+            const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
+            equipment.push({ name, code });
+            localStorage.setItem('farmstil_equipment', JSON.stringify(equipment));
+            
+            document.getElementById('equipmentName').value = '';
+            document.getElementById('equipmentCode').value = '';
+            
+            loadEquipment();
+            showNotification('Оборудование добавлено', 'success');
+        }
+        
+        function deleteEquipment(index) {
+            if (confirm('Удалить оборудование?')) {
+                const equipment = JSON.parse(localStorage.getItem('farmstil_equipment') || '[]');
+                equipment.splice(index, 1);
+                localStorage.setItem('farmstil_equipment', JSON.stringify(equipment));
+                loadEquipment();
+                showNotification('Оборудование удалено', 'success');
+            }
+        }
+        
+        function loadEmailSettings() {
+            const settings = JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}');
+            if (settings.managerEmail) {
+                document.getElementById('managerEmail').value = settings.managerEmail;
+            }
+        }
+        
+        function saveEmailSettings() {
+            const settings = {
+                managerEmail: document.getElementById('managerEmail').value
+            };
+            localStorage.setItem('farmstil_email_settings', JSON.stringify(settings));
+            showNotification('Настройки email сохранены', 'success');
+        }
+        
+        // ============================================
+        // АДМИНИСТРИРОВАНИЕ
+        // ============================================
+        function updateStats() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            
+            const totalNS = nsList.length;
+            const checkingNS = nsList.filter(ns => ns.status === 'checking').length;
+            const inProgressNS = nsList.filter(ns => ns.status === 'in_progress').length;
+            const closedNS = nsList.filter(ns => ns.status === 'closed').length;
+            
+            if (document.getElementById('totalNS')) {
+                document.getElementById('totalNS').textContent = totalNS;
+                document.getElementById('checkingNS').textContent = checkingNS;
+                document.getElementById('inProgressNS').textContent = inProgressNS;
+                document.getElementById('closedNS').textContent = closedNS;
+            }
+        }
+        
+        function backupData() {
+            const data = {
+                ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
+                qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
+                employees: JSON.parse(localStorage.getItem('farmstil_employees') || '[]'),
+                equipment: JSON.parse(localStorage.getItem('farmstil_equipment') || '[]'),
+                settings: JSON.parse(localStorage.getItem('farmstil_email_settings') || '{}'),
+                date: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `farmstil_backup_${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showNotification('Резервная копия создана', 'success');
+        }
+        
+        function restoreData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        
+                        if (confirm('Восстановить данные из резервной копии?')) {
+                            if (data.ns) localStorage.setItem('farmstil_ns', JSON.stringify(data.ns));
+                            if (data.qrcodes) localStorage.setItem('farmstil_qrcodes', JSON.stringify(data.qrcodes));
+                            if (data.employees) localStorage.setItem('farmstil_employees', JSON.stringify(data.employees));
+                            if (data.equipment) localStorage.setItem('farmstil_equipment', JSON.stringify(data.equipment));
+                            if (data.settings) {
+                                localStorage.setItem('farmstil_email_settings', JSON.stringify(data.settings));
+                            }
+                            
+                            loadNSList(currentNSFilter);
+                            loadDirectories();
+                            updateStats();
+                            
+                            showNotification('Данные восстановлены', 'success');
+                        }
+                    } catch (error) {
+                        console.error('Ошибка восстановления:', error);
+                        showNotification('Ошибка восстановления данных', 'error');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function clearAllData() {
+            if (confirm('Вы уверены? Это удалит ВСЕ данные системы!')) {
+                localStorage.removeItem('farmstil_ns');
+                localStorage.removeItem('farmstil_qrcodes');
+                localStorage.removeItem('farmstil_employees');
+                localStorage.removeItem('farmstil_equipment');
+                localStorage.removeItem('farmstil_email_settings');
+                
+                loadNSList('all');
+                loadDirectories();
+                updateStats();
+                
+                showNotification('Все данные очищены', 'success');
+            }
+        }
         
         // ============================================
         // ЭКСПОРТ ФУНКЦИЙ
