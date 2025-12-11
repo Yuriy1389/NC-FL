@@ -11,7 +11,6 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     
     <style>
-        /* Стили остаются почти теми же, но с улучшениями */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
@@ -66,6 +65,12 @@
             font-weight: bold;
         }
         
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
+        }
+        
         /* Улучшенные кнопки для мобильных */
         .mobile-btn {
             padding: 16px;
@@ -77,6 +82,24 @@
             align-items: center;
             justify-content: center;
             gap: 10px;
+        }
+        
+        /* QR код стили */
+        #qrPreview {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        #qrCodeContainer {
+            display: inline-block;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #ddd;
         }
         
         /* Индикатор статуса ЛН */
@@ -145,6 +168,121 @@
             color: #666;
         }
         
+        /* Уведомления */
+        .notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            background: white;
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            border-left: 5px solid #28a745;
+            text-align: center;
+        }
+        
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+        
+        .notification.warning {
+            border-left-color: #ffc107;
+        }
+        
+        .notification.info {
+            border-left-color: #17a2b8;
+        }
+        
+        /* Модальные окна */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .ln-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        
+        .ln-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .ln-number {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 18px;
+        }
+        
+        .ln-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-detected { background: #ffc107; color: #212529; }
+        .status-checking_smk { background: #17a2b8; color: white; }
+        .status-assigned { background: #6f42c1; color: white; }
+        .status-correction { background: #fd7e14; color: white; }
+        .status-checking_correction { background: #20c997; color: white; }
+        .status-execution { background: #007bff; color: white; }
+        .status-completed { background: #28a745; color: white; }
+        .status-closed { background: #6c757d; color: white; }
+        .status-rejected { background: #dc3545; color: white; }
+        
         /* Печатная версия */
         @media print {
             body {
@@ -170,27 +308,30 @@
             display: none;
         }
         
-        /* Остальные стили из предыдущей версии остаются */
+        /* Остальные стили */
         .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; }
         .menu { display: flex; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); padding: 0; gap: 1px; flex-wrap: wrap; }
         .menu-btn { padding: 12px 15px; background: white; border: none; color: #1e3c72; font-weight: bold; cursor: pointer; transition: all 0.3s ease; flex: 1; min-width: 120px; font-size: 14px; }
         .menu-btn.active { background: #1e3c72; color: white; }
+        .menu-btn:hover { background: #f8f9fa; }
         .page { display: none; padding: 20px; min-height: 500px; }
         .page.active { display: block; }
         .form-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
         .form-group { display: flex; flex-direction: column; width: 100%; }
         label { margin-bottom: 6px; font-weight: 600; color: #333; font-size: 14px; }
         input, select, textarea { padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; width: 100%; -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+        input:focus, select:focus, textarea:focus { border-color: #1e3c72; outline: none; }
         .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin: 5px 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: #1e3c72; color: white; }
+        .btn-primary:hover { background: #2a5298; }
         .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
         .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
         .btn-info { background: #17a2b8; color: white; }
-        .notification { position: fixed; top: 10px; right: 10px; left: 10px; background: white; color: #333; padding: 15px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: none; z-index: 1000; border-left: 5px solid #28a745; text-align: center; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; border-radius: 15px; padding: 25px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .ln-card { background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin: 10px 0; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+        .btn-info:hover { background: #138496; }
         
         @media (min-width: 768px) {
             .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
@@ -424,6 +565,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
             
+            // Проверка загрузки QRCode библиотеки
+            setTimeout(() => {
+                console.log('QRCode доступен?', typeof QRCode !== 'undefined');
+                if (typeof QRCode === 'undefined') {
+                    console.warn('Библиотека QRCode не загружена');
+                }
+            }, 500);
+            
             // Проверка режима
             checkMode();
             
@@ -458,6 +607,14 @@
                     { id: 3, name: "Попов В.В.", email: "popov@farmstil.ru", department: "Склад" }
                 ];
                 localStorage.setItem('farmstil_executors', JSON.stringify(defaultExecutors));
+            }
+            
+            if (!localStorage.getItem('farmstil_qrcodes')) {
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('farmstil_ns')) {
+                localStorage.setItem('farmstil_ns', JSON.stringify([]));
             }
         }
         
@@ -636,19 +793,21 @@
         }
         
         // ============================================
-        // WORKFLOW ISO 13485
+        // WORKFLOW ISO 13485 - ИСПРАВЛЕННЫЙ КОД
         // ============================================
         
         function checkMode() {
             const urlParams = new URLSearchParams(window.location.search);
             const mode = urlParams.get('mode');
             const nsId = urlParams.get('ns');
+            const qrcode = urlParams.get('qrcode');
+            
+            console.log('Проверка режима:', { mode, nsId, qrcode });
             
             if (mode === 'worker') {
                 // Режим рабочего через QR
-                const qrCode = urlParams.get('qrcode');
-                if (qrCode) {
-                    processQRCode(qrCode);
+                if (qrcode) {
+                    processQRCode(qrcode);
                 } else {
                     showWorkerFormManual();
                 }
@@ -666,11 +825,15 @@
         }
         
         function processQRCode(qrCode) {
+            console.log('Обработка QR кода:', qrCode);
+            
             document.getElementById('adminMode').style.display = 'none';
             document.getElementById('workerMode').style.display = 'block';
             
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
             let qrData = qrcodes.find(qr => qr.code === qrCode);
+            
+            console.log('Найден QR данные:', qrData);
             
             if (qrData) {
                 showWorkerForm(qrData);
@@ -680,6 +843,8 @@
         }
         
         function showWorkerForm(qrData) {
+            console.log('Показать форму рабочего с QR данными:', qrData);
+            
             currentQRData = qrData;
             
             const formHTML = `
@@ -688,6 +853,7 @@
                         <div class="workflow-step-number">1</div>
                         <h3>🚨 Регистрация несоответствия</h3>
                         <p>Сканирован QR код цеха: <strong>${qrData.department} - ${qrData.location}</strong></p>
+                        <p>Ответственный за зону: ${qrData.responsible || 'Не указан'}</p>
                     </div>
                     
                     <form id="nsForm" onsubmit="event.preventDefault(); submitNSForm();">
@@ -749,7 +915,7 @@
                             <div class="form-group">
                                 <label>Загрузите фотографии (макс. 5):</label>
                                 <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotoUpload(event)" style="padding: 10px; border: 2px dashed #28a745; border-radius: 8px;">
-                                <div id="photoPreview" style="margin-top: 10px;"></div>
+                                <div id="photoPreview" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
                             </div>
                         </div>
                         
@@ -757,7 +923,117 @@
                             <button type="submit" class="btn btn-success mobile-btn">
                                 📤 Отправить лист несоответствия
                             </button>
-                            <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname">
+                            <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="margin-top: 10px;">
+                                ❌ Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.getElementById('workerContent').innerHTML = formHTML;
+        }
+        
+        function showWorkerFormManual(qrCode = null) {
+            console.log('Показать ручную форму рабочего');
+            
+            document.getElementById('adminMode').style.display = 'none';
+            document.getElementById('workerMode').style.display = 'block';
+            
+            let locationInfo = '';
+            if (qrCode) {
+                locationInfo = `<p>QR код: <strong>${qrCode}</strong></p>`;
+            }
+            
+            const formHTML = `
+                <div style="padding: 20px;">
+                    <div class="workflow-step active">
+                        <div class="workflow-step-number">1</div>
+                        <h3>🚨 Регистрация несоответствия (Ручной ввод)</h3>
+                        ${locationInfo}
+                        <p>Заполните данные о несоответствии</p>
+                    </div>
+                    
+                    <form id="nsForm" onsubmit="event.preventDefault(); submitNSFormManual();">
+                        <div class="ns-form-section">
+                            <h4 class="ns-form-section-title">📋 Основные данные</h4>
+                            
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>🏭 Подразделение:</label>
+                                    <select id="manualDepartment" required>
+                                        <option value="">Выберите подразделение</option>
+                                        <option value="Цех №1">Цех №1 - Производство</option>
+                                        <option value="Цех №2">Цех №2 - Сборка</option>
+                                        <option value="Склад">Склад материалов</option>
+                                        <option value="ОТК">Отдел технического контроля</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>📍 Рабочее место/Станок:</label>
+                                    <input type="text" id="manualLocation" placeholder="Например: Станок ЧПУ-5, Стол сборки №3" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>📅 Дата обнаружения:</label>
+                                    <input type="datetime-local" id="manualDetectionDateTime" value="${new Date().toISOString().slice(0,16)}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>👤 Ваше ФИО:</label>
+                                    <input type="text" id="manualApplicant" placeholder="Введите ваше ФИО" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>📞 Контактный телефон:</label>
+                                    <input type="tel" id="manualApplicantPhone" placeholder="+7 (999) 999-99-99">
+                                </div>
+                                <div class="form-group">
+                                    <label>🏭 Тип несоответствия:</label>
+                                    <select id="manualNsType" required>
+                                        <option value="">Выберите тип</option>
+                                        <option value="product">Несоответствие продукции</option>
+                                        <option value="process">Несоответствие процесса</option>
+                                        <option value="documentation">Несоответствие документации</option>
+                                        <option value="equipment">Неисправность оборудования</option>
+                                        <option value="material">Несоответствие материалов</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="ns-form-section">
+                            <h4 class="ns-form-section-title">📝 Описание несоответствия</h4>
+                            <div class="form-group">
+                                <label>🔍 Краткое описание:</label>
+                                <input type="text" id="manualNsTitle" placeholder="Например: Трещина на детали, Сбой в работе станка" required>
+                            </div>
+                            <div class="form-group">
+                                <label>📋 Подробное описание:</label>
+                                <textarea id="manualDescription" rows="4" placeholder="Опишите проблему подробно, укажите возможные причины..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>⚠️ Критичность:</label>
+                                <select id="manualCriticality">
+                                    <option value="low">Низкая</option>
+                                    <option value="medium" selected>Средняя</option>
+                                    <option value="high">Высокая</option>
+                                    <option value="critical">Критическая</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="ns-form-section">
+                            <h4 class="ns-form-section-title">📷 Доказательства</h4>
+                            <div class="form-group">
+                                <label>Загрузите фотографии (макс. 5):</label>
+                                <input type="file" id="manualPhotoInput" accept="image/*" multiple onchange="handlePhotoUploadManual(event)" style="padding: 10px; border: 2px dashed #28a745; border-radius: 8px;">
+                                <div id="manualPhotoPreview" style="margin-top: 10px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="submit" class="btn btn-success mobile-btn">
+                                📤 Отправить лист несоответствия
+                            </button>
+                            <button type="button" class="btn btn-danger" onclick="window.location.href = window.location.pathname" style="margin-top: 10px;">
                                 ❌ Отмена
                             </button>
                         </div>
@@ -793,6 +1069,52 @@
                             user: document.getElementById('applicant').value,
                             date: new Date().toISOString(),
                             comment: 'Несоответствие зарегистрировано'
+                        }
+                    ]
+                };
+                
+                // Сохранение
+                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                nsList.push(nsData);
+                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                
+                // Отправка уведомления менеджеру СМК
+                sendEmailToSMKManager(nsData);
+                
+                // Показать успех
+                showSuccessScreen(nsData);
+                
+            } catch (error) {
+                console.error('Ошибка отправки ЛН:', error);
+                showNotification('Ошибка: ' + error.message, 'error');
+            }
+        }
+        
+        function submitNSFormManual() {
+            try {
+                // Сбор данных
+                const nsData = {
+                    id: 'ns_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    nsNumber: generateNSNumber(),
+                    detectionDateTime: document.getElementById('manualDetectionDateTime').value,
+                    department: document.getElementById('manualDepartment').value,
+                    location: document.getElementById('manualLocation').value,
+                    applicant: document.getElementById('manualApplicant').value,
+                    applicantPhone: document.getElementById('manualApplicantPhone').value,
+                    nsType: document.getElementById('manualNsType').value,
+                    nsTitle: document.getElementById('manualNsTitle').value,
+                    description: document.getElementById('manualDescription').value,
+                    criticality: document.getElementById('manualCriticality').value,
+                    photos: photos,
+                    status: WORKFLOW_STATUSES.DETECTED,
+                    created: new Date().toISOString(),
+                    workflow: [
+                        {
+                            step: 1,
+                            action: 'detected',
+                            user: document.getElementById('manualApplicant').value,
+                            date: new Date().toISOString(),
+                            comment: 'Несоответствие зарегистрировано (ручной ввод)'
                         }
                     ]
                 };
@@ -857,7 +1179,7 @@ ${window.location.origin}${window.location.pathname}?mode=continue&ns=${nsData.i
                     <h2 style="color: #1e3c72;">Лист несоответствия зарегистрирован!</h2>
                     <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
                     
-                    <div class="info-box" style="max-width: 500px; margin: 30px auto; text-align: left;">
+                    <div class="info-box" style="max-width: 500px; margin: 30px auto; text-align: left; padding: 20px; background: #f8f9fa; border-radius: 10px;">
                         <p><strong>📋 Что дальше:</strong></p>
                         <ol style="margin-left: 20px;">
                             <li>Менеджер СМК получил уведомление</li>
@@ -867,9 +1189,14 @@ ${window.location.origin}${window.location.pathname}?mode=continue&ns=${nsData.i
                         </ol>
                     </div>
                     
-                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="margin-top: 20px;">
-                        📝 Создать еще одно несоответствие
-                    </button>
+                    <div style="margin-top: 30px;">
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="margin: 5px;">
+                            📝 Создать еще одно несоответствие
+                        </button>
+                        <button class="btn btn-info" onclick="window.location.href = window.location.pathname + '?mode=continue&ns=' + encodeURIComponent(nsData.id)" style="margin: 5px;">
+                            🔄 Продолжить заполнение
+                        </button>
+                    </div>
                 </div>
             `;
             
@@ -877,13 +1204,251 @@ ${window.location.origin}${window.location.pathname}?mode=continue&ns=${nsData.i
         }
         
         // ============================================
-        // УПРАВЛЕНИЕ WORKFLOW
+        // ФУНКЦИИ ДЛЯ РАБОТЫ С QR КОДАМИ (ИСПРАВЛЕННЫЕ)
+        // ============================================
+        
+        function generateQRCode() {
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocation').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            if (!department || !location) {
+                showNotification('Заполните обязательные поля', 'error');
+                return;
+            }
+            
+            const code = `FS-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+            const qrUrl = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${encodeURIComponent(code)}`;
+            
+            currentQRData = {
+                code: code,
+                department: department,
+                location: location,
+                responsible: responsible,
+                url: qrUrl,
+                created: new Date().toISOString()
+            };
+            
+            // Сохраняем
+            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            qrcodes.push(currentQRData);
+            localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+            
+            // Генерируем QR
+            const qrcodeDiv = document.getElementById('qrPreview');
+            qrcodeDiv.innerHTML = '';
+            
+            // Создаем отдельный div для QR-кода
+            const qrContainer = document.createElement('div');
+            qrContainer.id = 'qrCodeContainer';
+            qrcodeDiv.appendChild(qrContainer);
+            
+            // Генерируем QR-код
+            if (typeof QRCode !== 'undefined') {
+                try {
+                    new QRCode(qrContainer, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1e3c72",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } catch (error) {
+                    console.error('Ошибка генерации QR-кода:', error);
+                    // Альтернативный вариант - показываем URL
+                    qrContainer.innerHTML = `
+                        <div style="padding: 20px; background: #f0f0f0; border-radius: 10px;">
+                            <p>URL для сканирования:</p>
+                            <p><strong>${qrUrl}</strong></p>
+                            <p>Скопируйте эту ссылку</p>
+                        </div>
+                    `;
+                }
+            } else {
+                // Если библиотека QRCode не загружена
+                qrContainer.innerHTML = `
+                    <div style="padding: 20px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+                        <p>Библиотека QR-кодов не загружена</p>
+                        <p>URL: <strong>${qrUrl}</strong></p>
+                        <button class="btn btn-primary" onclick="window.open('${qrUrl}', '_blank')">📱 Протестировать ссылку</button>
+                    </div>
+                `;
+            }
+            
+            // Добавляем информацию
+            qrcodeDiv.innerHTML += `
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <p><strong>Подразделение:</strong> ${department}</p>
+                    <p><strong>Место:</strong> ${location}</p>
+                    ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
+                    <p><strong>Код QR:</strong> <code>${code}</code></p>
+                    <p><strong>URL:</strong> <small>${qrUrl}</small></p>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать QR-кода</button>
+                        <button class="btn btn-info" onclick="testQRCode('${code}')">📱 Тест QR-кода</button>
+                    </div>
+                </div>
+            `;
+            
+            qrcodeDiv.style.display = 'block';
+            showNotification('QR-код создан успешно!', 'success');
+        }
+        
+        function testQRCode(code) {
+            const qrUrl = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${encodeURIComponent(code)}`;
+            window.open(qrUrl, '_blank');
+            showNotification('Открыта тестовая страница для QR-кода', 'info');
+        }
+        
+        function printQRCode() {
+            if (!currentQRData) {
+                showNotification('Сначала создайте QR-код', 'error');
+                return;
+            }
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>QR код - ${currentQRData.department}</title>
+                    <style>
+                        body { font-family: Arial; text-align: center; padding: 20px; }
+                        h1 { color: #1e3c72; }
+                        h2 { color: #666; }
+                        .info { margin: 20px 0; }
+                        .qrcode-container { margin: 30px auto; padding: 20px; display: inline-block; border: 1px solid #ddd; }
+                        @media print { body { padding: 10px; } }
+                    </style>
+                </head>
+                <body>
+                    <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
+                    <h2>ISO 13485 Workflow System</h2>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        ${currentQRData.responsible ? `<p><strong>Ответственный:</strong> ${currentQRData.responsible}</p>` : ''}
+                    </div>
+                    
+                    <div class="qrcode-container">
+                        <div id="qrcode"></div>
+                        <p style="margin-top: 10px;">Отсканируйте для регистрации несоответствия</p>
+                        <p><small>Код: ${currentQRData.code}</small></p>
+                    </div>
+                    
+                    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
+                    <script>
+                        new QRCode(document.getElementById('qrcode'), {
+                            text: '${currentQRData.url}',
+                            width: 200,
+                            height: 200,
+                            colorDark: "#1e3c72",
+                            colorLight: "#ffffff"
+                        });
+                        setTimeout(() => {
+                            window.print();
+                            setTimeout(() => window.close(), 1000);
+                        }, 500);
+                    <\/script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        }
+        
+        function handlePhotoUpload(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('photoPreview');
+            
+            if (!preview) return;
+            
+            photos = [];
+            preview.innerHTML = '';
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = '100px';
+                    img.style.height = '100px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '8px';
+                    img.style.margin = '5px';
+                    img.style.border = '2px solid #ddd';
+                    preview.appendChild(img);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+            
+            if (files.length > 5) {
+                showNotification('Загружено только 5 фото (максимум)', 'warning');
+            }
+        }
+        
+        function handlePhotoUploadManual(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('manualPhotoPreview');
+            
+            if (!preview) return;
+            
+            photos = [];
+            preview.innerHTML = '';
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.style.width = '100px';
+                    img.style.height = '100px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '8px';
+                    img.style.margin = '5px';
+                    img.style.border = '2px solid #ddd';
+                    preview.appendChild(img);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+            
+            if (files.length > 5) {
+                showNotification('Загружено только 5 фото (максимум)', 'warning');
+            }
+        }
+        
+        // ============================================
+        // УПРАВЛЕНИЕ WORKFLOW (остальные функции без изменений)
         // ============================================
         
         function loadPendingCount() {
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const pending = nsList.filter(ns => ns.status === WORKFLOW_STATUSES.DETECTED).length;
-            document.getElementById('pendingCount').textContent = pending;
+            const pendingCountEl = document.getElementById('pendingCount');
+            if (pendingCountEl) {
+                pendingCountEl.textContent = pending;
+            }
         }
         
         function showPendingNS() {
@@ -904,10 +1469,10 @@ ${window.location.origin}${window.location.pathname}?mode=continue&ns=${nsData.i
                     <div class="ln-card">
                         <div class="ln-card-header">
                             <div class="ln-number">${ns.nsNumber}</div>
-                            <div class="ln-status status-checking">НА ПРОВЕРКЕ</div>
+                            <div class="ln-status status-detected">НА ПРОВЕРКЕ</div>
                         </div>
                         <div>
-                            <p><strong>${ns.nsTitle}</strong></p>
+                            <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
                             <p>${ns.department} - ${ns.location}</p>
                             <p>Заявитель: ${ns.applicant}</p>
                             <p>${ns.description.substring(0, 100)}...</p>
@@ -1132,7 +1697,7 @@ ${continueLink}
                                 </div>
                                 <div class="form-group">
                                     <label>Срок исполнения:</label>
-                                    <input type="date" id="actionDeadline" value="${ns.deadline}">
+                                    <input type="date" id="actionDeadline" value="${ns.deadline || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
                                 </div>
                             </div>
                         </div>
@@ -1218,6 +1783,18 @@ ${continueLink}
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const ns = nsList.find(n => n.id === nsId);
             
+            if (!ns) {
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <h2>ЛН не найден</h2>
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
+                            На главную
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
             const html = `
                 <div style="padding: 20px;">
                     <h2>✅ Исполнение корректирующих действий</h2>
@@ -1225,7 +1802,7 @@ ${continueLink}
                     
                     <div class="ns-form-section">
                         <h4>Корректирующие действия:</h4>
-                        <p>${ns.correctionActions.correctiveActions || 'Не указаны'}</p>
+                        <p>${ns.correctionActions?.correctiveActions || 'Не указаны'}</p>
                     </div>
                     
                     <form onsubmit="event.preventDefault(); completeExecution('${nsId}');">
@@ -1334,7 +1911,7 @@ ${continueLink}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
-            // Отправляем уведомление заявителю (в реальной системе - на email заявителя)
+            // Отправляем уведомление заявителю
             const emailBody = `
 Ваш Лист Несоответствия ${ns.nsNumber} возвращен на доработку.
 
@@ -1344,7 +1921,6 @@ ${reason}
 Пожалуйста, исправьте указанные замечания и отправьте ЛН повторно.
             `.trim();
             
-            // Здесь в реальной системе нужно отправлять на email заявителя
             sendEmail('finkart23@mail.ru', `ЛН ${ns.nsNumber} возвращен на доработку`, emailBody);
             
             closeModal();
@@ -1380,12 +1956,11 @@ ${reason}
             if (!notification) return;
             
             notification.textContent = message;
-            notification.style.borderLeftColor = {
-                success: '#28a745',
-                error: '#dc3545',
-                warning: '#ffc107',
-                info: '#17a2b8'
-            }[type] || '#28a745';
+            notification.className = 'notification';
+            
+            if (type === 'error') notification.classList.add('error');
+            else if (type === 'warning') notification.classList.add('warning');
+            else if (type === 'info') notification.classList.add('info');
             
             notification.style.display = 'block';
             setTimeout(() => notification.style.display = 'none', duration);
@@ -1414,19 +1989,19 @@ ${reason}
             let html = '';
             responsibles.forEach((r, index) => {
                 html += `
-                    <div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;">
                         <div>
                             <strong>${r.name}</strong><br>
                             <small>${r.role} - ${r.email}</small>
                         </div>
-                        <button onclick="deleteResponsible(${index})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px;">
+                        <button onclick="deleteResponsible(${index})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">
                             Удалить
                         </button>
                     </div>
                 `;
             });
             
-            container.innerHTML = html || '<p>Нет ответственных</p>';
+            container.innerHTML = html || '<p style="padding: 10px; color: #666;">Нет ответственных</p>';
         }
         
         function addResponsible() {
@@ -1474,19 +2049,19 @@ ${reason}
             let html = '';
             executors.forEach((e, index) => {
                 html += `
-                    <div style="display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; border-bottom: 1px solid #eee;">
                         <div>
                             <strong>${e.name}</strong><br>
                             <small>${e.department} - ${e.email}</small>
                         </div>
-                        <button onclick="deleteExecutor(${index})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px;">
+                        <button onclick="deleteExecutor(${index})" style="background: #dc3545; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">
                             Удалить
                         </button>
                     </div>
                 `;
             });
             
-            container.innerHTML = html || '<p>Нет исполнителей</p>';
+            container.innerHTML = html || '<p style="padding: 10px; color: #666;">Нет исполнителей</p>';
         }
         
         function addExecutor() {
@@ -1541,27 +2116,27 @@ ${reason}
             
             const html = `
                 <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px;">
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #1e3c72;">${stats.total}</div>
                         <div style="color: #666; font-size: 14px;">Всего ЛН</div>
                     </div>
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #ffc107;">${stats.detected}</div>
                         <div style="color: #666; font-size: 14px;">На проверке</div>
                     </div>
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #6f42c1;">${stats.assigned}</div>
                         <div style="color: #666; font-size: 14px;">Назначены</div>
                     </div>
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #17a2b8;">${stats.correction}</div>
                         <div style="color: #666; font-size: 14px;">Корректировка</div>
                     </div>
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #fd7e14;">${stats.execution}</div>
                         <div style="color: #666; font-size: 14px;">Исполнение</div>
                     </div>
-                    <div class="info-box" style="text-align: center;">
+                    <div class="info-box" style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                         <div style="font-size: 32px; font-weight: bold; color: #28a745;">${stats.completed + stats.closed}</div>
                         <div style="color: #666; font-size: 14px;">Завершено</div>
                     </div>
@@ -1600,7 +2175,7 @@ ${reason}
                             <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
                             <p>${ns.department} - ${ns.location}</p>
                             <p>${new Date(ns.detectionDateTime || ns.created).toLocaleDateString('ru-RU')} - ${ns.applicant}</p>
-                            <p style="margin-top: 10px; color: #666; font-size: 14px;">${ns.description.substring(0, 100)}...</p>
+                            <p style="margin-top: 10px; color: #666; font-size: 14px;">${(ns.description || '').substring(0, 100)}...</p>
                             
                             <div style="margin-top: 15px;">
                                 <button class="btn btn-info" onclick="viewNSDetails(${index})" style="padding: 8px 12px; font-size: 14px; margin-right: 5px;">
@@ -1632,42 +2207,46 @@ ${reason}
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const ns = nsList[index];
             
-            let workflowHTML = '<h4>📋 История workflow:</h4><div style="max-height: 200px; overflow-y: auto;">';
-            ns.workflow.forEach(step => {
-                workflowHTML += `
-                    <div style="padding: 8px; border-bottom: 1px solid #eee;">
-                        <small>${new Date(step.date).toLocaleString('ru-RU')}</small><br>
-                        ${step.user}: ${step.comment}
-                    </div>
-                `;
-            });
+            let workflowHTML = '<h4>📋 История workflow:</h4><div style="max-height: 200px; overflow-y: auto; margin-bottom: 20px;">';
+            if (ns.workflow && ns.workflow.length > 0) {
+                ns.workflow.forEach(step => {
+                    workflowHTML += `
+                        <div style="padding: 8px; border-bottom: 1px solid #eee;">
+                            <small>${new Date(step.date).toLocaleString('ru-RU')}</small><br>
+                            ${step.user}: ${step.comment}
+                        </div>
+                    `;
+                });
+            } else {
+                workflowHTML += '<p>История отсутствует</p>';
+            }
             workflowHTML += '</div>';
             
             const html = `
                 <h3>${ns.nsNumber}</h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0;">
                     <div><strong>Статус:</strong> ${getStatusText(ns.status)}</div>
-                    <div><strong>Дата:</strong> ${new Date(ns.detectionDateTime).toLocaleString('ru-RU')}</div>
+                    <div><strong>Дата:</strong> ${new Date(ns.detectionDateTime || ns.created).toLocaleString('ru-RU')}</div>
                     <div><strong>Подразделение:</strong> ${ns.department}</div>
                     <div><strong>Место:</strong> ${ns.location}</div>
                     <div><strong>Заявитель:</strong> ${ns.applicant}</div>
-                    <div><strong>Телефон:</strong> ${ns.applicantPhone}</div>
-                    <div><strong>Тип:</strong> ${ns.nsType}</div>
-                    <div><strong>Критичность:</strong> ${ns.criticality}</div>
+                    <div><strong>Телефон:</strong> ${ns.applicantPhone || 'Не указан'}</div>
+                    <div><strong>Тип:</strong> ${ns.nsType || 'Не указан'}</div>
+                    <div><strong>Критичность:</strong> ${ns.criticality || 'Не указана'}</div>
                 </div>
                 
                 <h4>Описание:</h4>
-                <p>${ns.description}</p>
+                <p>${ns.description || 'Не указано'}</p>
                 
-                ${ns.responsiblePerson ? `<p><strong>Ответственный:</strong> ${ns.responsiblePerson} (до ${ns.deadline})</p>` : ''}
-                ${ns.correctionActions ? `<h4>Корректирующие действия:</h4><p>${ns.correctionActions.correctiveActions}</p>` : ''}
-                ${ns.executionReport ? `<h4>Отчет о выполнении:</h4><p>${ns.executionReport.report}</p>` : ''}
+                ${ns.responsiblePerson ? `<p><strong>Ответственный:</strong> ${ns.responsiblePerson} ${ns.deadline ? '(до ' + ns.deadline + ')' : ''}</p>` : ''}
+                ${ns.correctionActions ? `<h4>Корректирующие действия:</h4><p>${ns.correctionActions.correctiveActions || 'Не указаны'}</p>` : ''}
+                ${ns.executionReport ? `<h4>Отчет о выполнении:</h4><p>${ns.executionReport.report || 'Не указан'}</p>` : ''}
                 
                 ${workflowHTML}
                 
                 <div style="margin-top: 20px; text-align: center;">
-                    <button class="btn btn-primary" onclick="printNS(${index})">🖨️ Печать ЛН</button>
-                    <button class="btn btn-danger" onclick="closeModal()">Закрыть</button>
+                    <button class="btn btn-primary" onclick="printNS(${index})" style="margin: 5px;">🖨️ Печать ЛН</button>
+                    <button class="btn btn-danger" onclick="closeModal()" style="margin: 5px;">Закрыть</button>
                 </div>
             `;
             
@@ -1703,37 +2282,37 @@ ${reason}
                     
                     <div class="section">
                         <h3>1. ОБЩИЕ ДАННЫЕ</h3>
-                        <p><strong>Дата обнаружения:</strong> ${new Date(ns.detectionDateTime).toLocaleString('ru-RU')}</p>
+                        <p><strong>Дата обнаружения:</strong> ${new Date(ns.detectionDateTime || ns.created).toLocaleString('ru-RU')}</p>
                         <p><strong>Подразделение:</strong> ${ns.department}</p>
                         <p><strong>Место обнаружения:</strong> ${ns.location}</p>
                         <p><strong>Заявитель:</strong> ${ns.applicant}</p>
-                        <p><strong>Тип несоответствия:</strong> ${ns.nsType}</p>
-                        <p><strong>Критичность:</strong> ${ns.criticality}</p>
+                        <p><strong>Тип несоответствия:</strong> ${ns.nsType || 'Не указан'}</p>
+                        <p><strong>Критичность:</strong> ${ns.criticality || 'Не указана'}</p>
                     </div>
                     
                     <div class="section">
                         <h3>2. ОПИСАНИЕ НЕСООТВЕТСТВИЯ</h3>
-                        <p>${ns.description}</p>
+                        <p>${ns.description || 'Не указано'}</p>
                     </div>
                     
                     ${ns.correctionActions ? `
                     <div class="section">
                         <h3>3. КОРРЕКТИРУЮЩИЕ ДЕЙСТВИЯ</h3>
-                        <p><strong>Причины:</strong> ${ns.correctionActions.rootCauses}</p>
-                        <p><strong>Немедленные действия:</strong> ${ns.correctionActions.immediateActions}</p>
-                        <p><strong>Действия по устранению причин:</strong> ${ns.correctionActions.correctiveActions}</p>
-                        <p><strong>Предупреждающие действия:</strong> ${ns.correctionActions.preventiveActions}</p>
-                        <p><strong>Ответственный:</strong> ${ns.responsiblePerson}</p>
-                        <p><strong>Срок:</strong> ${ns.deadline}</p>
+                        <p><strong>Причины:</strong> ${ns.correctionActions.rootCauses || 'Не указаны'}</p>
+                        <p><strong>Немедленные действия:</strong> ${ns.correctionActions.immediateActions || 'Не указаны'}</p>
+                        <p><strong>Действия по устранению причин:</strong> ${ns.correctionActions.correctiveActions || 'Не указаны'}</p>
+                        <p><strong>Предупреждающие действия:</strong> ${ns.correctionActions.preventiveActions || 'Не указаны'}</p>
+                        <p><strong>Ответственный:</strong> ${ns.responsiblePerson || 'Не назначен'}</p>
+                        <p><strong>Срок:</strong> ${ns.deadline || 'Не указан'}</p>
                     </div>
                     ` : ''}
                     
                     ${ns.executionReport ? `
                     <div class="section">
                         <h3>4. ОТЧЕТ О ВЫПОЛНЕНИИ</h3>
-                        <p>${ns.executionReport.report}</p>
-                        <p><strong>Исполнитель:</strong> ${ns.executionReport.executor}</p>
-                        <p><strong>Дата выполнения:</strong> ${new Date(ns.executionReport.date).toLocaleDateString('ru-RU')}</p>
+                        <p>${ns.executionReport.report || 'Не указан'}</p>
+                        <p><strong>Исполнитель:</strong> ${ns.executionReport.executor || 'Не указан'}</p>
+                        <p><strong>Дата выполнения:</strong> ${new Date(ns.executionReport.date || ns.created).toLocaleDateString('ru-RU')}</p>
                     </div>
                     ` : ''}
                     
@@ -1914,125 +2493,63 @@ ${reason}
             document.getElementById('googleAuthModal').style.display = 'none';
         }
         
-        // ============================================
-        // ФУНКЦИИ ДЛЯ РАБОТЫ С QR КОДАМИ (упрощенные)
-        // ============================================
-        
-        function generateQRCode() {
-            const department = document.getElementById('qrDepartment').value;
-            const location = document.getElementById('qrLocation').value;
-            const responsible = document.getElementById('qrResponsible').value;
+        function searchNS() {
+            const searchTerm = document.getElementById('searchNS').value.toLowerCase();
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const container = document.getElementById('nsListContainer');
             
-            if (!department || !location) {
-                showNotification('Заполните обязательные поля', 'error');
+            if (!container) return;
+            
+            if (!searchTerm) {
+                loadNSList();
                 return;
             }
             
-            const code = `FS-${Date.now().toString().slice(-6)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
-            const qrUrl = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${code}`;
+            const filteredNS = nsList.filter(ns => 
+                (ns.nsNumber && ns.nsNumber.toLowerCase().includes(searchTerm)) ||
+                (ns.department && ns.department.toLowerCase().includes(searchTerm)) ||
+                (ns.location && ns.location.toLowerCase().includes(searchTerm)) ||
+                (ns.applicant && ns.applicant.toLowerCase().includes(searchTerm)) ||
+                (ns.nsTitle && ns.nsTitle.toLowerCase().includes(searchTerm)) ||
+                (ns.status && getStatusText(ns.status).toLowerCase().includes(searchTerm))
+            );
             
-            currentQRData = {
-                code: code,
-                department: department,
-                location: location,
-                responsible: responsible,
-                url: qrUrl,
-                created: new Date().toISOString()
-            };
-            
-            // Сохраняем
-            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            qrcodes.push(currentQRData);
-            localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
-            
-            // Генерируем QR
-            const qrcodeDiv = document.getElementById('qrPreview');
-            qrcodeDiv.innerHTML = '';
-            
-            if (typeof QRCode !== 'undefined') {
-                new QRCode(qrcodeDiv, {
-                    text: qrUrl,
-                    width: 200,
-                    height: 200,
-                    colorDark: "#1e3c72",
-                    colorLight: "#ffffff"
-                });
+            if (filteredNS.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><h3>Ничего не найдено</h3></div>';
+                return;
             }
             
-            qrcodeDiv.innerHTML += `
-                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                    <p><strong>Подразделение:</strong> ${department}</p>
-                    <p><strong>Место:</strong> ${location}</p>
-                    <p><strong>Код:</strong> <code>${code}</code></p>
-                    <button class="btn btn-primary" onclick="printQRCode()">🖨️ Печать</button>
-                </div>
-            `;
+            let html = '<div class="ln-list">';
             
-            qrcodeDiv.style.display = 'block';
-            showNotification('QR-код создан', 'success');
-        }
-        
-        function printQRCode() {
-            if (!currentQRData) return;
-            
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head><title>QR код</title></head>
-                <body style="text-align: center; padding: 20px;">
-                    <h2>ФАРМСТИЛ - Регистрация несоответствий</h2>
-                    <p>${currentQRData.department}</p>
-                    <p>${currentQRData.location}</p>
-                    <div id="qrcode"></div>
-                    <p>Отсканируйте для регистрации несоответствия</p>
-                    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
-                    <script>
-                        new QRCode(document.getElementById('qrcode'), {
-                            text: '${currentQRData.url}',
-                            width: 200,
-                            height: 200
-                        });
-                        setTimeout(() => window.print(), 500);
-                    <\/script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-        }
-        
-        function handlePhotoUpload(event) {
-            const files = event.target.files;
-            const preview = document.getElementById('photoPreview');
-            
-            if (!preview) return;
-            
-            photos = [];
-            preview.innerHTML = '';
-            
-            for (let i = 0; i < Math.min(files.length, 5); i++) {
-                const file = files[i];
-                const reader = new FileReader();
+            filteredNS.forEach((ns, index) => {
+                const statusText = getStatusText(ns.status);
+                const statusClass = `status-${ns.status.replace(/_/g, '-')}`;
                 
-                reader.onload = function(e) {
-                    photos.push({
-                        name: file.name,
-                        data: e.target.result,
-                        type: file.type
-                    });
-                    
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.style.width = '100px';
-                    img.style.height = '100px';
-                    img.style.objectFit = 'cover';
-                    img.style.borderRadius = '8px';
-                    img.style.margin = '5px';
-                    preview.appendChild(img);
-                };
-                
-                reader.readAsDataURL(file);
-            }
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div>
+                            <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
+                            <p>${ns.department} - ${ns.location}</p>
+                            <p>${new Date(ns.detectionDateTime || ns.created).toLocaleDateString('ru-RU')} - ${ns.applicant}</p>
+                            <p style="margin-top: 10px; color: #666; font-size: 14px;">${(ns.description || '').substring(0, 100)}...</p>
+                            
+                            <div style="margin-top: 15px;">
+                                <button class="btn btn-info" onclick="viewNSDetails(${nsList.findIndex(n => n.id === ns.id)})" style="padding: 8px 12px; font-size: 14px; margin-right: 5px;">
+                                    👁️ Просмотр
+                                </button>
+                                ${getActionButton(ns, nsList.findIndex(n => n.id === ns.id))}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
         }
         
         // Экспорт функций в глобальную область видимости
@@ -2059,6 +2576,9 @@ ${reason}
         window.exportToGoogleSheets = exportToGoogleSheets;
         window.syncFromGoogleSheets = syncFromGoogleSheets;
         window.showPendingNS = showPendingNS;
+        window.searchNS = searchNS;
+        window.showWorkerFormManual = showWorkerFormManual;
+        window.testQRCode = testQRCode;
     </script>
 </body>
 </html>
