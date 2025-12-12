@@ -48,40 +48,6 @@
             margin: 10px 0;
         }
         
-        /* Остальные стили остаются без изменений */
-        .workflow-step {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            margin: 15px 0;
-            border-left: 4px solid #1e3c72;
-            position: relative;
-        }
-        
-        .workflow-step.active {
-            background: #e8f4fd;
-            border-left-color: #28a745;
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.4); }
-            70% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0); }
-        }
-        
-        .mobile-btn {
-            padding: 16px;
-            font-size: 18px;
-            margin: 10px 0;
-            border-radius: 10px;
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-        
         .notification {
             position: fixed;
             top: 10px;
@@ -123,6 +89,29 @@
             width: 90%;
             max-height: 80vh;
             overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
         }
         
         .ln-card {
@@ -428,6 +417,8 @@
         let photos = [];
         let currentEditingNS = null;
         let googleToken = null;
+        let gapiInited = false;
+        let gisInited = false;
         
         // ============================================
         // ИНИЦИАЛИЗАЦИЯ
@@ -436,12 +427,14 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
             
-            // Инициализация данных
             initDirectories();
             checkMode();
             loadDirectories();
             updateStats();
             loadPendingCount();
+            
+            // Загружаем Google API
+            loadGoogleAPI();
             
             console.log('✅ Система готова к работе');
         });
@@ -473,7 +466,197 @@
         }
         
         // ============================================
-        // ИСПРАВЛЕННАЯ ГЕНЕРАЦИЯ QR-КОДА
+        // GOOGLE SHEETS ИНТЕГРАЦИЯ (ИСПРАВЛЕННАЯ)
+        // ============================================
+        
+        function loadGoogleAPI() {
+            // Проверяем, не загружена ли библиотека уже
+            if (typeof gapi !== 'undefined') {
+                gapi.load('client', initializeGapiClient);
+            } else {
+                // Ждем загрузки библиотеки
+                const checkGapi = setInterval(() => {
+                    if (typeof gapi !== 'undefined') {
+                        clearInterval(checkGapi);
+                        gapi.load('client', initializeGapiClient);
+                    }
+                }, 100);
+            }
+            
+            // Проверяем Google Identity Services
+            if (typeof google !== 'undefined') {
+                gisInited = true;
+            }
+        }
+        
+        async function initializeGapiClient() {
+            try {
+                await gapi.client.init({
+                    apiKey: GOOGLE_SHEETS_CONFIG.API_KEY,
+                    discoveryDocs: ['https://sheets.googleapis.com/$discovery/rest?version=v4'],
+                });
+                gapiInited = true;
+                console.log('✅ Google API инициализирован');
+                
+                // Проверяем сохраненный токен
+                const savedToken = localStorage.getItem('google_token');
+                if (savedToken) {
+                    googleToken = JSON.parse(savedToken);
+                    updateSheetsStatus('✅ Авторизован в Google Sheets', 'success');
+                    document.getElementById('sheetsControls').style.display = 'block';
+                }
+            } catch (error) {
+                console.error('❌ Ошибка инициализации Google API:', error);
+            }
+        }
+        
+        function initGoogleSheets() {
+            document.getElementById('googleAuthModal').style.display = 'flex';
+        }
+        
+        function googleAuth() {
+            if (typeof google === 'undefined') {
+                showNotification('Google Identity Services не загружен', 'error');
+                return;
+            }
+            
+            const client = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_SHEETS_CONFIG.CLIENT_ID,
+                scope: GOOGLE_SHEETS_CONFIG.SCOPES,
+                callback: (response) => {
+                    if (response.access_token) {
+                        googleToken = response;
+                        localStorage.setItem('google_token', JSON.stringify(response));
+                        updateSheetsStatus('✅ Авторизация успешна!', 'success');
+                        document.getElementById('sheetsControls').style.display = 'block';
+                        closeModal();
+                    } else {
+                        updateSheetsStatus('❌ Авторизация не удалась', 'error');
+                    }
+                },
+            });
+            
+            client.requestAccessToken();
+        }
+        
+        function updateSheetsStatus(message, type) {
+            const statusDiv = document.getElementById('googleSheetsStatus');
+            if (!statusDiv) return;
+            
+            statusDiv.innerHTML = `
+                <div style="padding: 15px; border-radius: 8px; background: ${type === 'success' ? '#d4edda' : '#f8d7da'}; 
+                           color: ${type === 'success' ? '#155724' : '#721c24'}; border: 1px solid ${type === 'success' ? '#c3e6cb' : '#f5c6cb'};">
+                    ${message}
+                </div>
+            `;
+        }
+        
+        async function exportToGoogleSheets() {
+            try {
+                if (!googleToken || !gapiInited) {
+                    showNotification('Сначала авторизуйтесь в Google', 'error');
+                    initGoogleSheets();
+                    return;
+                }
+                
+                showNotification('Экспорт в Google Sheets...', 'info');
+                
+                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                
+                if (nsList.length === 0) {
+                    showNotification('Нет данных для экспорта', 'warning');
+                    return;
+                }
+                
+                // Подготавливаем данные
+                const headers = [
+                    'Номер ЛН', 'Дата создания', 'Подразделение', 'Место',
+                    'Заявитель', 'Телефон', 'Тип', 'Описание', 'Статус',
+                    'Ответственный', 'Срок', 'Корректирующие действия', 'Дата закрытия'
+                ];
+                
+                const values = nsList.map(ns => [
+                    ns.nsNumber || '',
+                    ns.createdDate || '',
+                    ns.department || '',
+                    ns.location || '',
+                    ns.applicant || '',
+                    ns.applicantPhone || '',
+                    ns.nsType || '',
+                    ns.description ? ns.description.substring(0, 100) : '',
+                    getStatusText(ns.status),
+                    ns.responsiblePerson || '',
+                    ns.deadline || '',
+                    ns.correctionActions || '',
+                    ns.closedDate ? new Date(ns.closedDate).toISOString().split('T')[0] : ''
+                ]);
+                
+                values.unshift(headers);
+                
+                // Устанавливаем токен
+                gapi.client.setToken(googleToken);
+                
+                // Очищаем лист перед записью
+                await gapi.client.sheets.spreadsheets.values.clear({
+                    spreadsheetId: GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID,
+                    range: 'A1:Z1000'
+                });
+                
+                // Записываем данные
+                await gapi.client.sheets.spreadsheets.values.update({
+                    spreadsheetId: GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID,
+                    range: 'A1',
+                    valueInputOption: 'RAW',
+                    resource: { values }
+                });
+                
+                showNotification('✅ Данные успешно экспортированы в Google Sheets', 'success');
+                
+            } catch (error) {
+                console.error('❌ Ошибка экспорта:', error);
+                showNotification('Ошибка экспорта: ' + error.message, 'error');
+            }
+        }
+        
+        async function syncFromGoogleSheets() {
+            try {
+                if (!googleToken || !gapiInited) {
+                    showNotification('Сначала авторизуйтесь в Google', 'error');
+                    initGoogleSheets();
+                    return;
+                }
+                
+                showNotification('Синхронизация из Google Sheets...', 'info');
+                
+                // Устанавливаем токен
+                gapi.client.setToken(googleToken);
+                
+                // Читаем данные
+                const response = await gapi.client.sheets.spreadsheets.values.get({
+                    spreadsheetId: GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID,
+                    range: 'A2:Z'
+                });
+                
+                const rows = response.result.values || [];
+                
+                if (rows.length === 0) {
+                    showNotification('Нет данных в таблице', 'warning');
+                    return;
+                }
+                
+                // Здесь можно добавить логику синхронизации
+                // Например, обновление статусов ЛН из таблицы
+                
+                showNotification(`Загружено ${rows.length} строк из Google Sheets`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Ошибка синхронизации:', error);
+                showNotification('Ошибка синхронизации: ' + error.message, 'error');
+            }
+        }
+        
+        // ============================================
+        // QR-КОДЫ (ИСПРАВЛЕННЫЕ)
         // ============================================
         
         function generateQRCode() {
@@ -486,12 +669,9 @@
                 return;
             }
             
-            // Генерируем уникальный код
             const code = `FS-${Date.now().toString().slice(-8)}`;
-            
-            // Создаем URL с кодом
-            const currentUrl = window.location.href.split('?')[0];
-            const qrUrl = `${currentUrl}?mode=worker&qrcode=${code}`;
+            const currentUrl = window.location.origin + window.location.pathname;
+            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
             
             currentQRData = {
                 code: code,
@@ -502,7 +682,7 @@
                 created: new Date().toISOString()
             };
             
-            // Сохраняем QR код
+            // Сохраняем
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
             qrcodes.push(currentQRData);
             localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
@@ -517,14 +697,12 @@
             const qrcodeDiv = document.getElementById('qrPreview');
             qrcodeDiv.innerHTML = '';
             
-            // Создаем контейнер для QR-кода
             const qrContainer = document.createElement('div');
             qrContainer.className = 'qr-container';
             qrcodeDiv.appendChild(qrContainer);
             
-            // Создаем div для QR-кода
             const qrCodeDiv = document.createElement('div');
-            qrCodeDiv.id = 'qrcode';
+            qrCodeDiv.id = 'qrcode-' + Date.now();
             qrContainer.appendChild(qrCodeDiv);
             
             // Генерируем QR-код
@@ -535,8 +713,7 @@
                         width: 200,
                         height: 200,
                         colorDark: "#1e3c72",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
+                        colorLight: "#ffffff"
                     });
                 } else {
                     throw new Error('Библиотека QRCode не загружена');
@@ -546,7 +723,7 @@
                 qrCodeDiv.innerHTML = `
                     <div style="width: 200px; height: 200px; background: #1e3c72; color: white; display: flex; align-items: center; justify-content: center; border-radius: 10px; margin: 0 auto;">
                         <div style="text-align: center;">
-                            <div style="font-size: 24px; margin-bottom: 10px;">QR</div>
+                            <div style="font-size: 24px;">QR</div>
                             <div style="font-size: 12px;">${code}</div>
                         </div>
                     </div>
@@ -560,7 +737,6 @@
                     <p><strong>Место:</strong> ${location}</p>
                     ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
                     <p><strong>Код:</strong> <code>${code}</code></p>
-                    <p><strong>Ссылка:</strong> <small>${qrUrl}</small></p>
                     <div style="margin-top: 15px;">
                         <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать</button>
                         <button class="btn btn-info" onclick="testQRCode('${code}')">📱 Тест</button>
@@ -572,17 +748,13 @@
         }
         
         function testQRCode(code) {
-            const currentUrl = window.location.href.split('?')[0];
-            const qrUrl = `${currentUrl}?mode=worker&qrcode=${code}`;
+            const currentUrl = window.location.origin + window.location.pathname;
+            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
             window.open(qrUrl, '_blank');
-            showNotification('Открыта тестовая страница', 'info');
         }
         
         function printQRCode() {
-            if (!currentQRData) {
-                showNotification('Сначала создайте QR-код', 'error');
-                return;
-            }
+            if (!currentQRData) return;
             
             const printWindow = window.open('', '_blank');
             printWindow.document.write(`
@@ -591,10 +763,10 @@
                 <head>
                     <title>QR код - ${currentQRData.department}</title>
                     <style>
-                        body { font-family: Arial; text-align: center; padding: 20px; }
-                        h1 { color: #1e3c72; }
-                        .info { margin: 20px 0; }
-                        @media print { body { padding: 10px; } }
+                        body { font-family: Arial; text-align: center; padding: 40px; }
+                        h1 { color: #1e3c72; margin-bottom: 20px; }
+                        .info { margin: 20px 0; font-size: 16px; }
+                        @media print { body { padding: 20px; } }
                     </style>
                 </head>
                 <body>
@@ -607,21 +779,18 @@
                     </div>
                     
                     <div id="qrcode"></div>
-                    <p style="margin-top: 10px;">Отсканируйте для регистрации несоответствия</p>
+                    <p style="margin-top: 20px; font-size: 14px;">Отсканируйте для регистрации несоответствия</p>
                     
                     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"><\/script>
                     <script>
                         new QRCode(document.getElementById('qrcode'), {
                             text: '${currentQRData.url}',
-                            width: 200,
-                            height: 200,
+                            width: 300,
+                            height: 300,
                             colorDark: "#1e3c72",
                             colorLight: "#ffffff"
                         });
-                        setTimeout(() => {
-                            window.print();
-                            setTimeout(() => window.close(), 1000);
-                        }, 500);
+                        setTimeout(() => window.print(), 500);
                     <\/script>
                 </body>
                 </html>
@@ -630,7 +799,7 @@
         }
         
         // ============================================
-        // WORKFLOW И РАБОТА С ЛН
+        // WORKFLOW И ЛН (ИСПРАВЛЕННЫЕ)
         // ============================================
         
         function checkMode() {
@@ -640,7 +809,6 @@
             const qrcode = urlParams.get('qrcode');
             
             if (mode === 'worker') {
-                // Режим рабочего
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
                 
@@ -650,13 +818,10 @@
                     showWorkerFormManual();
                 }
             } else if (mode === 'continue' && nsId) {
-                // Продолжение заполнения
                 continueNSWorkflow(nsId);
             } else if (mode === 'execute' && nsId) {
-                // Режим исполнителя
                 executeNS(nsId);
             } else {
-                // Админский режим
                 document.getElementById('adminMode').style.display = 'block';
                 document.getElementById('workerMode').style.display = 'none';
             }
@@ -678,23 +843,17 @@
             
             const formHTML = `
                 <div style="padding: 20px;">
-                    <div class="workflow-step active">
-                        <h3>🚨 Регистрация несоответствия</h3>
-                        <p>Сканирован QR код: <strong>${qrData.department} - ${qrData.location}</strong></p>
-                    </div>
+                    <h2>🚨 Регистрация несоответствия</h2>
+                    <p>Цех: <strong>${qrData.department} - ${qrData.location}</strong></p>
                     
-                    <form id="nsForm" onsubmit="event.preventDefault(); submitNSForm();">
+                    <form onsubmit="event.preventDefault(); submitNSForm();">
                         <div class="form-grid">
                             <div class="form-group">
-                                <label>📅 Дата обнаружения:</label>
-                                <input type="datetime-local" id="detectionDateTime" value="${new Date().toISOString().slice(0,16)}" required>
-                            </div>
-                            <div class="form-group">
                                 <label>👤 Ваше ФИО:</label>
-                                <input type="text" id="applicant" placeholder="Введите ваше ФИО" required>
+                                <input type="text" id="applicant" placeholder="ФИО" required>
                             </div>
                             <div class="form-group">
-                                <label>📞 Контактный телефон:</label>
+                                <label>📞 Телефон:</label>
                                 <input type="tel" id="applicantPhone" placeholder="+7 (999) 999-99-99">
                             </div>
                             <div class="form-group">
@@ -703,23 +862,23 @@
                                     <option value="">Выберите тип</option>
                                     <option value="product">Несоответствие продукции</option>
                                     <option value="process">Несоответствие процесса</option>
-                                    <option value="documentation">Несоответствие документации</option>
+                                    <option value="equipment">Неисправность оборудования</option>
                                 </select>
                             </div>
                         </div>
                         
                         <div class="form-group">
                             <label>🔍 Краткое описание:</label>
-                            <input type="text" id="nsTitle" placeholder="Например: Трещина на детали" required>
+                            <input type="text" id="nsTitle" placeholder="Краткое описание" required>
                         </div>
                         
                         <div class="form-group">
                             <label>📋 Подробное описание:</label>
-                            <textarea id="description" rows="4" placeholder="Опишите проблему подробно..." required></textarea>
+                            <textarea id="description" rows="4" placeholder="Подробное описание..." required></textarea>
                         </div>
                         
                         <div class="form-group">
-                            <label>📷 Фотографии (макс. 5):</label>
+                            <label>📷 Фотографии:</label>
                             <input type="file" id="photoInput" accept="image/*" multiple onchange="handlePhotoUpload(event)">
                             <div id="photoPreview" class="photo-preview-container"></div>
                         </div>
@@ -750,87 +909,24 @@
             
             for (let i = 0; i < Math.min(files.length, 5); i++) {
                 const file = files[i];
-                
-                // Сжимаем фото если нужно
-                compressImage(file, 800, 0.8).then(compressedFile => {
-                    const reader = new FileReader();
-                    
-                    reader.onload = function(e) {
-                        photos.push({
-                            name: compressedFile.name,
-                            data: e.target.result,
-                            type: compressedFile.type,
-                            size: compressedFile.size
-                        });
-                        
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        img.className = 'photo-preview';
-                        preview.appendChild(img);
-                    };
-                    
-                    reader.readAsDataURL(compressedFile);
-                }).catch(error => {
-                    console.error('Ошибка сжатия:', error);
-                    // Используем оригинальный файл если сжатие не удалось
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        photos.push({
-                            name: file.name,
-                            data: e.target.result,
-                            type: file.type,
-                            size: file.size
-                        });
-                        
-                        const img = document.createElement('img');
-                        img.src = e.target.result;
-                        img.className = 'photo-preview';
-                        preview.appendChild(img);
-                    };
-                    reader.readAsDataURL(file);
-                });
-            }
-        }
-        
-        function compressImage(file, maxWidth, quality) {
-            return new Promise((resolve, reject) => {
                 const reader = new FileReader();
-                reader.readAsDataURL(file);
                 
-                reader.onload = function(event) {
-                    const img = new Image();
-                    img.src = event.target.result;
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
                     
-                    img.onload = function() {
-                        const canvas = document.createElement('canvas');
-                        let width = img.width;
-                        let height = img.height;
-                        
-                        if (width > maxWidth) {
-                            height = Math.round((height * maxWidth) / width);
-                            width = maxWidth;
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        canvas.toBlob(function(blob) {
-                            const compressedFile = new File([blob], file.name, {
-                                type: 'image/jpeg',
-                                lastModified: Date.now()
-                            });
-                            resolve(compressedFile);
-                        }, 'image/jpeg', quality);
-                    };
-                    
-                    img.onerror = reject;
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'photo-preview';
+                    preview.appendChild(img);
                 };
                 
-                reader.onerror = reject;
-            });
+                reader.readAsDataURL(file);
+            }
         }
         
         function submitNSForm() {
@@ -838,8 +934,8 @@
                 const nsData = {
                     id: 'ns_' + Date.now(),
                     nsNumber: generateNSNumber(),
-                    detectionDateTime: document.getElementById('detectionDateTime').value,
                     detectionDate: new Date().toISOString().split('T')[0],
+                    detectionDateTime: new Date().toISOString(),
                     department: document.getElementById('department').value,
                     location: document.getElementById('location').value,
                     applicant: document.getElementById('applicant').value,
@@ -860,16 +956,16 @@
                     }]
                 };
                 
-                // Сохраняем ЛН
+                // Сохраняем
                 const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
                 nsList.push(nsData);
                 localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
                 
-                // Отправляем уведомление
+                // Отправляем письмо со ССЫЛКОЙ НА ЛН
                 sendEmailToSMKManager(nsData);
                 
                 // Показываем успех
-                showSuccessScreenWithOptions(nsData);
+                showSuccessScreen(nsData);
                 
             } catch (error) {
                 console.error('Ошибка:', error);
@@ -881,64 +977,55 @@
             const year = new Date().getFullYear().toString().slice(-2);
             const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const currentMonthCount = nsList.filter(ns => {
+            const count = nsList.filter(ns => {
                 const nsDate = new Date(ns.created);
                 return nsDate.getFullYear() === new Date().getFullYear() && 
                        nsDate.getMonth() + 1 === new Date().getMonth() + 1;
             }).length + 1;
-            return `ЛН-${year}${month}-${currentMonthCount.toString().padStart(3, '0')}`;
+            return `ЛН-${year}${month}-${count.toString().padStart(3, '0')}`;
         }
         
         function sendEmailToSMKManager(nsData) {
             const recipient = 'finkart23@mail.ru';
-            const currentUrl = window.location.href.split('?')[0];
-            const adminUrl = currentUrl;
+            const currentUrl = window.location.origin + window.location.pathname;
+            
+            // Ссылка ВЕДЕТ НЕПОСРЕДСТВЕННО К ЭТОМУ ЛН
+            const nsLink = `${currentUrl}?mode=continue&ns=${encodeURIComponent(nsData.id)}`;
             
             const emailBody = `
-НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ ISO 13485
+НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ
 
-Номер ЛН: ${nsData.nsNumber}
-Дата обнаружения: ${new Date(nsData.detectionDateTime).toLocaleString('ru-RU')}
-Подразделение: ${nsData.department}
+Номер: ${nsData.nsNumber}
+Дата: ${new Date().toLocaleDateString('ru-RU')}
+Цех: ${nsData.department}
 Место: ${nsData.location}
 Заявитель: ${nsData.applicant}
-Телефон: ${nsData.applicantPhone || 'не указан'}
-
-Тип: ${nsData.nsType}
 
 Описание:
 ${nsData.description}
 
-Для проверки перейдите в систему:
-${adminUrl}
+Для проверки и назначения ответственного перейдите по ссылке:
+${nsLink}
 
 Количество фото: ${nsData.photos ? nsData.photos.length : 0}
             `.trim();
             
-            sendEmail(recipient, `Новое несоответствие: ${nsData.nsNumber}`, emailBody);
+            sendEmail(recipient, `Новый ЛН: ${nsData.nsNumber}`, emailBody);
         }
         
-        function showSuccessScreenWithOptions(nsData) {
+        function showSuccessScreen(nsData) {
             const html = `
                 <div style="text-align: center; padding: 40px;">
                     <div style="font-size: 80px; color: #28a745; margin-bottom: 20px;">✅</div>
-                    <h2>Лист несоответствия зарегистрирован!</h2>
+                    <h2>Лист несоответствия создан!</h2>
                     <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
                     
-                    <div style="max-width: 500px; margin: 30px auto; text-align: left; padding: 20px; background: #f8f9fa; border-radius: 10px;">
-                        <p><strong>📋 Что дальше:</strong></p>
-                        <ol style="margin-left: 20px;">
-                            <li>Менеджер СМК получил уведомление</li>
-                            <li>После проверки будет назначен ответственный</li>
-                        </ol>
-                    </div>
-                    
                     <div style="margin-top: 30px;">
-                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname + '?mode=worker' + (currentQRData ? '&qrcode=' + encodeURIComponent(currentQRData.code) : '')" style="margin: 5px;">
-                            📝 Создать еще одно несоответствие
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname + '?mode=worker' + (currentQRData ? '&qrcode=' + encodeURIComponent(currentQRData.code) : '')" style="margin: 10px;">
+                            📝 Создать еще
                         </button>
-                        <button class="btn btn-info" onclick="window.location.href = window.location.pathname" style="margin: 5px;">
-                            🏠 Вернуться на главную
+                        <button class="btn btn-info" onclick="window.location.href = window.location.pathname" style="margin: 10px;">
+                            🏠 На главную
                         </button>
                     </div>
                 </div>
@@ -948,7 +1035,7 @@ ${adminUrl}
         }
         
         // ============================================
-        // УПРАВЛЕНИЕ ЛН (админская часть)
+        // УПРАВЛЕНИЕ ЛН (АДМИН)
         // ============================================
         
         function loadPendingCount() {
@@ -984,7 +1071,7 @@ ${adminUrl}
                             <p>Заявитель: ${ns.applicant}</p>
                             <div class="action-buttons">
                                 <button class="btn btn-info btn-sm" onclick="reviewNS(${index})">👁️ Просмотр</button>
-                                <button class="btn btn-success btn-sm" onclick="approveNS(${index})">✅ Принять</button>
+                                <button class="btn btn-success btn-sm" onclick="approveNS(${index})">✅ Назначить</button>
                             </div>
                         </div>
                     </div>
@@ -1015,7 +1102,7 @@ ${adminUrl}
                 <h3>${ns.nsNumber}</h3>
                 <div style="margin: 20px 0;">
                     <div><strong>Дата:</strong> ${new Date(ns.detectionDateTime || ns.created).toLocaleString('ru-RU')}</div>
-                    <div><strong>Подразделение:</strong> ${ns.department}</div>
+                    <div><strong>Цех:</strong> ${ns.department}</div>
                     <div><strong>Место:</strong> ${ns.location}</div>
                     <div><strong>Заявитель:</strong> ${ns.applicant}</div>
                 </div>
@@ -1026,7 +1113,7 @@ ${adminUrl}
                 ${photosHTML}
                 
                 <div class="action-buttons" style="margin-top: 30px;">
-                    <button class="btn btn-success" onclick="approveNS(${index})">✅ Принять и назначить ответственного</button>
+                    <button class="btn btn-success" onclick="approveNS(${index})">✅ Назначить ответственного</button>
                 </div>
             `;
             
@@ -1040,21 +1127,22 @@ ${adminUrl}
             const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
             let options = '<option value="">Выберите ответственного</option>';
             responsibles.forEach(r => {
-                options += `<option value="${r.id}|${r.name}|${r.email}">${r.name} - ${r.role}</option>`;
+                options += `<option value="${r.id}|${r.name}|${r.email}">${r.name} (${r.role})</option>`;
             });
             
             const html = `
                 <h3>Назначение ответственного</h3>
                 <div class="form-group" style="margin: 20px 0;">
                     <label>Ответственный:</label>
-                    <select id="responsibleSelect">
+                    <select id="responsibleSelect" style="margin-bottom: 15px;">
                         ${options}
                     </select>
-                    <label style="margin-top: 15px;">Срок исполнения:</label>
+                    <label>Срок исполнения:</label>
                     <input type="date" id="deadline" value="${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}">
                 </div>
                 <div class="action-buttons">
                     <button class="btn btn-success" onclick="assignResponsible()">📧 Назначить</button>
+                    <button class="btn btn-danger" onclick="closeModal()">Отмена</button>
                 </div>
             `;
             
@@ -1094,29 +1182,32 @@ ${adminUrl}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
-            // Создаем ссылку для ответственного
-            const currentUrl = window.location.href.split('?')[0];
-            const continueLink = `${currentUrl}?mode=continue&ns=${ns.id}`;
+            // Ссылка для ответственного
+            const currentUrl = window.location.origin + window.location.pathname;
+            const continueLink = `${currentUrl}?mode=continue&ns=${encodeURIComponent(ns.id)}`;
             
             const emailBody = `
 Вам назначен Лист Несоответствия
 
 Номер ЛН: ${ns.nsNumber}
 Заявитель: ${ns.applicant}
-Подразделение: ${ns.department}
+Цех: ${ns.department}
 Место: ${ns.location}
 
 Срок исполнения: ${deadline}
 
 Для заполнения корректирующих действий перейдите по ссылке:
 ${continueLink}
+
+Описание:
+${ns.description}
             `.trim();
             
             sendEmail(email, `ЛН ${ns.nsNumber} - назначен ответственным`, emailBody);
             
             closeModal();
             loadPendingCount();
-            showNotification('Ответственный назначен', 'success');
+            showNotification('Ответственный назначен, письмо отправлено', 'success');
         }
         
         function continueNSWorkflow(nsId) {
@@ -1140,20 +1231,18 @@ ${continueLink}
             
             const html = `
                 <div style="padding: 20px;">
-                    <div class="workflow-step active">
-                        <h3>🛠️ Корректирующие действия</h3>
-                        <p>ЛН: <strong>${ns.nsNumber}</strong></p>
-                    </div>
+                    <h2>🛠️ Корректирующие действия</h2>
+                    <p>ЛН: <strong>${ns.nsNumber}</strong></p>
                     
                     <form onsubmit="event.preventDefault(); submitCorrectionActions('${nsId}');">
                         <div class="form-group">
                             <label>Корректирующие действия:</label>
-                            <textarea id="correctiveActions" rows="4" placeholder="Опишите корректирующие действия..." required></textarea>
+                            <textarea id="correctiveActions" rows="6" placeholder="Опишите корректирующие действия..." required></textarea>
                         </div>
                         
                         <div style="margin: 30px 0; text-align: center;">
                             <button type="submit" class="btn btn-success mobile-btn">
-                                📤 Отправить на проверку
+                                📤 Отправить
                             </button>
                         </div>
                     </form>
@@ -1176,7 +1265,7 @@ ${continueLink}
             ns.workflow.push({
                 step: 3,
                 action: 'correction_submitted',
-                user: ns.responsiblePerson,
+                user: ns.responsiblePerson || 'Ответственный',
                 date: new Date().toISOString(),
                 comment: 'Корректирующие действия разработаны'
             });
@@ -1187,8 +1276,9 @@ ${continueLink}
             
             document.getElementById('workerContent').innerHTML = `
                 <div style="text-align: center; padding: 40px;">
-                    <h2>✅ Корректирующие действия отправлены!</h2>
-                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
+                    <h2>✅ Готово!</h2>
+                    <p>Корректирующие действия отправлены на проверку.</p>
+                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname" style="margin-top: 20px;">
                         На главную
                     </button>
                 </div>
@@ -1277,31 +1367,29 @@ ${continueLink}
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const ns = nsList[index];
             
-            let workflowHTML = '<h4>История:</h4>';
-            if (ns.workflow && ns.workflow.length > 0) {
-                ns.workflow.forEach(step => {
-                    workflowHTML += `
-                        <div style="padding: 8px; border-bottom: 1px solid #eee;">
-                            <small>${new Date(step.date).toLocaleString('ru-RU')}</small><br>
-                            ${step.user}: ${step.comment}
-                        </div>
-                    `;
+            let photosHTML = '';
+            if (ns.photos && ns.photos.length > 0) {
+                photosHTML = '<h4>📷 Фотографии:</h4><div class="photo-preview-container">';
+                ns.photos.forEach((photo, i) => {
+                    photosHTML += `<img src="${photo.data}" class="photo-preview">`;
                 });
+                photosHTML += '</div>';
             }
             
             const html = `
                 <h3>${ns.nsNumber}</h3>
                 <div style="margin: 20px 0;">
-                    <div><strong>Дата создания:</strong> ${new Date(ns.created).toLocaleDateString('ru-RU')}</div>
-                    <div><strong>Подразделение:</strong> ${ns.department}</div>
+                    <div><strong>Дата:</strong> ${new Date(ns.created).toLocaleDateString('ru-RU')}</div>
+                    <div><strong>Цех:</strong> ${ns.department}</div>
                     <div><strong>Место:</strong> ${ns.location}</div>
                     <div><strong>Заявитель:</strong> ${ns.applicant}</div>
+                    <div><strong>Статус:</strong> ${getStatusText(ns.status)}</div>
                 </div>
                 
                 <h4>Описание:</h4>
                 <p>${ns.description || 'Не указано'}</p>
                 
-                ${workflowHTML}
+                ${photosHTML}
                 
                 <div class="action-buttons">
                     <button class="btn btn-primary" onclick="printNS(${index})">🖨️ Печать</button>
@@ -1368,7 +1456,7 @@ ${continueLink}
             })
             .then(response => response.json())
             .then(data => {
-                console.log('Email отправлен:', data);
+                console.log('Email отправлен');
             })
             .catch(error => {
                 console.error('Ошибка отправки email:', error);
@@ -1423,77 +1511,6 @@ ${continueLink}
             document.getElementById('statsGrid').innerHTML = html;
         }
         
-        function backupData() {
-            const data = {
-                ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
-                qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
-                responsibles: JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]'),
-                executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
-                date: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(data, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `farmstil_backup_${new Date().toISOString().slice(0,10)}.json`;
-            a.click();
-            
-            URL.revokeObjectURL(url);
-            showNotification('Резервная копия создана', 'success');
-        }
-        
-        // ============================================
-        // GOOGLE SHEETS ИНТЕГРАЦИЯ
-        // ============================================
-        
-        async function exportToGoogleSheets() {
-            try {
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                
-                if (nsList.length === 0) {
-                    showNotification('Нет данных для экспорта', 'warning');
-                    return;
-                }
-                
-                showNotification('Экспорт в Google Sheets...', 'info');
-                
-                // Подготавливаем данные
-                const headers = [
-                    'ID', 'Номер ЛН', 'Дата создания', 'Подразделение', 'Место',
-                    'Заявитель', 'Телефон', 'Тип', 'Описание', 'Статус',
-                    'Ответственный', 'Срок', 'Корректирующие действия', 'Дата закрытия'
-                ];
-                
-                const values = nsList.map(ns => [
-                    ns.id || '',
-                    ns.nsNumber || '',
-                    ns.createdDate || '',
-                    ns.department || '',
-                    ns.location || '',
-                    ns.applicant || '',
-                    ns.applicantPhone || '',
-                    ns.nsType || '',
-                    ns.description || '',
-                    getStatusText(ns.status),
-                    ns.responsiblePerson || '',
-                    ns.deadline || '',
-                    ns.correctionActions || '',
-                    ns.closedDate ? new Date(ns.closedDate).toISOString().split('T')[0] : ''
-                ]);
-                
-                values.unshift(headers);
-                
-                // Если нет авторизации, показываем сообщение
-                showNotification('Функция экспорта в Google Sheets требует настройки OAuth', 'info');
-                
-            } catch (error) {
-                console.error('Ошибка экспорта:', error);
-                showNotification('Ошибка экспорта', 'error');
-            }
-        }
-        
         // Экспорт функций
         window.showPage = showPage;
         window.generateQRCode = generateQRCode;
@@ -1510,8 +1527,10 @@ ${continueLink}
         window.deleteExecutor = deleteExecutor;
         window.backupData = backupData;
         window.exportToGoogleSheets = exportToGoogleSheets;
+        window.syncFromGoogleSheets = syncFromGoogleSheets;
+        window.initGoogleSheets = initGoogleSheets;
+        window.googleAuth = googleAuth;
         window.showPendingNS = showPendingNS;
-        window.searchNS = searchNS;
     </script>
 </body>
 </html>
