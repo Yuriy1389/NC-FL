@@ -287,6 +287,24 @@
             .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
             .btn { width: auto; }
         }
+        
+        .sync-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #f8f9fa;
+            border-left: 4px solid #17a2b8;
+        }
+        
+        .sync-status.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .sync-status.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
     </style>
 </head>
 <body>
@@ -433,11 +451,27 @@
             <div class="page" id="adminPage">
                 <h2>⚙️ Администрирование</h2>
                 <div id="statsGrid"></div>
-                <div class="form-grid">
+                <div id="syncSection">
+                    <h3>🔄 Синхронизация с Google Sheets</h3>
+                    <div class="sync-status" id="syncStatus">
+                        <p>Статус: Ожидание синхронизации</p>
+                    </div>
+                    <div class="form-grid">
+                        <button class="btn btn-primary" onclick="syncWithGoogleSheets()">🔄 Синхронизировать сейчас</button>
+                        <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
+                        <button class="btn btn-info" onclick="openGoogleSheets()">📊 Открыть Google Sheets</button>
+                    </div>
+                    <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <h4>📋 Информация о синхронизации:</h4>
+                        <p><strong>Таблица:</strong> ЛН_ISO13485</p>
+                        <p><strong>ID таблицы:</strong> 1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU</p>
+                        <p><strong>Последняя синхронизация:</strong> <span id="lastSyncTime">Никогда</span></p>
+                    </div>
+                </div>
+                <div class="form-grid" style="margin-top: 30px;">
                     <button class="btn btn-primary" onclick="backupData()">💾 Резервная копия</button>
                     <button class="btn btn-info" onclick="restoreData()">🔄 Восстановить</button>
                     <button class="btn btn-warning" onclick="clearAllData()">🗑️ Очистить все</button>
-                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
                 </div>
             </div>
         </div>
@@ -450,11 +484,9 @@
         
         // Конфигурация Google Sheets
         const GOOGLE_SHEETS_CONFIG = {
-            CLIENT_ID: '203702148278-cve81h74eeaihshm9lnu1le7f0coos8f.apps.googleusercontent.com',
-            API_KEY: 'AIzaSyA_XwRd7egwncb-fAnO_JF4GN86fbqbb9A',
             SPREADSHEET_ID: '1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU',
             SHEET_NAME: 'ЛН_ISO13485',
-            SCOPES: 'https://www.googleapis.com/auth/spreadsheets'
+            WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzC-ySCf4MqMDd1Kl_DHPgfz8Q7OhgLNKtMQv2E1XzHHZc2G7S1isL7ubWt7xcdclEC/exec'
         };
         
         const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
@@ -481,53 +513,15 @@
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
             
-            // Добавляем обработчики событий для всех кнопок
-            initEventListeners();
-            
             initDirectories();
             checkMode();
             loadDirectories();
             updateStats();
             loadPendingCount();
-            
-            // Проверяем загрузку QRCode библиотеки
-            setTimeout(checkQRCodeLibrary, 1000);
+            updateLastSyncTime();
             
             console.log('✅ Система готова к работе');
         });
-        
-        function initEventListeners() {
-            // Обработчик для кнопки генерации QR
-            document.addEventListener('click', function(e) {
-                if (e.target.closest('.btn-primary') && e.target.closest('#generateQRPage')) {
-                    console.log('Кнопка генерации QR нажата через делегирование');
-                    generateQRCode();
-                }
-            });
-        }
-        
-        function checkQRCodeLibrary() {
-            if (typeof QRCode === 'undefined') {
-                console.error('❌ Библиотека QRCode не загрузилась!');
-                showNotification('Ошибка загрузки библиотеки QRCode. Перезагрузите страницу.', 'error', 5000);
-                
-                // Показываем альтернативный интерфейс
-                document.getElementById('generateQRPage').innerHTML += `
-                    <div style="margin-top: 20px; padding: 20px; background: #fff3cd; border-radius: 10px; border-left: 5px solid #ffc107;">
-                        <h3>⚠️ Внимание: Библиотека QRCode не загрузилась</h3>
-                        <p>Попробуйте:</p>
-                        <ol>
-                            <li>Обновить страницу (F5)</li>
-                            <li>Проверить интернет-соединение</li>
-                            <li>Отключить блокировщик рекламы</li>
-                        </ol>
-                        <button class="btn btn-warning" onclick="location.reload()">🔄 Перезагрузить страницу</button>
-                    </div>
-                `;
-            } else {
-                console.log('✅ Библиотека QRCode загружена');
-            }
-        }
         
         function initDirectories() {
             if (!localStorage.getItem('farmstil_responsibles')) {
@@ -553,20 +547,20 @@
             if (!localStorage.getItem('farmstil_ns')) {
                 localStorage.setItem('farmstil_ns', JSON.stringify([]));
             }
+            
+            if (!localStorage.getItem('farmstil_last_sync')) {
+                localStorage.setItem('farmstil_last_sync', '');
+            }
         }
         
         // ============================================
-        // QR-КОДЫ - ИСПРАВЛЕННАЯ ВЕРСИЯ
+        // QR-КОДЫ - ИСПРАВЛЕННЫЕ ФУНКЦИИ
         // ============================================
         
         function generateQRCode() {
-            console.log('=== ФУНКЦИЯ generateQRCode ВЫЗВАНА ===');
-            
             const department = document.getElementById('qrDepartment').value;
             const location = document.getElementById('qrLocation').value;
             const responsible = document.getElementById('qrResponsible').value;
-            
-            console.log('Данные формы:', { department, location, responsible });
             
             if (!department || !location) {
                 showNotification('Заполните обязательные поля: Подразделение и Место', 'error');
@@ -574,11 +568,10 @@
             }
             
             const code = `FS-${Date.now().toString().slice(-8)}`;
+            
+            // Создаем URL для регистрации несоответствия
             const currentUrl = window.location.origin + window.location.pathname;
             const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
-            
-            console.log('Сгенерирован код:', code);
-            console.log('QR URL:', qrUrl);
             
             currentQRData = {
                 code: code,
@@ -593,52 +586,28 @@
             qrcodes.push(currentQRData);
             localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
             
-            console.log('Данные сохранены в localStorage');
-            
             displayQRCode(qrUrl, code, department, location, responsible);
             showNotification('QR-код успешно создан!', 'success');
+            
+            // Автоматическая синхронизация с Google Sheets
+            setTimeout(syncQRCodeWithGoogleSheets, 1000);
         }
         
         function displayQRCode(qrUrl, code, department, location, responsible) {
-            console.log('=== ФУНКЦИЯ displayQRCode ВЫЗВАНА ===');
-            console.log('Параметры:', { qrUrl, code, department, location, responsible });
-            
             const qrcodeDiv = document.getElementById('qrPreview');
-            if (!qrcodeDiv) {
-                console.error('❌ Элемент qrPreview не найден!');
-                return;
-            }
-            
-            // Очищаем предыдущий контент
             qrcodeDiv.innerHTML = '';
             
-            // Создаем основной контейнер
-            const mainContainer = document.createElement('div');
-            mainContainer.style.textAlign = 'center';
-            
-            // Создаем контейнер для QR-кода
             const qrContainer = document.createElement('div');
             qrContainer.className = 'qr-container';
-            qrContainer.id = 'qrcode-container-' + Date.now();
-            qrContainer.style.display = 'inline-block';
             
-            mainContainer.appendChild(qrContainer);
-            qrcodeDiv.appendChild(mainContainer);
+            const qrCodeDiv = document.createElement('div');
+            qrCodeDiv.id = 'qrcode-' + Date.now();
+            qrContainer.appendChild(qrCodeDiv);
+            qrcodeDiv.appendChild(qrContainer);
             
-            // Пробуем создать QR-код
             try {
-                console.log('Пытаюсь создать QR-код...');
-                
-                // Проверяем, загружена ли библиотека
-                if (typeof QRCode !== 'undefined' && typeof QRCode === 'function') {
-                    console.log('Библиотека QRCode доступна, создаю QR-код...');
-                    
-                    // Удаляем предыдущий QR-код если есть
-                    const oldQR = document.getElementById(qrContainer.id);
-                    if (oldQR) oldQR.innerHTML = '';
-                    
-                    // Создаем новый QR-код
-                    const qrcode = new QRCode(qrContainer, {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrCodeDiv, {
                         text: qrUrl,
                         width: 200,
                         height: 200,
@@ -646,219 +615,389 @@
                         colorLight: "#ffffff",
                         correctLevel: QRCode.CorrectLevel.H
                     });
-                    
-                    console.log('✅ QR-код создан успешно!');
-                    
-                    // Добавляем небольшую задержку для рендеринга
-                    setTimeout(() => {
-                        console.log('QR-код должен быть виден');
-                    }, 100);
-                    
                 } else {
-                    console.error('❌ QRCode не является функцией:', typeof QRCode);
-                    throw new Error('QRCode library not properly loaded');
+                    throw new Error('Библиотека QRCode не загружена');
                 }
             } catch (error) {
-                console.error('❌ Ошибка при создании QR-кода:', error);
-                console.error('Стек ошибки:', error.stack);
-                
-                // Создаем заглушку
-                qrContainer.innerHTML = `
+                console.error('Ошибка генерации QR:', error);
+                qrCodeDiv.innerHTML = `
                     <div style="width: 200px; height: 200px; background: #1e3c72; color: white; 
-                         display: flex; align-items: center; justify-content: center; border-radius: 10px;">
-                        <div style="text-align: center; padding: 10px;">
-                            <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">QR-код</div>
-                            <div style="font-size: 14px; word-break: break-all; padding: 5px; background: rgba(255,255,255,0.1); border-radius: 5px;">
-                                ${code}
-                            </div>
-                            <div style="font-size: 10px; margin-top: 10px; color: #ccc;">
-                                (визуальная заглушка)
-                            </div>
+                         display: flex; align-items: center; justify-content: center; border-radius: 10px; margin: 0 auto;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">QR</div>
+                            <div style="font-size: 14px; margin-top: 10px;">${code}</div>
                         </div>
                     </div>
                 `;
             }
             
-            // Добавляем информацию
-            const infoDiv = document.createElement('div');
-            infoDiv.style.marginTop = '20px';
-            infoDiv.style.padding = '20px';
-            infoDiv.style.background = '#f8f9fa';
-            infoDiv.style.borderRadius = '10px';
-            infoDiv.style.textAlign = 'left';
-            infoDiv.innerHTML = `
-                <h3 style="margin-bottom: 15px; color: #1e3c72;">📋 Информация о QR-коде</h3>
-                <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
-                    <div><strong>🏭 Подразделение:</strong> ${department}</div>
-                    <div><strong>📍 Рабочее место:</strong> ${location}</div>
-                    ${responsible ? `<div><strong>👤 Ответственный:</strong> ${responsible}</div>` : ''}
-                    <div><strong>🔢 Код:</strong> <code style="background: #e9ecef; padding: 2px 6px; border-radius: 4px;">${code}</code></div>
-                    <div><strong>🔗 Ссылка:</strong> 
-                        <div style="font-size: 12px; color: #666; word-break: break-all; margin-top: 5px; padding: 8px; background: white; border-radius: 5px; border: 1px solid #dee2e6;">
-                            ${qrUrl}
-                        </div>
+            qrcodeDiv.innerHTML += `
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <h3>📋 Информация о QR-коде</h3>
+                    <p><strong>Подразделение:</strong> ${department}</p>
+                    <p><strong>Место:</strong> ${location}</p>
+                    ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
+                    <p><strong>Код:</strong> <code>${code}</code></p>
+                    <p><strong>Назначение:</strong> Регистрация несоответствия ISO 13485</p>
+                    <p><small style="color: #666;">Сотрудник сканирует QR-код для регистрации несоответствия</small></p>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать QR-кода</button>
+                        <button class="btn btn-info" onclick="testQRCode('${code}')">📱 Тест регистрации</button>
                     </div>
-                </div>
-                <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <button class="btn btn-primary" onclick="testQRCode('${code}')" style="flex: 1;">📱 Тестировать</button>
-                    <button class="btn btn-primary" onclick="printQRCode()" style="flex: 1;">🖨️ Печать</button>
-                    <button class="btn btn-info" onclick="copyQRCodeLink('${qrUrl}')" style="flex: 1;">📋 Копировать ссылку</button>
                 </div>
             `;
             
-            mainContainer.appendChild(infoDiv);
             qrcodeDiv.style.display = 'block';
-            
-            console.log('✅ QR-код отображен');
         }
         
         function testQRCode(code) {
-            console.log('Тестируем QR-код:', code);
             const currentUrl = window.location.origin + window.location.pathname;
             const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
             window.open(qrUrl, '_blank');
-            showNotification('Открыта тестовая страница в новом окне', 'success');
-        }
-        
-        function copyQRCodeLink(url) {
-            navigator.clipboard.writeText(url).then(function() {
-                showNotification('Ссылка скопирована в буфер обмена!', 'success');
-            }, function(err) {
-                console.error('Ошибка копирования: ', err);
-                showNotification('Не удалось скопировать ссылку', 'error');
-            });
+            showNotification('Открыта страница регистрации несоответствия', 'success');
         }
         
         function printQRCode() {
-            if (!currentQRData) {
-                showNotification('Нет данных для печати', 'error');
-                return;
-            }
+            if (!currentQRData) return;
             
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(`
-                <!DOCTYPE html>
+            const printContent = `
                 <html>
                 <head>
-                    <title>Печать QR-кода - ${currentQRData.department}</title>
+                    <title>QR код - ${currentQRData.department}</title>
                     <style>
-                        body { 
-                            font-family: Arial, sans-serif; 
-                            text-align: center; 
-                            padding: 40px 20px;
-                            margin: 0;
-                        }
-                        .print-container {
-                            max-width: 600px;
-                            margin: 0 auto;
-                        }
-                        h1 { 
-                            color: #1e3c72; 
-                            margin-bottom: 20px;
-                            font-size: 24px;
-                        }
-                        .info { 
-                            margin: 20px 0; 
-                            font-size: 16px; 
-                            text-align: left;
-                            background: #f8f9fa;
-                            padding: 15px;
-                            border-radius: 8px;
-                        }
-                        .info p {
-                            margin: 8px 0;
-                        }
-                        .qr-placeholder {
-                            width: 300px;
-                            height: 300px;
-                            background: #1e3c72;
-                            color: white;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            margin: 20px auto;
-                            border-radius: 10px;
-                        }
-                        .footer {
-                            margin-top: 30px;
-                            color: #666;
-                            font-size: 12px;
-                            border-top: 1px solid #ddd;
-                            padding-top: 15px;
-                        }
-                        @media print {
+                        body { font-family: Arial; text-align: center; padding: 40px; }
+                        h1 { color: #1e3c72; margin-bottom: 20px; }
+                        .info { margin: 20px 0; font-size: 16px; text-align: left; }
+                        .instruction { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; }
+                        @media print { 
                             body { padding: 20px; }
                             .no-print { display: none; }
-                            .print-container { max-width: 100%; }
                         }
                     </style>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
                 </head>
                 <body>
-                    <div class="print-container">
-                        <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
-                        
-                        <div class="info">
-                            <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
-                            <p><strong>Место:</strong> ${currentQRData.location}</p>
-                            ${currentQRData.responsible ? `<p><strong>Ответственный:</strong> ${currentQRData.responsible}</p>` : ''}
-                            <p><strong>Код:</strong> ${currentQRData.code}</p>
-                            <p><strong>Дата создания:</strong> ${new Date().toLocaleDateString('ru-RU')}</p>
-                        </div>
-                        
-                        <div class="qr-placeholder" id="qrcode">
-                            <div style="text-align: center;">
-                                <div style="font-size: 32px; font-weight: bold;">QR-код</div>
-                                <div style="font-size: 16px; margin-top: 10px;">${currentQRData.code}</div>
-                                <div style="font-size: 12px; margin-top: 5px; color: #ccc;">
-                                    Отсканируйте код<br>для регистрации несоответствия
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <p style="margin-top: 20px; font-size: 14px;">
-                            <strong>Назначение:</strong> Регистрация несоответствий по ISO 13485
-                        </p>
-                        
-                        <div class="footer">
-                            <p>Сгенерировано системой ФАРМСТИЛ</p>
-                            <p>Дата: ${new Date().toLocaleString('ru-RU')}</p>
-                            <button class="no-print" onclick="window.print()" style="padding: 10px 20px; background: #1e3c72; color: white; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;">
-                                🖨️ Печать
-                            </button>
-                        </div>
+                    <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
+                    <h2>QR-код для регистрации несоответствия</h2>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        ${currentQRData.responsible ? `<p><strong>Ответственный за зону:</strong> ${currentQRData.responsible}</p>` : ''}
+                        <p><strong>Код:</strong> ${currentQRData.code}</p>
+                        <p><strong>Дата создания:</strong> ${new Date().toLocaleDateString('ru-RU')}</p>
                     </div>
                     
+                    <div class="instruction">
+                        <p><strong>📱 Как использовать:</strong></p>
+                        <ol style="text-align: left;">
+                            <li>Сканируйте QR-код камерой телефона</li>
+                            <li>Откроется форма регистрации несоответствия</li>
+                            <li>Заполните все обязательные поля</li>
+                            <li>Прикрепите фотографии (при необходимости)</li>
+                            <li>Нажмите "Отправить"</li>
+                        </ol>
+                    </div>
+                    
+                    <div id="qrcode" style="margin: 20px auto; width: 300px; height: 300px;"></div>
+                    <p style="margin-top: 20px; font-size: 14px; font-weight: bold;">Отсканируйте для регистрации несоответствия ISO 13485</p>
+                    
+                    <p class="no-print" style="color: #666; font-size: 12px; margin-top: 30px;">
+                        Сгенерировано: ${new Date().toLocaleString('ru-RU')}
+                    </p>
+                    
                     <script>
-                        // Автоматическая печать через 1 секунду
                         setTimeout(function() {
-                            window.print();
-                            setTimeout(function() { 
-                                window.close(); 
-                            }, 500);
-                        }, 1000);
+                            try {
+                                new QRCode(document.getElementById('qrcode'), {
+                                    text: '${currentQRData.url}',
+                                    width: 300,
+                                    height: 300,
+                                    colorDark: "#1e3c72",
+                                    colorLight: "#ffffff"
+                                });
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            } catch(e) {
+                                document.getElementById('qrcode').innerHTML = 
+                                    '<div style="width: 300px; height: 300px; background: #1e3c72; color: white; ' +
+                                    'display: flex; align-items: center; justify-content: center; margin: 0 auto;">' +
+                                    '<div style="text-align: center;">' +
+                                    '<div style="font-size: 32px; font-weight: bold;">QR</div>' +
+                                    '<div style="font-size: 16px;">${currentQRData.code}</div>' +
+                                    '<div style="font-size: 12px; margin-top: 10px;">Регистрация несоответствия</div>' +
+                                    '</div></div>';
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            }
+                        }, 100);
                     <\/script>
                 </body>
                 </html>
-            `);
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(printContent);
             printWindow.document.close();
+        }
+        
+        // ============================================
+        // РАБОЧИЙ РЕЖИМ - РЕГИСТРАЦИЯ НЕСООТВЕТСТВИЯ
+        // ============================================
+        
+        function checkMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const qrcode = urlParams.get('qrcode');
+            
+            if (mode === 'worker') {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
+                
+                if (qrcode) {
+                    showWorkerFormByQR(qrcode);
+                } else {
+                    showWorkerFormManual();
+                }
+            } else {
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
+                showPage('generateQR');
+            }
+        }
+        
+        function showWorkerFormByQR(qrCode) {
+            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            const qrData = qrcodes.find(qr => qr.code === qrCode);
+            
+            const html = `
+                <div style="padding: 20px;">
+                    <h2>🚨 Регистрация несоответствия ISO 13485</h2>
+                    ${qrData ? `
+                        <div style="background: #e8f4ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
+                            <h3>📋 Информация о месте</h3>
+                            <p><strong>Цех/Подразделение:</strong> ${qrData.department}</p>
+                            <p><strong>Рабочее место:</strong> ${qrData.location}</p>
+                            ${qrData.responsible ? `<p><strong>Ответственный за зону:</strong> ${qrData.responsible}</p>` : ''}
+                            <p><strong>QR-код:</strong> ${qrCode}</p>
+                        </div>
+                    ` : `
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                            <p>⚠️ QR-код "${qrCode}" не найден в системе</p>
+                            <p>Пожалуйста, заполните данные вручную</p>
+                        </div>
+                    `}
+                    
+                    <form onsubmit="event.preventDefault(); submitWorkerForm('${qrCode}');">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>👤 Ваше ФИО:</label>
+                                <input type="text" id="workerApplicant" placeholder="ФИО сотрудника" required>
+                            </div>
+                            <div class="form-group">
+                                <label>📞 Телефон для связи:</label>
+                                <input type="tel" id="workerPhone" placeholder="+7 (999) 999-99-99">
+                            </div>
+                            <div class="form-group">
+                                <label>📅 Дата обнаружения:</label>
+                                <input type="datetime-local" id="workerDate" value="${new Date().toISOString().slice(0, 16)}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>🏭 Тип несоответствия:</label>
+                                <select id="workerNsType" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="product">Несоответствие продукции</option>
+                                    <option value="process">Несоответствие процесса</option>
+                                    <option value="equipment">Неисправность оборудования</option>
+                                    <option value="documentation">Ошибка в документации</option>
+                                    <option value="safety">Нарушение безопасности</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>🔍 Краткое описание проблемы:</label>
+                            <input type="text" id="workerTitle" placeholder="Краткое описание проблемы (до 100 символов)" maxlength="100" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📋 Подробное описание:</label>
+                            <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины и последствия..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>⚠️ Срочность:</label>
+                            <select id="workerUrgency" required>
+                                <option value="low">Низкая (решить в течение недели)</option>
+                                <option value="medium" selected>Средняя (решить в течение 3 дней)</option>
+                                <option value="high">Высокая (решить в течение 24 часов)</option>
+                                <option value="critical">Критическая (остановить производство)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📷 Фотографии (макс. 5):</label>
+                            <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
+                            <div id="workerPhotoPreview" class="photo-preview-container"></div>
+                        </div>
+                        
+                        <input type="hidden" id="workerDepartment" value="${qrData ? qrData.department : ''}">
+                        <input type="hidden" id="workerLocation" value="${qrData ? qrData.location : ''}">
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="submit" class="btn btn-success" style="padding: 15px 30px; font-size: 18px;">
+                                📤 Отправить Лист Несоответствия
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
+                                ↩️ Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.getElementById('workerContent').innerHTML = html;
+        }
+        
+        function handleWorkerPhotos(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('workerPhotoPreview');
+            
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            photos = [];
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'photo-preview';
+                    preview.appendChild(img);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function submitWorkerForm(qrCode) {
+            const nsData = {
+                id: 'ns_' + Date.now(),
+                nsNumber: generateNSNumber(),
+                created: new Date().toISOString(),
+                detectionDate: document.getElementById('workerDate').value,
+                department: document.getElementById('workerDepartment').value || document.getElementById('qrDepartment')?.value || 'Не указано',
+                location: document.getElementById('workerLocation').value || document.getElementById('qrLocation')?.value || 'Не указано',
+                applicant: document.getElementById('workerApplicant').value,
+                applicantPhone: document.getElementById('workerPhone').value,
+                nsType: document.getElementById('workerNsType').value,
+                nsTitle: document.getElementById('workerTitle').value,
+                description: document.getElementById('workerDescription').value,
+                urgency: document.getElementById('workerUrgency').value,
+                photos: photos,
+                status: WORKFLOW_STATUSES.DETECTED,
+                qrCode: qrCode,
+                workflow: [{
+                    step: 1,
+                    action: 'detected',
+                    user: document.getElementById('workerApplicant').value,
+                    date: new Date().toISOString(),
+                    comment: 'Несоответствие зарегистрировано через QR-код'
+                }]
+            };
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            nsList.push(nsData);
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // Отправляем email через Web3Forms
+            sendEmailToSMKManager(nsData);
+            
+            // Синхронизируем с Google Sheets
+            syncNSWithGoogleSheets(nsData);
+            
+            document.getElementById('workerContent').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 80px; color: #28a745;">✅</div>
+                    <h2>Лист несоответствия создан!</h2>
+                    <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
+                    <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
+                        <p><strong>📋 Краткая информация:</strong></p>
+                        <p>Цех: ${nsData.department}</p>
+                        <p>Место: ${nsData.location}</p>
+                        <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
+                        <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
+                    </div>
+                    <p style="color: #666; margin: 20px 0;">
+                        ✅ Данные сохранены в системе<br>
+                        📧 Менеджер СМК получил уведомление<br>
+                        📊 Информация синхронизирована с Google Sheets
+                    </p>
+                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
+                        Вернуться на главную
+                    </button>
+                </div>
+            `;
+            
+            showNotification(`ЛН ${nsData.nsNumber} успешно создан! Данные синхронизированы.`, 'success');
+        }
+        
+        function generateNSNumber() {
+            const year = new Date().getFullYear().toString().slice(-2);
+            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const count = nsList.filter(ns => {
+                const nsDate = new Date(ns.created);
+                return nsDate.getFullYear() === new Date().getFullYear() && 
+                       nsDate.getMonth() + 1 === new Date().getMonth() + 1;
+            }).length + 1;
+            return `ЛН-${year}${month}-${count.toString().padStart(3, '0')}`;
+        }
+        
+        function getUrgencyText(urgency) {
+            const urgencyMap = {
+                'low': 'Низкая (неделя)',
+                'medium': 'Средняя (3 дня)',
+                'high': 'Высокая (24 часа)',
+                'critical': 'Критическая (немедленно)'
+            };
+            return urgencyMap[urgency] || urgency;
         }
         
         // ============================================
         // СИНХРОНИЗАЦИЯ С GOOGLE SHEETS
         // ============================================
         
-        // Функция для отправки данных в Google Sheets через WebApp
         async function syncWithGoogleSheets() {
-            showNotification('Подготавливаю данные для синхронизации...', 'success');
+            showNotification('Начинаю синхронизацию с Google Sheets...', 'success');
             
             try {
-                // Получаем все данные из localStorage
+                const syncStatus = document.getElementById('syncStatus');
+                syncStatus.innerHTML = '<p>Статус: Синхронизация...</p>';
+                syncStatus.className = 'sync-status';
+                
+                // Получаем все данные
                 const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
                 const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
                 const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
                 const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
                 
-                // Подготавливаем данные для отправки
+                // Подготавливаем данные
                 const data = {
                     action: 'sync_all_data',
                     timestamp: new Date().toISOString(),
@@ -868,86 +1007,220 @@
                     executors: executors
                 };
                 
-                console.log('Данные для синхронизации:', data);
-                
-                // Создаем CSV для скачивания
-                let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-                
-                // Листы несоответствий
-                csvContent += "=== ЛИСТЫ НЕСООТВЕТСТВИЙ ===\n";
-                csvContent += "Номер ЛН;Дата создания;Подразделение;Рабочее место;Заявитель;Телефон;Тип несоответствия;Краткое описание;Статус;Ответственный;Email ответственного;Срок исполнения;QR код;Количество фото\n";
-                
-                nsList.forEach(ns => {
-                    const row = [
-                        ns.nsNumber || '',
-                        ns.created ? new Date(ns.created).toLocaleDateString('ru-RU') : '',
-                        ns.department || '',
-                        ns.location || '',
-                        ns.applicant || '',
-                        ns.applicantPhone || '',
-                        getNSTypeText(ns.nsType),
-                        ns.nsTitle || '',
-                        getStatusText(ns.status),
-                        ns.responsiblePerson || '',
-                        ns.responsibleEmail || '',
-                        ns.deadline || '',
-                        ns.qrCode || '',
-                        ns.photos ? ns.photos.length : 0
-                    ].map(cell => `"${cell}"`).join(';');
-                    csvContent += row + "\n";
+                // Отправляем в Google Web App
+                const response = await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
                 });
                 
-                csvContent += "\n=== QR-КОДЫ ===\n";
-                csvContent += "Код;Подразделение;Рабочее место;Ответственный;Дата создания;URL\n";
+                // Обновляем статус
+                syncStatus.innerHTML = `
+                    <p>✅ Синхронизация завершена успешно!</p>
+                    <p><small>Синхронизировано:</small></p>
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>Листов несоответствий: ${nsList.length}</li>
+                        <li>QR-кодов: ${qrcodes.length}</li>
+                        <li>Ответственных: ${responsibles.length}</li>
+                        <li>Исполнителей: ${executors.length}</li>
+                    </ul>
+                `;
+                syncStatus.className = 'sync-status success';
                 
-                qrcodes.forEach(qr => {
-                    const row = [
-                        qr.code || '',
-                        qr.department || '',
-                        qr.location || '',
-                        qr.responsible || '',
-                        qr.created ? new Date(qr.created).toLocaleDateString('ru-RU') : '',
-                        qr.url || ''
-                    ].map(cell => `"${cell}"`).join(';');
-                    csvContent += row + "\n";
-                });
+                // Сохраняем время последней синхронизации
+                localStorage.setItem('farmstil_last_sync', new Date().toISOString());
+                updateLastSyncTime();
                 
-                // Скачиваем CSV файл
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", `farmstil_export_${new Date().toISOString().split('T')[0]}.csv`);
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                showNotification(`Экспортировано ${nsList.length} ЛН и ${qrcodes.length} QR-кодов в CSV`, 'success');
-                
-                // Показываем инструкцию для Google Sheets
-                setTimeout(() => {
-                    showNotification(`
-                        📊 Для загрузки в Google Sheets:
-                        1. Откройте Google Sheets
-                        2. Файл → Импорт → Загрузить
-                        3. Выберите скачанный файл CSV
-                        4. Выберите "Заменить таблицу"
-                    `, 'success', 8000);
-                }, 1000);
+                showNotification(`Синхронизировано ${nsList.length} записей с Google Sheets`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка синхронизации:', error);
-                showNotification('Ошибка при синхронизации: ' + error.message, 'error');
+                const syncStatus = document.getElementById('syncStatus');
+                syncStatus.innerHTML = '<p>❌ Ошибка синхронизации. Используйте экспорт в CSV.</p>';
+                syncStatus.className = 'sync-status error';
+                showNotification('Ошибка синхронизации. Используйте экспорт в CSV.', 'error');
             }
         }
         
-        // Остальные функции остаются без изменений
-        // ... [Остальной код из вашего файла] ...
+        async function syncNSWithGoogleSheets(nsData) {
+            try {
+                const data = {
+                    action: 'add_ns',
+                    nsData: nsData
+                };
+                
+                await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                console.log('ЛН синхронизирован с Google Sheets:', nsData.nsNumber);
+            } catch (error) {
+                console.error('Ошибка синхронизации ЛН:', error);
+            }
+        }
+        
+        async function syncQRCodeWithGoogleSheets() {
+            if (!currentQRData) return;
+            
+            try {
+                const data = {
+                    action: 'add_qrcode',
+                    qrData: currentQRData
+                };
+                
+                await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                console.log('QR-код синхронизирован с Google Sheets:', currentQRData.code);
+            } catch (error) {
+                console.error('Ошибка синхронизации QR-кода:', error);
+            }
+        }
+        
+        function updateLastSyncTime() {
+            const lastSync = localStorage.getItem('farmstil_last_sync');
+            const lastSyncTimeEl = document.getElementById('lastSyncTime');
+            
+            if (lastSyncTimeEl) {
+                if (lastSync) {
+                    const date = new Date(lastSync);
+                    lastSyncTimeEl.textContent = date.toLocaleString('ru-RU');
+                } else {
+                    lastSyncTimeEl.textContent = 'Никогда';
+                }
+            }
+        }
+        
+        function openGoogleSheets() {
+            const sheetsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID}/edit`;
+            window.open(sheetsUrl, '_blank');
+            showNotification('Открываю Google Sheets...', 'success');
+        }
+        
+        // ============================================
+        // ЭКСПОРТ В CSV
+        // ============================================
+        
+        function exportToCSV() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            
+            if (nsList.length === 0) {
+                showNotification('Нет данных для экспорта', 'warning');
+                return;
+            }
+            
+            // Заголовки CSV
+            const headers = [
+                'Номер ЛН', 'Дата создания', 'Дата обнаружения', 'Подразделение', 
+                'Рабочее место', 'Заявитель', 'Телефон', 'Тип несоответствия', 
+                'Краткое описание', 'Полное описание', 'Срочность', 'Статус', 
+                'Ответственный', 'Email ответственного', 'Срок исполнения', 
+                'QR код', 'Количество фото', 'История workflow'
+            ];
+            
+            const csvRows = [];
+            csvRows.push(headers.join(';'));
+            
+            nsList.forEach(ns => {
+                const workflowText = ns.workflow ? ns.workflow.map(w => 
+                    `${w.date}: ${w.user} - ${w.comment}`
+                ).join(' | ') : '';
+                
+                const row = [
+                    ns.nsNumber || '',
+                    ns.created ? new Date(ns.created).toLocaleString('ru-RU') : '',
+                    ns.detectionDate || '',
+                    ns.department || '',
+                    ns.location || '',
+                    ns.applicant || '',
+                    ns.applicantPhone || '',
+                    getNSTypeText(ns.nsType),
+                    ns.nsTitle || '',
+                    ns.description ? `"${ns.description.replace(/"/g, '""')}"` : '',
+                    getUrgencyText(ns.urgency),
+                    getStatusText(ns.status),
+                    ns.responsiblePerson || '',
+                    ns.responsibleEmail || '',
+                    ns.deadline || '',
+                    ns.qrCode || '',
+                    ns.photos ? ns.photos.length : 0,
+                    workflowText ? `"${workflowText.replace(/"/g, '""')}"` : ''
+                ];
+                csvRows.push(row.join(';'));
+            });
+            
+            const csvContent = csvRows.join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `farmstil_ns_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+            
+            showNotification(`Экспортировано ${nsList.length} записей в CSV`, 'success');
+        }
+        
+        // ============================================
+        // ОСТАЛЬНЫЕ ФУНКЦИИ
+        // ============================================
+        
+        function showNotification(message, type = 'success', duration = 3000) {
+            const notification = document.getElementById('notification');
+            if (!notification) return;
+            
+            notification.textContent = message;
+            notification.className = 'notification';
+            if (type === 'error') notification.classList.add('error');
+            notification.style.display = 'block';
+            
+            setTimeout(() => notification.style.display = 'none', duration);
+        }
+        
+        function closeModal() {
+            document.getElementById('statusModal').style.display = 'none';
+        }
+        
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.add('active');
+                const buttons = document.querySelectorAll('.menu-btn');
+                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
+                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
+                
+                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'directories') loadDirectories();
+                if (pageId === 'admin') {
+                    updateStats();
+                    updateLastSyncTime();
+                }
+            }
+        }
         
         function getNSTypeText(type) {
             const typeMap = {
                 'product': 'Несоответствие продукции',
                 'process': 'Несоответствие процесса',
                 'equipment': 'Неисправность оборудования',
+                'documentation': 'Ошибка в документации',
                 'safety': 'Нарушение безопасности',
                 'other': 'Другое'
             };
@@ -969,75 +1242,29 @@
             return statusMap[status] || status.toUpperCase();
         }
         
-        function showNotification(message, type = 'success', duration = 3000) {
-            const notification = document.getElementById('notification');
-            if (!notification) return;
-            
-            notification.textContent = message;
-            notification.className = 'notification';
-            if (type === 'error') notification.classList.add('error');
-            notification.style.display = 'block';
-            
-            setTimeout(() => {
-                notification.style.display = 'none';
-            }, duration);
-        }
-        
-        function closeModal() {
-            document.getElementById('statusModal').style.display = 'none';
-        }
-        
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-            
-            const page = document.getElementById(pageId + 'Page');
-            if (page) {
-                page.classList.add('active');
-                const buttons = document.querySelectorAll('.menu-btn');
-                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
-                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
-            }
-        }
-        
         // Экспорт функций в глобальную область видимости
         window.generateQRCode = generateQRCode;
         window.testQRCode = testQRCode;
         window.printQRCode = printQRCode;
-        window.copyQRCodeLink = copyQRCodeLink;
         window.syncWithGoogleSheets = syncWithGoogleSheets;
+        window.exportToCSV = exportToCSV;
+        window.openGoogleSheets = openGoogleSheets;
         window.closeModal = closeModal;
         window.showPage = showPage;
-        window.showNotification = showNotification;
-        
-        // Также экспортируем все остальные функции, которые могут быть вызваны из HTML
-        window.addResponsible = function() { showNotification('Функция добавления ответственного', 'info'); };
-        window.deleteResponsible = function() { showNotification('Функция удаления ответственного', 'info'); };
-        window.addExecutor = function() { showNotification('Функция добавления исполнителя', 'info'); };
-        window.deleteExecutor = function() { showNotification('Функция удаления исполнителя', 'info'); };
-        window.backupData = function() { showNotification('Функция резервного копирования', 'info'); };
-        window.restoreData = function() { showNotification('Функция восстановления', 'info'); };
-        window.clearAllData = function() { showNotification('Функция очистки данных', 'info'); };
-        window.exportToCSV = function() { showNotification('Функция экспорта в CSV', 'info'); };
-        window.showPendingNS = function() { showNotification('Функция показа ЛН на проверке', 'info'); };
-        window.reviewNS = function() { showNotification('Функция просмотра ЛН', 'info'); };
-        window.approveNS = function() { showNotification('Функция утверждения ЛН', 'info'); };
-        window.viewNSDetails = function() { showNotification('Функция детального просмотра ЛН', 'info'); };
+        window.showPendingNS = showPendingNS;
+        window.reviewNS = reviewNS;
+        window.approveNS = approveNS;
+        window.viewNSDetails = viewNSDetails;
+        window.addResponsible = addResponsible;
+        window.deleteResponsible = deleteResponsible;
+        window.addExecutor = addExecutor;
+        window.deleteExecutor = deleteExecutor;
+        window.backupData = backupData;
+        window.restoreData = restoreData;
+        window.clearAllData = clearAllData;
+        window.searchNS = searchNS;
         
         console.log('✅ Все функции экспортированы в глобальную область видимости');
-        
-        // Тестируем кнопки
-        console.log('=== ТЕСТ КНОПОК ===');
-        console.log('Кнопка генерации QR доступна:', document.querySelector('#generateQRPage .btn-primary') !== null);
-        console.log('Библиотека QRCode доступна:', typeof QRCode !== 'undefined');
-        
-        // Показываем тестовое сообщение
-        setTimeout(() => {
-            console.log('=== СИСТЕМА ГОТОВА ===');
-            console.log('1. Заполните поля подразделения и места');
-            console.log('2. Нажмите кнопку "Сгенерировать QR-код"');
-            console.log('3. QR-код появится ниже');
-        }, 2000);
     </script>
 </body>
 </html>
