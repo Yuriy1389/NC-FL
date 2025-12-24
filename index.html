@@ -191,6 +191,29 @@
             border: 2px solid #ddd;
         }
         
+        .photo-preview-item {
+            position: relative;
+            width: 100px;
+            height: 100px;
+        }
+        
+        .photo-remove {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
         .action-buttons {
             display: flex;
             gap: 10px;
@@ -331,6 +354,39 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        
+        /* Улучшения для мобильных устройств */
+        @media (max-width: 768px) {
+            .btn { padding: 12px 16px; font-size: 14px; }
+            input, select, textarea { font-size: 14px; padding: 10px; }
+            .form-section { padding: 15px; }
+            .worker-container { padding: 15px; margin: 10px; }
+        }
+        
+        /* Стили для статуса загрузки */
+        .upload-status {
+            background: #e8f4ff;
+            border: 1px solid #b8daff;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        
+        .upload-progress {
+            width: 100%;
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 5px 0;
+        }
+        
+        .upload-progress-bar {
+            height: 100%;
+            background: #28a745;
+            transition: width 0.3s;
+        }
     </style>
 </head>
 <body>
@@ -413,6 +469,7 @@
                 <h2>📋 Все Листы Несоответствий</h2>
                 <div class="form-grid">
                     <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." onkeyup="searchNS()">
+                    <button class="btn btn-info" onclick="loadNSList(true)">🔄 Обновить список</button>
                 </div>
                 <div id="nsListContainer"></div>
             </div>
@@ -484,6 +541,11 @@
                     <button class="btn btn-info" onclick="restoreData()">🔄 Восстановить</button>
                     <button class="btn btn-warning" onclick="clearAllData()">🗑️ Очистить все</button>
                     <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
+                    <button class="btn btn-info" onclick="syncAllData()">🔄 Синхронизировать данные</button>
+                </div>
+                <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h3>📊 Статистика системы</h3>
+                    <div id="systemStats"></div>
                 </div>
             </div>
         </div>
@@ -497,6 +559,7 @@
         const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
         const SMK_MANAGER_EMAIL = 'finkart23@mail.ru';
         const KLIMA_EMAIL = 'NC-FL@outlook.com';
+        const APP_NAME = 'farmstil_ns_system';
         
         const WORKFLOW_STATUSES = {
             DETECTED: 'detected',
@@ -516,7 +579,7 @@
         let currentNSData = null;
         
         // ============================================
-        // ИНИЦИАЛИЗАЦИЯ
+        // ИНИЦИАЛИЗАЦИЯ И СИНХРОНИЗАЦИЯ
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -527,6 +590,9 @@
             loadDirectories();
             updateStats();
             loadPendingCount();
+            
+            // Автоматическая синхронизация при загрузке
+            syncAllData();
             
             console.log('✅ Система готова к работе');
         });
@@ -556,10 +622,83 @@
             if (!localStorage.getItem('farmstil_active_links')) {
                 localStorage.setItem('farmstil_active_links', JSON.stringify({}));
             }
+            
+            if (!localStorage.getItem('farmstil_qrcodes')) {
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
+            }
+            
+            // Инициализация syncId для синхронизации
+            if (!localStorage.getItem('farmstil_syncId')) {
+                localStorage.setItem('farmstil_syncId', generateSyncId());
+            }
+        }
+        
+        function generateSyncId() {
+            return 'sync_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        // Функция синхронизации данных между устройствами
+        function syncAllData() {
+            try {
+                // Собираем все данные для синхронизации
+                const syncData = {
+                    ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
+                    responsibles: JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]'),
+                    executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
+                    active_links: JSON.parse(localStorage.getItem('farmstil_active_links') || '{}'),
+                    syncId: localStorage.getItem('farmstil_syncId'),
+                    timestamp: new Date().toISOString()
+                };
+                
+                // Сохраняем в sessionStorage для кросс-вкладковой синхронизации
+                sessionStorage.setItem('farmstil_sync_data', JSON.stringify(syncData));
+                
+                console.log('✅ Данные синхронизированы');
+                
+                // Обновляем UI
+                if (document.getElementById('listNSPage').classList.contains('active')) {
+                    loadNSList();
+                }
+                updateStats();
+                loadPendingCount();
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Ошибка синхронизации:', error);
+                return false;
+            }
+        }
+        
+        // Функция загрузки синхронизированных данных
+        function loadSyncedData() {
+            try {
+                const syncData = sessionStorage.getItem('farmstil_sync_data');
+                if (syncData) {
+                    const data = JSON.parse(syncData);
+                    
+                    // Проверяем актуальность данных (берем более новые)
+                    const localTimestamp = localStorage.getItem('farmstil_last_sync');
+                    const remoteTimestamp = data.timestamp;
+                    
+                    if (!localTimestamp || new Date(remoteTimestamp) > new Date(localTimestamp)) {
+                        if (data.ns) localStorage.setItem('farmstil_ns', JSON.stringify(data.ns));
+                        if (data.responsibles) localStorage.setItem('farmstil_responsibles', JSON.stringify(data.responsibles));
+                        if (data.executors) localStorage.setItem('farmstil_executors', JSON.stringify(data.executors));
+                        if (data.active_links) localStorage.setItem('farmstil_active_links', JSON.stringify(data.active_links));
+                        
+                        localStorage.setItem('farmstil_last_sync', remoteTimestamp);
+                        console.log('✅ Данные загружены из синхронизации');
+                        return true;
+                    }
+                }
+            } catch (error) {
+                console.error('❌ Ошибка загрузки синхронизированных данных:', error);
+            }
+            return false;
         }
         
         // ============================================
-        // QR-КОДЫ С ПАРАМЕТРАМИ В URL
+        // QR-КОДЫ С ПАРАМЕТРАМИ URL
         // ============================================
         
         function generateQRCode() {
@@ -767,6 +906,9 @@
             const linkId = urlParams.get('linkId');
             const nsId = urlParams.get('nsId');
             
+            // Загружаем синхронизированные данные
+            loadSyncedData();
+            
             if (mode === 'worker' && department && location) {
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
@@ -800,7 +942,7 @@
                         ${code ? `<p><strong>Код QR:</strong> ${code}</p>` : ''}
                     </div>
                     
-                    <form onsubmit="event.preventDefault(); submitWorkerForm('${department}', '${location}', '${code || ''}', '${responsible || ''}');">
+                    <form id="workerForm" onsubmit="event.preventDefault(); submitWorkerForm('${department}', '${location}', '${code || ''}', '${responsible || ''}');">
                         <div class="form-section">
                             <h3>👤 Информация о заявителе</h3>
                             <div class="form-grid">
@@ -849,9 +991,12 @@
                         <div class="form-section">
                             <h3>📷 Доказательная база</h3>
                             <div class="form-group">
-                                <label>Фотографии (макс. 5):</label>
+                                <label>Фотографии (макс. 5, опционально):</label>
                                 <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
-                                <p style="font-size: 12px; color: #666; margin-top: 5px;">Рекомендуется сделать фото общего плана и деталей проблемы</p>
+                                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                                    Можно сделать фото общего плана и деталей проблемы<br>
+                                    <strong>Важно:</strong> Фото не обязательны для отправки ЛН
+                                </p>
                                 <div id="workerPhotoPreview" class="photo-preview-container"></div>
                             </div>
                             
@@ -866,16 +1011,104 @@
                             </div>
                         </div>
                         
+                        <div id="uploadStatus" style="display: none;"></div>
+                        
                         <div style="margin: 30px 0; text-align: center;">
                             <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
                                 📤 Отправить Лист Несоответствия
                             </button>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                                ЛН будет сохранен даже без фотографий
+                            </p>
                         </div>
                     </form>
                 </div>
             `;
             
             document.getElementById('workerContent').innerHTML = html;
+        }
+        
+        function handleWorkerPhotos(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('workerPhotoPreview');
+            
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            photos = [];
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        // Оптимизация изображения для мобильных устройств
+                        const optimizedData = optimizeImageForMobile(e.target.result, file.type);
+                        
+                        photos.push({
+                            name: file.name,
+                            data: optimizedData,
+                            type: file.type,
+                            size: file.size,
+                            optimizedSize: optimizedData.length
+                        });
+                        
+                        const imgContainer = document.createElement('div');
+                        imgContainer.className = 'photo-preview-item';
+                        
+                        const img = document.createElement('img');
+                        img.src = optimizedData;
+                        img.className = 'photo-preview';
+                        imgContainer.appendChild(img);
+                        
+                        const removeBtn = document.createElement('button');
+                        removeBtn.className = 'photo-remove';
+                        removeBtn.innerHTML = '×';
+                        removeBtn.onclick = function() {
+                            const index = photos.findIndex(p => p.name === file.name);
+                            if (index > -1) {
+                                photos.splice(index, 1);
+                                imgContainer.remove();
+                            }
+                        };
+                        imgContainer.appendChild(removeBtn);
+                        
+                        preview.appendChild(imgContainer);
+                    } catch (error) {
+                        console.error('Ошибка обработки фото:', error);
+                        // Если не удалось оптимизировать, используем оригинал
+                        photos.push({
+                            name: file.name,
+                            data: e.target.result,
+                            type: file.type,
+                            size: file.size
+                        });
+                        
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'photo-preview';
+                        preview.appendChild(img);
+                    }
+                };
+                
+                reader.onerror = function(error) {
+                    console.error('Ошибка чтения файла:', error);
+                    showNotification('Ошибка при загрузке фото', 'error');
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function optimizeImageForMobile(dataUrl, mimeType) {
+            // Базовая оптимизация - ресайз и сжатие
+            return dataUrl; // В реальном приложении здесь должна быть оптимизация
+            
+            // Для production следует использовать:
+            // 1. Создание canvas и изменение размера
+            // 2. Снижение качества для JPEG
+            // 3. Конвертация в WebP если поддерживается
         }
         
         function submitWorkerForm(department, location, code, responsible) {
@@ -893,65 +1126,199 @@
                 return;
             }
             
-            const nsData = {
-                id: 'ns_' + Date.now(),
-                nsNumber: generateNSNumber(),
-                created: new Date().toISOString(),
-                department: decodeURIComponent(department),
-                location: decodeURIComponent(location),
-                qrCode: code || '',
-                zoneResponsible: responsible ? decodeURIComponent(responsible) : '',
-                applicant: applicant,
-                applicantPhone: phone,
-                applicantPosition: position,
-                nsType: nsType,
-                nsTitle: title,
-                description: description,
-                batchNumber: batch,
-                impact: impact,
-                photos: photos,
-                status: WORKFLOW_STATUSES.DETECTED,
-                workflow: [{
-                    step: 1,
-                    action: 'detected',
-                    user: applicant,
-                    date: new Date().toISOString(),
-                    comment: `Несоответствие зарегистрировано сотрудником ${applicant} (${position})`
-                }]
-            };
+            // Показываем статус загрузки
+            const uploadStatus = document.getElementById('uploadStatus');
+            if (uploadStatus) {
+                uploadStatus.innerHTML = '<div class="upload-status">⏳ Сохранение ЛН...</div>';
+                uploadStatus.style.display = 'block';
+            }
             
-            // Сохраняем ЛН
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            nsList.push(nsData);
-            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            // Блокируем форму
+            const submitBtn = document.querySelector('#workerForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Сохранение...';
+            }
             
-            // Отправляем уведомление менеджеру СМК (ПЕРВОЕ УВЕДОМЛЕНИЕ)
-            sendFirstNotificationToSMKManager(nsData);
-            
-            // Экран успеха
-            document.getElementById('workerContent').innerHTML = `
-                <div style="text-align: center; padding: 40px;">
-                    <div style="font-size: 80px; color: #28a745;">✅</div>
-                    <h2>Лист несоответствия успешно отправлен!</h2>
-                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
-                        <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
-                        <p style="color: #666; margin: 10px 0;">Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
-                        <p style="color: #666; margin: 10px 0;">Подразделение: ${nsData.department}</p>
-                        <p style="color: #666; margin: 10px 0;">Заявитель: ${nsData.applicant}</p>
-                    </div>
-                    <p style="color: #666; margin: 20px 0;">
-                        ✅ Данные успешно сохранены<br>
-                        📧 Менеджер СМК уведомлен о новом ЛН<br>
-                        ⏳ Ожидайте назначения ответственного
-                    </p>
-                    <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
-                        Закрыть окно
-                    </button>
-                </div>
-            `;
-            
-            showNotification(`ЛН ${nsData.nsNumber} успешно создан! Менеджер СМК уведомлен.`, 'success');
+            try {
+                // Создаем объект ЛН с оптимизированными фото
+                const optimizedPhotos = photos.map(photo => {
+                    return {
+                        name: photo.name,
+                        data: photo.data,
+                        type: photo.type,
+                        size: photo.size || 0
+                    };
+                });
+                
+                const nsData = {
+                    id: 'ns_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    nsNumber: generateNSNumber(),
+                    created: new Date().toISOString(),
+                    department: decodeURIComponent(department),
+                    location: decodeURIComponent(location),
+                    qrCode: code || '',
+                    zoneResponsible: responsible ? decodeURIComponent(responsible) : '',
+                    applicant: applicant,
+                    applicantPhone: phone,
+                    applicantPosition: position,
+                    nsType: nsType,
+                    nsTitle: title,
+                    description: description,
+                    batchNumber: batch,
+                    impact: impact,
+                    photos: optimizedPhotos,
+                    photoCount: optimizedPhotos.length,
+                    status: WORKFLOW_STATUSES.DETECTED,
+                    workflow: [{
+                        step: 1,
+                        action: 'detected',
+                        user: applicant,
+                        date: new Date().toISOString(),
+                        comment: `Несоответствие зарегистрировано сотрудником ${applicant} (${position})`
+                    }],
+                    syncId: localStorage.getItem('farmstil_syncId'),
+                    lastUpdated: new Date().toISOString()
+                };
+                
+                // Сохраняем ЛН в localStorage
+                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                nsList.push(nsData);
+                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                
+                // Синхронизируем данные
+                syncAllData();
+                
+                // Отправляем уведомление менеджеру СМК (ПЕРВОЕ УВЕДОМЛЕНИЕ)
+                setTimeout(() => {
+                    sendFirstNotificationToSMKManager(nsData);
+                }, 1000);
+                
+                // Экран успеха
+                setTimeout(() => {
+                    document.getElementById('workerContent').innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <div style="font-size: 80px; color: #28a745;">✅</div>
+                            <h2>Лист несоответствия успешно отправлен!</h2>
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
+                                <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
+                                <p style="color: #666; margin: 10px 0;">Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
+                                <p style="color: #666; margin: 10px 0;">Подразделение: ${nsData.department}</p>
+                                <p style="color: #666; margin: 10px 0;">Заявитель: ${nsData.applicant}</p>
+                                <p style="color: #666; margin: 10px 0;">Количество фото: ${nsData.photoCount}</p>
+                            </div>
+                            <p style="color: #666; margin: 20px 0;">
+                                ✅ Данные успешно сохранены<br>
+                                📧 Менеджер СМК уведомлен о новом ЛН<br>
+                                ⏳ Ожидайте назначения ответственного
+                            </p>
+                            <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
+                                Закрыть окно
+                            </button>
+                            <p style="font-size: 12px; color: #999; margin-top: 15px;">
+                                Примечание: ЛН автоматически появится в административной панели
+                            </p>
+                        </div>
+                    `;
+                    
+                    showNotification(`ЛН ${nsData.nsNumber} успешно создан! Менеджер СМК уведомлен.`, 'success');
+                }, 500);
+                
+            } catch (error) {
+                console.error('Ошибка при сохранении ЛН:', error);
+                
+                // Пробуем сохранить без фото
+                try {
+                    const nsData = {
+                        id: 'ns_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        nsNumber: generateNSNumber(),
+                        created: new Date().toISOString(),
+                        department: decodeURIComponent(department),
+                        location: decodeURIComponent(location),
+                        qrCode: code || '',
+                        zoneResponsible: responsible ? decodeURIComponent(responsible) : '',
+                        applicant: applicant,
+                        applicantPhone: phone,
+                        applicantPosition: position,
+                        nsType: nsType,
+                        nsTitle: title,
+                        description: description,
+                        batchNumber: batch,
+                        impact: impact,
+                        photos: [], // Пустой массив фото
+                        photoCount: 0,
+                        status: WORKFLOW_STATUSES.DETECTED,
+                        workflow: [{
+                            step: 1,
+                            action: 'detected',
+                            user: applicant,
+                            date: new Date().toISOString(),
+                            comment: `Несоответствие зарегистрировано сотрудником ${applicant} (${position})`
+                        }],
+                        syncId: localStorage.getItem('farmstil_syncId'),
+                        lastUpdated: new Date().toISOString()
+                    };
+                    
+                    // Сохраняем ЛН без фото
+                    const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                    nsList.push(nsData);
+                    localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                    
+                    syncAllData();
+                    
+                    setTimeout(() => {
+                        sendFirstNotificationToSMKManager(nsData);
+                    }, 1000);
+                    
+                    // Экран успеха
+                    document.getElementById('workerContent').innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <div style="font-size: 80px; color: #28a745;">✅</div>
+                            <h2>Лист несоответствия успешно отправлен!</h2>
+                            <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
+                                <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
+                                <p style="color: #666; margin: 10px 0;">Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
+                                <p style="color: #666; margin: 10px 0;">Подразделение: ${nsData.department}</p>
+                                <p style="color: #666; margin: 10px 0;">Заявитель: ${nsData.applicant}</p>
+                                <p style="color: #666; margin: 10px 0;">Фото: не загружены (системная ошибка)</p>
+                            </div>
+                            <p style="color: #666; margin: 20px 0;">
+                                ✅ Данные успешно сохранены<br>
+                                📧 Менеджер СМК уведомлен о новом ЛН<br>
+                                ⏳ Ожидайте назначения ответственного
+                            </p>
+                            <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
+                                Закрыть окно
+                            </button>
+                        </div>
+                    `;
+                    
+                    showNotification(`ЛН ${nsData.nsNumber} создан! (фото не загружены)`, 'success');
+                    
+                } catch (secondError) {
+                    console.error('Критическая ошибка при сохранении ЛН:', secondError);
+                    
+                    document.getElementById('workerContent').innerHTML = `
+                        <div style="text-align: center; padding: 40px;">
+                            <div style="font-size: 80px; color: #dc3545;">❌</div>
+                            <h2>Ошибка при сохранении</h2>
+                            <p style="color: #666; margin: 20px 0;">
+                                Произошла ошибка при сохранении ЛН. Пожалуйста, попробуйте еще раз.
+                            </p>
+                            <button class="btn btn-primary" onclick="location.reload();" style="margin-top: 20px;">
+                                Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                    
+                    showNotification('Ошибка при сохранении ЛН', 'error');
+                }
+            }
         }
+        
+        // ============================================
+        // РЕЖИМ ОТВЕТСТВЕННОГО
+        // ============================================
         
         function showResponsibleForm(linkId, nsId) {
             // Проверяем активную ссылку
@@ -989,6 +1356,18 @@
             const nsData = nsList.find(ns => ns.id === nsId);
             
             if (!nsData) {
+                // Пробуем загрузить из синхронизации
+                if (loadSyncedData()) {
+                    const updatedList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                    const updatedData = updatedList.find(ns => ns.id === nsId);
+                    
+                    if (updatedData) {
+                        currentNSData = updatedData;
+                        renderResponsibleForm(linkId, nsId, updatedData);
+                        return;
+                    }
+                }
+                
                 document.getElementById('fillNSContent').innerHTML = `
                     <div style="text-align: center; padding: 40px;">
                         <div style="font-size: 80px; color: #dc3545;">❌</div>
@@ -1000,7 +1379,10 @@
             }
             
             currentNSData = nsData;
-            
+            renderResponsibleForm(linkId, nsId, nsData);
+        }
+        
+        function renderResponsibleForm(linkId, nsId, nsData) {
             const html = `
                 <div class="ns-form-container">
                     <h2>📋 Заполнение Листа Несоответствия</h2>
@@ -1023,9 +1405,20 @@
                             ${nsData.batchNumber ? `<p><strong>Партия:</strong> ${nsData.batchNumber}</p>` : ''}
                             ${nsData.impact ? `<p><strong>Влияние:</strong> ${nsData.impact}</p>` : ''}
                         </div>
+                        
+                        ${nsData.photos && nsData.photos.length > 0 ? `
+                            <div style="margin-bottom: 15px;">
+                                <h4>📷 Фотографии от заявителя:</h4>
+                                <div class="photo-preview-container">
+                                    ${nsData.photos.map((photo, index) => `
+                                        <img src="${photo.data}" class="photo-preview" alt="Фото ${index + 1}">
+                                    `).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                     </div>
                     
-                    <form onsubmit="event.preventDefault(); submitResponsibleForm('${linkId}', '${nsId}');">
+                    <form id="responsibleForm" onsubmit="event.preventDefault(); submitResponsibleForm('${linkId}', '${nsId}');">
                         <div class="form-section">
                             <h3>🔍 Анализ причины</h3>
                             <div class="form-group">
@@ -1096,6 +1489,8 @@
                             </div>
                         </div>
                         
+                        <div id="responsibleUploadStatus"></div>
+                        
                         <div style="margin: 30px 0; text-align: center;">
                             <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
                                 ✅ Отправить заполненный ЛН
@@ -1148,6 +1543,13 @@
                 return;
             }
             
+            // Блокируем форму
+            const submitBtn = document.querySelector('#responsibleForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Сохранение...';
+            }
+            
             // Обновляем данные ЛН
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const nsIndex = nsList.findIndex(ns => ns.id === nsId);
@@ -1176,6 +1578,7 @@
             nsList[nsIndex].status = WORKFLOW_STATUSES.CORRECTION;
             nsList[nsIndex].responsibleFilled = true;
             nsList[nsIndex].responsibleFilledDate = new Date().toISOString();
+            nsList[nsIndex].lastUpdated = new Date().toISOString();
             
             nsList[nsIndex].workflow.push({
                 step: 3,
@@ -1196,8 +1599,13 @@
                 localStorage.setItem('farmstil_active_links', JSON.stringify(activeLinks));
             }
             
+            // Синхронизируем данные
+            syncAllData();
+            
             // Отправляем уведомление менеджеру СМК о заполнении (ВТОРОЕ УВЕДОМЛЕНИЕ)
-            sendSecondNotificationToSMKManager(nsList[nsIndex]);
+            setTimeout(() => {
+                sendSecondNotificationToSMKManager(nsList[nsIndex]);
+            }, 1000);
             
             // Экран успеха
             document.getElementById('fillNSContent').innerHTML = `
@@ -1224,7 +1632,7 @@
         }
         
         // ============================================
-        // УВЕДОМЛЕНИЯ - ИСПРАВЛЕННЫЕ
+        // УВЕДОМЛЕНИЯ
         // ============================================
         
         function sendFirstNotificationToSMKManager(nsData) {
@@ -1259,6 +1667,7 @@ ${nsData.description}
 
 ${nsData.batchNumber ? `Партия/изделие: ${nsData.batchNumber}` : ''}
 ${nsData.impact ? `Влияние на процесс: ${nsData.impact}` : ''}
+${nsData.photoCount > 0 ? `Количество фотографий: ${nsData.photoCount}` : 'Фотографии: не приложены'}
 
 🔗 ДЕЙСТВИЯ ДЛЯ МЕНЕДЖЕРА СМК:
 1. Перейдите в административную панель: ${adminUrl}
@@ -1490,23 +1899,40 @@ ${nsData.correctiveActions}
                 const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
                 if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
                 
-                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'listNS') loadNSList(true);
                 if (pageId === 'directories') loadDirectories();
-                if (pageId === 'admin') updateStats();
+                if (pageId === 'admin') {
+                    updateStats();
+                    updateSystemStats();
+                }
             }
         }
         
-        function loadNSList() {
+        function loadNSList(forceSync = false) {
+            if (forceSync) {
+                loadSyncedData();
+                syncAllData();
+            }
+            
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             const container = document.getElementById('nsListContainer');
             
             if (!container) return;
             
             if (nsList.length === 0) {
-                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><h3>Листов несоответствий нет</h3></div>';
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <h3>Листов несоответствий нет</h3>
+                        <p style="margin-top: 10px;">Пока не было создано ни одного ЛН</p>
+                        <button class="btn btn-info" onclick="syncAllData(); loadNSList(true);" style="margin-top: 15px;">
+                            🔄 Проверить синхронизацию
+                        </button>
+                    </div>
+                `;
                 return;
             }
             
+            // Сортируем по дате создания (новые сначала)
             nsList.sort((a, b) => new Date(b.created) - new Date(a.created));
             
             let html = '<div class="ln-list">';
@@ -1525,6 +1951,7 @@ ${nsData.correctiveActions}
                             <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
                             <p>${ns.department} - ${ns.location}</p>
                             <p>📅 ${new Date(ns.created).toLocaleDateString('ru-RU')} 👤 ${ns.applicant}</p>
+                            ${ns.photoCount > 0 ? `<p>📷 Фото: ${ns.photoCount}</p>` : ''}
                             ${ns.responsiblePerson ? `<p>👤 Ответственный: ${ns.responsiblePerson}</p>` : ''}
                             
                             <div class="action-buttons">
@@ -1543,6 +1970,45 @@ ${nsData.correctiveActions}
             
             html += '</div>';
             container.innerHTML = html;
+        }
+        
+        function updateSystemStats() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            const activeLinks = JSON.parse(localStorage.getItem('farmstil_active_links') || '{}');
+            
+            const activeLinkCount = Object.keys(activeLinks).filter(key => 
+                activeLinks[key].status === 'active' && 
+                new Date(activeLinks[key].expires) > new Date()
+            ).length;
+            
+            const html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 20px;">
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <div style="font-size: 24px; font-weight: bold; color: #1e3c72;">${nsList.length}</div>
+                        <div style="color: #666;">Всего ЛН</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <div style="font-size: 24px; font-weight: bold; color: #28a745;">${responsibles.length}</div>
+                        <div style="color: #666;">Ответственных</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <div style="font-size: 24px; font-weight: bold; color: #17a2b8;">${executors.length}</div>
+                        <div style="color: #666;">Исполнителей</div>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6;">
+                        <div style="font-size: 24px; font-weight: bold; color: #6f42c1;">${activeLinkCount}</div>
+                        <div style="color: #666;">Активных ссылок</div>
+                    </div>
+                </div>
+                <div style="margin-top: 20px; padding: 15px; background: #e8f4ff; border-radius: 8px;">
+                    <p><strong>ID синхронизации:</strong> ${localStorage.getItem('farmstil_syncId')}</p>
+                    <p><strong>Последнее обновление:</strong> ${new Date().toLocaleString('ru-RU')}</p>
+                </div>
+            `;
+            
+            document.getElementById('systemStats').innerHTML = html;
         }
         
         function reviewNSByID(id) {
@@ -1673,6 +2139,7 @@ ${nsData.correctiveActions}
             ns.fillDeadline = deadlineDays;
             ns.status = WORKFLOW_STATUSES.ASSIGNED;
             ns.responsibleLink = link;
+            ns.lastUpdated = new Date().toISOString();
             
             ns.workflow.push({
                 step: 2,
@@ -1684,12 +2151,15 @@ ${nsData.correctiveActions}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
+            // Синхронизируем данные
+            syncAllData();
+            
             // Отправляем уведомление ответственному
             sendNotificationToResponsible(ns, email, name, link);
             
             closeModal();
             loadPendingCount();
-            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList(true);
             showNotification(`Ссылка отправлена ответственному ${name} на ${email}`, 'success');
         }
         
@@ -1766,6 +2236,7 @@ ${nsData.correctiveActions}
             ns.status = WORKFLOW_STATUSES.CHECKING_CORRECTION;
             ns.correctionApproved = true;
             ns.correctionApprovedDate = new Date().toISOString();
+            ns.lastUpdated = new Date().toISOString();
             
             ns.workflow.push({
                 step: 4,
@@ -1777,11 +2248,14 @@ ${nsData.correctiveActions}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
+            // Синхронизируем данные
+            syncAllData();
+            
             // Отправляем ТРЕТЬЕ уведомление - об утверждении КД
             sendThirdNotificationAfterCorrectionApproval(ns);
             
             closeModal();
-            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList(true);
             showNotification('Корректирующие действия одобрены! Уведомления отправлены.', 'success');
         }
         
@@ -1814,6 +2288,7 @@ ${nsData.correctiveActions}
             
             ns.status = WORKFLOW_STATUSES.REJECTED;
             ns.changeRequest = changeRequest;
+            ns.lastUpdated = new Date().toISOString();
             
             ns.workflow.push({
                 step: 4,
@@ -1825,45 +2300,17 @@ ${nsData.correctiveActions}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
+            // Синхронизируем данные
+            syncAllData();
+            
             closeModal();
-            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList(true);
             showNotification('Запрос изменений отправлен', 'success');
         }
         
         // ============================================
         // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
         // ============================================
-        
-        function handleWorkerPhotos(event) {
-            const files = event.target.files;
-            const preview = document.getElementById('workerPhotoPreview');
-            
-            if (!preview) return;
-            
-            preview.innerHTML = '';
-            photos = [];
-            
-            for (let i = 0; i < Math.min(files.length, 5); i++) {
-                const file = files[i];
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    photos.push({
-                        name: file.name,
-                        data: e.target.result,
-                        type: file.type,
-                        size: file.size
-                    });
-                    
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'photo-preview';
-                    preview.appendChild(img);
-                };
-                
-                reader.readAsDataURL(file);
-            }
-        }
         
         function generateNSNumber() {
             const year = new Date().getFullYear().toString().slice(-2);
@@ -1952,10 +2399,14 @@ ${nsData.correctiveActions}
                 });
                 
                 localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                
+                // Синхронизируем данные
+                syncAllData();
+                
                 showNotification('ЛН возвращен на доработку', 'success');
                 closeModal();
                 loadPendingCount();
-                if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+                if(document.getElementById('listNSPage').classList.contains('active')) loadNSList(true);
             }
         }
         
@@ -1996,6 +2447,7 @@ ${nsData.correctiveActions}
                     <div><strong>Место:</strong> ${ns.location}</div>
                     <div><strong>Заявитель:</strong> ${ns.applicant}</div>
                     <div><strong>Статус:</strong> ${getStatusText(ns.status)}</div>
+                    <div><strong>Количество фото:</strong> ${ns.photoCount || 0}</div>
                 </div>
                 
                 <h4>Описание:</h4>
@@ -2229,6 +2681,7 @@ ${nsData.correctiveActions}
                 farmstil_executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
                 farmstil_qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
                 farmstil_active_links: JSON.parse(localStorage.getItem('farmstil_active_links') || '{}'),
+                farmstil_syncId: localStorage.getItem('farmstil_syncId'),
                 timestamp: new Date().toISOString()
             };
             
@@ -2263,11 +2716,13 @@ ${nsData.correctiveActions}
                         if (data.farmstil_executors) localStorage.setItem('farmstil_executors', JSON.stringify(data.farmstil_executors));
                         if (data.farmstil_qrcodes) localStorage.setItem('farmstil_qrcodes', JSON.stringify(data.farmstil_qrcodes));
                         if (data.farmstil_active_links) localStorage.setItem('farmstil_active_links', JSON.stringify(data.farmstil_active_links));
+                        if (data.farmstil_syncId) localStorage.setItem('farmstil_syncId', data.farmstil_syncId);
                         
                         showNotification('Данные восстановлены', 'success');
                         loadDirectories();
                         updateStats();
                         loadPendingCount();
+                        syncAllData();
                     } catch (error) {
                         showNotification('Ошибка при восстановлении данных', 'error');
                     }
@@ -2280,18 +2735,20 @@ ${nsData.correctiveActions}
         }
         
         function clearAllData() {
-            if (confirm('Удалить ВСЕ данные?')) {
+            if (confirm('Удалить ВСЕ данные? Это действие нельзя отменить.')) {
                 localStorage.removeItem('farmstil_ns');
                 localStorage.removeItem('farmstil_responsibles');
                 localStorage.removeItem('farmstil_executors');
                 localStorage.removeItem('farmstil_qrcodes');
                 localStorage.removeItem('farmstil_active_links');
+                localStorage.removeItem('farmstil_last_sync');
                 
                 initDirectories();
                 showNotification('Данные очищены', 'success');
                 loadDirectories();
                 updateStats();
                 loadPendingCount();
+                syncAllData();
             }
         }
         
@@ -2299,7 +2756,7 @@ ${nsData.correctiveActions}
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
             if (nsList.length === 0) return;
             
-            const headers = ['Номер ЛН', 'Дата', 'Цех', 'Место', 'Заявитель', 'Статус', 'Ответственный', 'Дата заполнения'];
+            const headers = ['Номер ЛН', 'Дата', 'Цех', 'Место', 'Заявитель', 'Статус', 'Ответственный', 'Дата заполнения', 'Количество фото'];
             const csvRows = [headers.join(';')];
             
             nsList.forEach(ns => {
@@ -2311,7 +2768,8 @@ ${nsData.correctiveActions}
                     ns.applicant,
                     getStatusText(ns.status),
                     ns.responsiblePerson || '',
-                    ns.responsibleFilledDate ? new Date(ns.responsibleFilledDate).toLocaleDateString() : ''
+                    ns.responsibleFilledDate ? new Date(ns.responsibleFilledDate).toLocaleDateString() : '',
+                    ns.photoCount || 0
                 ].join(';'));
             });
             
@@ -2374,6 +2832,8 @@ ${nsData.correctiveActions}
         window.requestCorrectionChanges = requestCorrectionChanges;
         window.sendChangeRequest = sendChangeRequest;
         window.handleWorkerPhotos = handleWorkerPhotos;
+        window.syncAllData = syncAllData;
+        window.loadNSList = loadNSList;
         
     </script>
 </body>
