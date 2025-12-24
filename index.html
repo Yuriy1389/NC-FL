@@ -8,36 +8,309 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
-        /* [Здесь сохранена вся ваша CSS-стилистика из оригинала: градиенты, карточки, модалки] */
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh; padding: 10px;
+            min-height: 100vh;
+            padding: 10px;
         }
-        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        /* QR код стили */
+        #qrPreview {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+            display: none;
+        }
+        
+        .qr-container {
+            display: inline-block;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #1e3c72;
+            margin: 10px 0;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            background: white;
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            border-left: 5px solid #28a745;
+            text-align: center;
+        }
+        
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .ln-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        
+        .ln-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .ln-number {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 18px;
+        }
+        
+        .ln-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-detected { background: #ffc107; color: #212529; }
+        .status-checking_smk { background: #17a2b8; color: white; }
+        .status-assigned { background: #6f42c1; color: white; }
+        .status-correction { background: #fd7e14; color: white; }
+        .status-checking_correction { background: #20c997; color: white; }
+        .status-execution { background: #007bff; color: white; }
+        .status-completed { background: #28a745; color: white; }
+        .status-closed { background: #6c757d; color: white; }
+        .status-rejected { background: #dc3545; color: white; }
+        
         .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; }
         .menu { display: flex; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); padding: 0; gap: 1px; flex-wrap: wrap; }
         .menu-btn { padding: 12px 15px; background: white; border: none; color: #1e3c72; font-weight: bold; cursor: pointer; transition: all 0.3s ease; flex: 1; min-width: 120px; font-size: 14px; }
         .menu-btn.active { background: #1e3c72; color: white; }
+        .menu-btn:hover { background: #f8f9fa; }
         .page { display: none; padding: 20px; min-height: 500px; }
         .page.active { display: block; }
-        .notification { position: fixed; top: 10px; right: 10px; left: 10px; background: white; color: #333; padding: 15px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: none; z-index: 1000; border-left: 5px solid #28a745; text-align: center; }
-        .notification.error { border-left-color: #dc3545; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
-        .modal-content { background: white; border-radius: 15px; padding: 25px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
-        .ln-card { background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin: 10px 0; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
-        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
         .form-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .form-group { display: flex; flex-direction: column; width: 100%; }
+        label { margin-bottom: 6px; font-weight: 600; color: #333; font-size: 14px; }
         input, select, textarea { padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; width: 100%; }
-        .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        input:focus, select:focus, textarea:focus { border-color: #1e3c72; outline: none; }
+        .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin: 5px 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: #1e3c72; color: white; }
+        .btn-primary:hover { background: #2a5298; }
         .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
         .btn-danger { background: #dc3545; color: white; }
-        .directory-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e0e0e0; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        .btn-sm { padding: 8px 12px; font-size: 14px; }
+        
+        .photo-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .photo-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        /* Стили для рабочего интерфейса */
+        .worker-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .worker-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        /* Справочники - исправленные стили */
+        .directory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .directory-item-info {
+            flex: 1;
+        }
+        
+        .directory-item-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .directory-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .directory-input-group input {
+            flex: 1;
+        }
+        
         /* Workflow steps */
-        .workflow-step { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; border-left: 5px solid #1e3c72; position: relative; }
-        .workflow-step.active { background: #e8f4ff; border-left-color: #28a745; }
+        .workflow-step {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 5px solid #1e3c72;
+            position: relative;
+        }
+        
+        .workflow-step.active {
+            background: #e8f4ff;
+            border-left-color: #28a745;
+        }
+        
+        .workflow-step-number {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 30px;
+            height: 30px;
+            background: #1e3c72;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .workflow-step.active .workflow-step-number {
+            background: #28a745;
+        }
+        
+        @media (min-width: 768px) {
+            .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+            .btn { width: auto; }
+        }
+        
+        .ns-form-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1e3c72;
+        }
+        
+        .form-section h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .required::after {
+            content: " *";
+            color: #dc3545;
+        }
     </style>
 </head>
 <body>
@@ -45,295 +318,1977 @@
     
     <div class="modal" id="statusModal">
         <div class="modal-content">
-            <div class="modal-header" style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h3 id="modalTitle">Детали ЛН</h3>
-                <button onclick="closeModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle"></div>
+                <button class="modal-close" onclick="closeModal()">×</button>
             </div>
             <div id="modalContent"></div>
         </div>
     </div>
-
+    
     <div id="workerMode" style="display: none;">
-        <div class="container" style="max-width: 800px; margin: 20px auto; padding: 20px;">
-            <div class="header" style="border-radius: 10px 10px 0 0;">
-                <h1>📝 Регистрация несоответствия</h1>
+        <div class="worker-container">
+            <div class="worker-header">
+                <h1>📝 Регистрация несоответствия ISO 13485</h1>
                 <p>ФАРМСТИЛ - Система управления качеством</p>
             </div>
-            <div id="workerContent" style="padding: 20px;">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>📝 Описание несоответствия:</label>
-                        <textarea id="ncDescription" rows="5" placeholder="Опишите, что произошло..."></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>📸 Фотографии (до 3-х штук):</label>
-                        <input type="file" id="ncPhotos" accept="image/*" multiple onchange="handlePhotoSelect(event)">
-                        <div id="photoPreview" style="display:flex; gap:10px; margin-top:10px;"></div>
-                    </div>
-                    <button class="btn btn-success" onclick="submitNC()">🚀 ОТПРАВИТЬ В СМК</button>
-                </div>
-            </div>
+            <div id="workerContent"></div>
         </div>
     </div>
-
+    
+    <div id="fillNSMode" style="display: none;">
+        <div class="worker-container">
+            <div class="worker-header">
+                <h1>📋 Заполнение Листа Несоответствия</h1>
+                <p>ФАРМСТИЛ - Система управления качеством</p>
+            </div>
+            <div id="fillNSContent"></div>
+        </div>
+    </div>
+    
     <div id="adminMode">
         <div class="container">
             <div class="header">
                 <h1>ФАРМСТИЛ - Административная панель</h1>
-                <h2>ISO 13485 Workflow</h2>
+                <h2>ISO 13485 Workflow + Google Sheets</h2>
             </div>
             
             <div class="menu">
-                <button class="menu-btn active" onclick="showPage('listNS')">📋 Все ЛН</button>
-                <button class="menu-btn" onclick="showPage('generateQR')">🎯 Создать QR</button>
+                <button class="menu-btn active" onclick="showPage('generateQR')">🎯 Создать QR</button>
+                <button class="menu-btn" onclick="showPage('listNS')">📋 Все ЛН</button>
                 <button class="menu-btn" onclick="showPage('workflow')">🔄 Workflow</button>
                 <button class="menu-btn" onclick="showPage('directories')">📚 Справочники</button>
                 <button class="menu-btn" onclick="showPage('admin')">⚙️ Админ</button>
             </div>
-
-            <div class="page active" id="listNSPage">
-                <h2>📋 Реестр Листов Несоответствий</h2>
-                <input type="text" id="searchNS" placeholder="🔍 Быстрый поиск..." onkeyup="filterNS()" style="margin-bottom: 15px;">
+            
+            <div class="page active" id="generateQRPage">
+                <h2>🎯 Генерация QR-кода для цеха</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>🏭 Подразделение:</label>
+                        <select id="qrDepartment">
+                            <option value="">Выберите подразделение</option>
+                            <option value="Цех №1">Цех №1 - Производство</option>
+                            <option value="Цех №2">Цех №2 - Сборка</option>
+                            <option value="Склад">Склад материалов</option>
+                            <option value="ОТК">Отдел технического контроля</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>📍 Рабочее место/Станок:</label>
+                        <input type="text" id="qrLocation" placeholder="Например: Станок ЧПУ-5, Стол сборки №3">
+                    </div>
+                    <div class="form-group">
+                        <label>👤 Ответственный за зону:</label>
+                        <input type="text" id="qrResponsible" placeholder="ФИО ответственного">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="generateQRCode()">
+                    🎯 Сгенерировать QR-код
+                </button>
+                <div id="qrPreview"></div>
+            </div>
+            
+            <div class="page" id="listNSPage">
+                <h2>📋 Все Листы Несоответствий</h2>
+                <div class="form-grid">
+                    <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." onkeyup="searchNS()">
+                </div>
                 <div id="nsListContainer"></div>
             </div>
-
-            <div class="page" id="generateQRPage">
-                <h2>🎯 Создание точки контроля</h2>
-                <div class="form-grid">
-                    <input type="text" id="qrDept" placeholder="Цех/Подразделение">
-                    <input type="text" id="qrLoc" placeholder="Рабочее место/Станок">
-                    <button class="btn btn-primary" onclick="generateQRCode()">Сгенерировать QR</button>
+            
+            <div class="page" id="workflowPage">
+                <h2>🔄 Workflow ISO 13485</h2>
+                <div class="workflow-step active">
+                    <div class="workflow-step-number">1</div>
+                    <h3>🚨 Обнаружение несоответствия</h3>
+                    <p>Сотрудник сканирует QR, заполняет ЛН с фотографиями</p>
                 </div>
-                <div id="qrPreview" style="text-align: center; display:none; padding: 20px; border: 2px dashed #ccc;"></div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">2</div>
+                    <h3>📧 Проверка менеджера СМК</h3>
+                    <p>Менеджер проверяет полноту заполнения и назначает ответственного</p>
+                    <button class="btn btn-info" onclick="showPendingNS()">Показать ЛН на проверке (<span id="pendingCount">0</span>)</button>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">3</div>
+                    <h3>📨 Уведомление ответственного</h3>
+                    <p>Ответственный получает ссылку для заполнения ЛН</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">4</div>
+                    <h3>🛠️ Разработка решений</h3>
+                    <p>Ответственный заполняет Корректирующие действия</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">5</div>
+                    <h3>✅ Проверка и исполнение</h3>
+                    <p>Менеджер проверяет и назначает исполнителя</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">6</div>
+                    <h3>📋 Закрытие и подписание</h3>
+                    <p>Закрытие ЛН, печать и подписание у руководства</p>
+                </div>
             </div>
-
+            
             <div class="page" id="directoriesPage">
-                <h2>📚 Управление персоналом</h2>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <div>
-                        <h3>👥 Ответственные</h3>
+                <h2>📚 Справочники системы</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <h3>👥 Ответственные за решения</h3>
                         <div id="responsiblesList"></div>
-                        <div class="directory-input-group" style="margin-top:10px;">
-                            <input type="text" id="respName" placeholder="ФИО">
-                            <input type="email" id="respEmail" placeholder="Email">
-                            <button class="btn btn-success" onclick="addResponsible()">Добавить</button>
+                        <div class="directory-input-group">
+                            <input type="text" id="responsibleName" placeholder="ФИО ответственного" style="flex: 2;">
+                            <input type="email" id="responsibleEmail" placeholder="Email" style="flex: 2;">
+                            <button class="btn btn-success" onclick="addResponsible()" style="flex: 1;">Добавить</button>
                         </div>
                     </div>
-                    <div>
+                    <div class="form-group">
                         <h3>👷 Исполнители</h3>
                         <div id="executorsList"></div>
-                        <div class="directory-input-group" style="margin-top:10px;">
-                            <input type="text" id="execName" placeholder="ФИО">
-                            <button class="btn btn-success" onclick="addExecutor()">Добавить</button>
+                        <div class="directory-input-group">
+                            <input type="text" id="executorName" placeholder="ФИО исполнителя" style="flex: 2;">
+                            <input type="email" id="executorEmail" placeholder="Email" style="flex: 2;">
+                            <button class="btn btn-success" onclick="addExecutor()" style="flex: 1;">Добавить</button>
                         </div>
                     </div>
                 </div>
             </div>
-
+            
             <div class="page" id="adminPage">
-                <h2>⚙️ Система</h2>
+                <h2>⚙️ Администрирование</h2>
+                <div id="statsGrid"></div>
                 <div class="form-grid">
                     <button class="btn btn-primary" onclick="backupData()">💾 Резервная копия</button>
-                    <button class="btn btn-danger" onclick="clearAllData()">🗑️ Очистить базу данных</button>
-                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в Excel (CSV)</button>
+                    <button class="btn btn-info" onclick="restoreData()">🔄 Восстановить</button>
+                    <button class="btn btn-warning" onclick="clearAllData()">🗑️ Очистить все</button>
+                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- ГЛОБАЛЬНЫЕ ДАННЫЕ (ВОССТАНОВЛЕНО) ---
-        let nsData = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-        let responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
-        let executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
-        let selectedPhotos = [];
-
-        // Инициализация
-        window.onload = function() {
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('mode') === 'worker') {
-                document.getElementById('adminMode').style.display = 'none';
-                document.getElementById('workerMode').style.display = 'block';
-            }
-            renderNSList();
-            renderDirectories();
+        // ============================================
+        // КОНСТАНТЫ И КОНФИГУРАЦИЯ
+        // ============================================
+        
+        const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
+        const WORKFLOW_STATUSES = {
+            DETECTED: 'detected',
+            CHECKING_SMK: 'checking_smk',
+            ASSIGNED: 'assigned',
+            CORRECTION: 'correction',
+            CHECKING_CORRECTION: 'checking_correction',
+            EXECUTION: 'execution',
+            COMPLETED: 'completed',
+            CLOSED: 'closed',
+            REJECTED: 'rejected'
         };
-
-        // --- ЛОГИКА РАБОЧЕГО (С ФОТО) ---
-        function handlePhotoSelect(e) {
-            const files = Array.from(e.target.files);
-            selectedPhotos = [];
-            const preview = document.getElementById('photoPreview');
-            preview.innerHTML = '';
+        
+        let currentQRData = null;
+        let photos = [];
+        let currentEditingNS = null;
+        let currentNSData = null;
+        
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
             
-            files.slice(0, 3).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    selectedPhotos.push(event.target.result);
-                    const img = document.createElement('img');
-                    img.src = event.target.result;
-                    img.style.width = '80px';
-                    img.style.height = '80px';
-                    img.style.objectFit = 'cover';
-                    img.style.borderRadius = '5px';
-                    preview.appendChild(img);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        function submitNC() {
-            const desc = document.getElementById('ncDescription').value;
-            if (!desc) return showNotification('Введите описание!', 'error');
-
-            const params = new URLSearchParams(window.location.search);
-            const newNC = {
-                id: 'ЛН-' + Date.now().toString().slice(-6),
-                date: new Date().toLocaleString(),
-                location: params.get('qrcode') || 'Не указана',
-                description: desc,
-                photos: selectedPhotos,
-                status: 'checking_smk',
-                history: [{ date: new Date().toLocaleString(), action: 'Создан' }]
-            };
-
-            nsData.push(newNC);
-            localStorage.setItem('farmstil_ns', JSON.stringify(nsData));
-            showNotification('Успешно отправлено!');
-            setTimeout(() => window.location.search = '', 2000);
-        }
-
-        // --- ЛОГИКА АДМИНА (ПОЛНЫЙ ФУНКЦИОНАЛ) ---
-        function renderNSList() {
-            const container = document.getElementById('nsListContainer');
-            if (!container) return;
-            container.innerHTML = nsData.length ? '' : '<p>Нет записей</p>';
+            initDirectories();
+            checkMode();
+            loadDirectories();
+            updateStats();
+            loadPendingCount();
             
-            nsData.slice().reverse().forEach(ns => {
-                const card = document.createElement('div');
-                card.className = 'ln-card';
-                card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between;">
-                        <strong>${ns.id}</strong>
-                        <span class="status-badge" style="background:#17a2b8; color:white;">${ns.status}</span>
-                    </div>
-                    <p style="margin:10px 0;">${ns.description}</p>
-                    <button class="btn btn-primary btn-sm" onclick="viewNSDetails('${ns.id}')">Открыть детали</button>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function viewNSDetails(id) {
-            const ns = nsData.find(item => item.id === id);
-            const modal = document.getElementById('statusModal');
-            document.getElementById('modalTitle').innerText = `Детали ${ns.id}`;
+            console.log('✅ Система готова к работе');
+        });
+        
+        function initDirectories() {
+            if (!localStorage.getItem('farmstil_responsibles')) {
+                const defaultResponsibles = [
+                    { id: 1, name: "Иванов И.И.", email: "finkart23@mail.ru", role: "Начальник цеха" },
+                    { id: 2, name: "Петров П.П.", email: "finkart23@mail.ru", role: "Главный технолог" }
+                ];
+                localStorage.setItem('farmstil_responsibles', JSON.stringify(defaultResponsibles));
+            }
             
-            let photoHtml = ns.photos.map(p => `<img src="${p}" style="width:100%; margin-bottom:10px; border-radius:10px;">`).join('');
+            if (!localStorage.getItem('farmstil_executors')) {
+                const defaultExecutors = [
+                    { id: 1, name: "Смирнов А.А.", email: "finkart23@mail.ru", department: "Цех №1" },
+                    { id: 2, name: "Кузнецов Б.Б.", email: "finkart23@mail.ru", department: "Цех №2" }
+                ];
+                localStorage.setItem('farmstil_executors', JSON.stringify(defaultExecutors));
+            }
             
-            document.getElementById('modalContent').innerHTML = `
-                <p><strong>Дата:</strong> ${ns.date}</p>
-                <p><strong>Локация:</strong> ${ns.location}</p>
-                <div style="margin:15px 0;">${photoHtml}</div>
-                <hr>
-                <div style="margin-top:15px;">
-                    <label>Назначить ответственного:</label>
-                    <select id="assignee">
-                        ${responsibles.map(r => `<option value="${r.email}">${r.name}</option>`).join('')}
-                    </select>
-                    <button class="btn btn-success" style="margin-top:10px; width:100%;" onclick="approveNS('${ns.id}')">Утвердить ЛН</button>
-                </div>
-            `;
-            modal.style.display = 'flex';
-        }
-
-        function approveNS(id) {
-            const ns = nsData.find(item => item.id === id);
-            ns.status = 'assigned';
-            ns.assignedTo = document.getElementById('assignee').value;
-            localStorage.setItem('farmstil_ns', JSON.stringify(nsData));
-            closeModal();
-            renderNSList();
-            showNotification('Статус изменен на: Назначено');
-        }
-
-        // --- УТИЛИТЫ ---
-        function generateQRCode() {
-            const dept = document.getElementById('qrDept').value;
-            const loc = document.getElementById('qrLoc').value;
-            if(!dept || !loc) return alert('Заполните все поля');
+            if (!localStorage.getItem('farmstil_qrcodes')) {
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
+            }
             
-            const code = `FS-${Date.now().toString().slice(-5)}`;
-            const url = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${code}`;
-            const preview = document.getElementById('qrPreview');
-            preview.innerHTML = `<h3>${dept} - ${loc}</h3><div id="qrImg" style="display:inline-block; margin:20px;"></div><p>${url}</p>`;
-            preview.style.display = 'block';
-            new QRCode(document.getElementById("qrImg"), { text: url, width: 200, height: 200 });
-        }
-
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(id + 'Page').classList.add('active');
-            event.currentTarget.classList.add('active');
-        }
-
-        function closeModal() { document.getElementById('statusModal').style.display = 'none'; }
-
-        function showNotification(msg, type = 'success') {
-            const n = document.getElementById('notification');
-            n.innerText = msg; n.className = 'notification ' + type;
-            n.style.display = 'block';
-            setTimeout(() => n.style.display = 'none', 3000);
-        }
-
-        function backupData() {
-            const blob = new Blob([JSON.stringify(nsData)], {type: 'application/json'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'fs_backup.json';
-            a.click();
-        }
-
-        function clearAllData() {
-            if(confirm('Удалить ВСЕ записи?')) { localStorage.clear(); location.reload(); }
-        }
-
-        function renderDirectories() {
-            const rList = document.getElementById('responsiblesList');
-            const eList = document.getElementById('executorsList');
-            rList.innerHTML = responsibles.map(r => `<div class="directory-item">${r.name} (${r.email})</div>`).join('');
-            eList.innerHTML = executors.map(e => `<div class="directory-item">${e.name}</div>`).join('');
-        }
-
-        function addResponsible() {
-            const name = document.getElementById('respName').value;
-            const email = document.getElementById('respEmail').value;
-            if(name && email) {
-                responsibles.push({name, email});
-                localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
-                renderDirectories();
+            if (!localStorage.getItem('farmstil_ns')) {
+                localStorage.setItem('farmstil_ns', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('farmstil_links')) {
+                localStorage.setItem('farmstil_links', JSON.stringify({}));
             }
         }
         
-        function addExecutor() {
-            const name = document.getElementById('execName').value;
-            if(name) {
-                executors.push({name});
-                localStorage.setItem('farmstil_executors', JSON.stringify(executors));
-                renderDirectories();
+        // ============================================
+        // QR-КОДЫ С УНИКАЛЬНЫМИ ССЫЛКАМИ
+        // ============================================
+        
+        function generateQRCode() {
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocation').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            if (!department || !location) {
+                showNotification('Заполните обязательные поля: Подразделение и Место', 'error');
+                return;
+            }
+            
+            const code = `FS-${Date.now().toString().slice(-8)}`;
+            const uniqueId = generateUniqueId();
+            const currentUrl = window.location.origin + window.location.pathname;
+            
+            // Создаем ссылку для рабочего
+            const qrUrl = `${currentUrl}?mode=worker&id=${uniqueId}`;
+            
+            currentQRData = {
+                code: code,
+                department: department,
+                location: location,
+                responsible: responsible,
+                url: qrUrl,
+                uniqueId: uniqueId,
+                created: new Date().toISOString()
+            };
+            
+            // Сохраняем ссылку в отдельном хранилище
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            links[uniqueId] = {
+                type: 'worker_form',
+                department: department,
+                location: location,
+                responsible: responsible,
+                code: code,
+                created: new Date().toISOString(),
+                status: 'active'
+            };
+            localStorage.setItem('farmstil_links', JSON.stringify(links));
+            
+            // Сохраняем QR код
+            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            qrcodes.push(currentQRData);
+            localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+            
+            displayQRCode(qrUrl, code, department, location, responsible);
+            showNotification('QR-код успешно создан!', 'success');
+        }
+        
+        function generateUniqueId() {
+            return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
+        function generateResponsibleLink(nsId, responsibleEmail, responsibleName) {
+            const uniqueId = generateUniqueId();
+            const currentUrl = window.location.origin + window.location.pathname;
+            const link = `${currentUrl}?mode=fillNS&id=${uniqueId}&ns=${nsId}`;
+            
+            // Сохраняем ссылку для ответственного
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            links[uniqueId] = {
+                type: 'responsible_form',
+                nsId: nsId,
+                responsibleEmail: responsibleEmail,
+                responsibleName: responsibleName,
+                link: link,
+                created: new Date().toISOString(),
+                expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 дней
+                status: 'active'
+            };
+            localStorage.setItem('farmstil_links', JSON.stringify(links));
+            
+            return link;
+        }
+        
+        function displayQRCode(qrUrl, code, department, location, responsible) {
+            const qrcodeDiv = document.getElementById('qrPreview');
+            qrcodeDiv.innerHTML = '';
+            
+            const qrContainer = document.createElement('div');
+            qrContainer.className = 'qr-container';
+            
+            const qrCodeDiv = document.createElement('div');
+            qrCodeDiv.id = 'qrcode-' + Date.now();
+            qrContainer.appendChild(qrCodeDiv);
+            qrcodeDiv.appendChild(qrContainer);
+            
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrCodeDiv, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1e3c72",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } else {
+                    throw new Error('Библиотека QRCode не загружена');
+                }
+            } catch (error) {
+                console.error('Ошибка генерации QR:', error);
+                qrCodeDiv.innerHTML = `
+                    <div style="width: 200px; height: 200px; background: #1e3c72; color: white; 
+                         display: flex; align-items: center; justify-content: center; border-radius: 10px; margin: 0 auto;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">QR</div>
+                            <div style="font-size: 14px; margin-top: 10px;">${code}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            qrcodeDiv.innerHTML += `
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <p><strong>Подразделение:</strong> ${department}</p>
+                    <p><strong>Место:</strong> ${location}</p>
+                    ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
+                    <p><strong>Код:</strong> <code>${code}</code></p>
+                    <p><strong>Ссылка:</strong> <small style="word-break: break-all; color: #666;">${qrUrl}</small></p>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать</button>
+                        <button class="btn btn-info" onclick="testWorkerLink('${qrUrl}')">📱 Тест</button>
+                    </div>
+                </div>
+            `;
+            
+            qrcodeDiv.style.display = 'block';
+        }
+        
+        function testWorkerLink(url) {
+            window.open(url, '_blank');
+        }
+        
+        function printQRCode() {
+            if (!currentQRData) return;
+            
+            const printContent = `
+                <html>
+                <head>
+                    <title>QR код - ${currentQRData.department}</title>
+                    <style>
+                        body { font-family: Arial; text-align: center; padding: 40px; }
+                        h1 { color: #1e3c72; margin-bottom: 20px; }
+                        .info { margin: 20px 0; font-size: 16px; text-align: left; }
+                        @media print { 
+                            body { padding: 20px; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+                </head>
+                <body>
+                    <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        ${currentQRData.responsible ? `<p><strong>Ответственный:</strong> ${currentQRData.responsible}</p>` : ''}
+                        <p><strong>Код:</strong> ${currentQRData.code}</p>
+                    </div>
+                    
+                    <div id="qrcode" style="margin: 20px auto; width: 300px; height: 300px;"></div>
+                    <p style="margin-top: 20px; font-size: 14px;">Отсканируйте для регистрации несоответствия</p>
+                    
+                    <p class="no-print" style="color: #666; font-size: 12px; margin-top: 30px;">
+                        Сгенерировано: ${new Date().toLocaleString('ru-RU')}
+                    </p>
+                    
+                    <script>
+                        setTimeout(function() {
+                            try {
+                                new QRCode(document.getElementById('qrcode'), {
+                                    text: '${currentQRData.url}',
+                                    width: 300,
+                                    height: 300,
+                                    colorDark: "#1e3c72",
+                                    colorLight: "#ffffff"
+                                });
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            } catch(e) {
+                                document.getElementById('qrcode').innerHTML = 
+                                    '<div style="width: 300px; height: 300px; background: #1e3c72; color: white; ' +
+                                    'display: flex; align-items: center; justify-content: center; margin: 0 auto;">' +
+                                    '<div style="text-align: center;">' +
+                                    '<div style="font-size: 32px; font-weight: bold;">QR</div>' +
+                                    '<div style="font-size: 16px;">${currentQRData.code}</div>' +
+                                    '</div></div>';
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            }
+                        }, 100);
+                    <\/script>
+                </body>
+                </html>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(printContent);
+            printWindow.document.close();
+        }
+        
+        // ============================================
+        // РЕЖИМЫ РАБОТЫ СИСТЕМЫ
+        // ============================================
+        
+        function checkMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const id = urlParams.get('id');
+            const nsId = urlParams.get('ns');
+            
+            if (mode === 'worker' && id) {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
+                document.getElementById('fillNSMode').style.display = 'none';
+                showWorkerFormByLink(id);
+            } 
+            else if (mode === 'fillNS' && id && nsId) {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'none';
+                document.getElementById('fillNSMode').style.display = 'block';
+                showResponsibleForm(id, nsId);
+            }
+            else {
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
+                document.getElementById('fillNSMode').style.display = 'none';
+                showPage('generateQR');
             }
         }
-
-        function exportToCSV() {
-            let csv = "ID,Дата,Статус,Описание\n";
-            nsData.forEach(n => csv += `${n.id},${n.date},${n.status},${n.description}\n`);
-            const blob = new Blob([csv], {type: 'text/csv'});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = 'export.csv';
-            a.click();
+        
+        function showWorkerFormByLink(linkId) {
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            const linkData = links[linkId];
+            
+            if (!linkData || linkData.type !== 'worker_form') {
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ссылка недействительна</h2>
+                        <p style="color: #666; margin: 20px 0;">QR-код устарел или не зарегистрирован в системе.</p>
+                        <button class="btn btn-primary" onclick="window.close()">
+                            Закрыть окно
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const html = `
+                <div class="ns-form-container">
+                    <h2>🚨 Регистрация несоответствия</h2>
+                    
+                    <div class="form-section">
+                        <h3>📍 Место обнаружения</h3>
+                        <p><strong>Подразделение:</strong> ${linkData.department}</p>
+                        <p><strong>Рабочее место:</strong> ${linkData.location}</p>
+                        ${linkData.responsible ? `<p><strong>Ответственный за зону:</strong> ${linkData.responsible}</p>` : ''}
+                        <p><strong>Код QR:</strong> ${linkData.code}</p>
+                    </div>
+                    
+                    <form onsubmit="event.preventDefault(); submitWorkerForm('${linkId}');">
+                        <div class="form-section">
+                            <h3>👤 Информация о заявителе</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="required">ФИО:</label>
+                                    <input type="text" id="workerApplicant" placeholder="Иванов Иван Иванович" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Телефон:</label>
+                                    <input type="tel" id="workerPhone" placeholder="+7 (999) 999-99-99">
+                                </div>
+                                <div class="form-group">
+                                    <label class="required">Должность:</label>
+                                    <input type="text" id="workerPosition" placeholder="Оператор станка" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>📋 Описание несоответствия</h3>
+                            <div class="form-group">
+                                <label class="required">Тип несоответствия:</label>
+                                <select id="workerNsType" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="product">Несоответствие продукции</option>
+                                    <option value="process">Несоответствие процесса</option>
+                                    <option value="equipment">Неисправность оборудования</option>
+                                    <option value="safety">Нарушение безопасности</option>
+                                    <option value="documentation">Ошибка в документации</option>
+                                    <option value="material">Несоответствие материала</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Краткое описание:</label>
+                                <input type="text" id="workerTitle" placeholder="Краткое описание проблемы" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Подробное описание:</label>
+                                <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины..." required></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>📷 Доказательная база</h3>
+                            <div class="form-group">
+                                <label>Фотографии (макс. 5):</label>
+                                <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
+                                <p style="font-size: 12px; color: #666; margin-top: 5px;">Рекомендуется сделать фото общего плана и деталей проблемы</p>
+                                <div id="workerPhotoPreview" class="photo-preview-container"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Номер партии/изделия:</label>
+                                <input type="text" id="workerBatch" placeholder="При наличии">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Влияние на процесс/продукцию:</label>
+                                <textarea id="workerImpact" rows="3" placeholder="Опишите влияние на качество продукции или процесс производства"></textarea>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" id="workerDepartment" value="${linkData.department}">
+                        <input type="hidden" id="workerLocation" value="${linkData.location}">
+                        <input type="hidden" id="workerQRCode" value="${linkData.code}">
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
+                                📤 Отправить Лист Несоответствия
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.getElementById('workerContent').innerHTML = html;
         }
+        
+        function submitWorkerForm(linkId) {
+            const applicant = document.getElementById('workerApplicant').value;
+            const phone = document.getElementById('workerPhone').value;
+            const position = document.getElementById('workerPosition').value;
+            const nsType = document.getElementById('workerNsType').value;
+            const title = document.getElementById('workerTitle').value;
+            const description = document.getElementById('workerDescription').value;
+            const department = document.getElementById('workerDepartment').value;
+            const location = document.getElementById('workerLocation').value;
+            const qrCode = document.getElementById('workerQRCode').value;
+            const batch = document.getElementById('workerBatch').value;
+            const impact = document.getElementById('workerImpact').value;
+            
+            if (!applicant || !position || !nsType || !title || !description) {
+                showNotification('Заполните все обязательные поля', 'error');
+                return;
+            }
+            
+            const nsData = {
+                id: 'ns_' + Date.now(),
+                nsNumber: generateNSNumber(),
+                created: new Date().toISOString(),
+                department: department,
+                location: location,
+                qrCode: qrCode,
+                applicant: applicant,
+                applicantPhone: phone,
+                applicantPosition: position,
+                nsType: nsType,
+                nsTitle: title,
+                description: description,
+                batchNumber: batch,
+                impact: impact,
+                photos: photos,
+                status: WORKFLOW_STATUSES.DETECTED,
+                linkId: linkId,
+                workflow: [{
+                    step: 1,
+                    action: 'detected',
+                    user: applicant,
+                    date: new Date().toISOString(),
+                    comment: `Несоответствие зарегистрировано сотрудником ${applicant} (${position})`
+                }]
+            };
+            
+            // Сохраняем ЛН
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            nsList.push(nsData);
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // Отправляем уведомление менеджеру СМК (ПЕРВОЕ УВЕДОМЛЕНИЕ)
+            sendFirstNotificationToSMKManager(nsData);
+            
+            // Помечаем ссылку как использованную
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            if (links[linkId]) {
+                links[linkId].used = true;
+                links[linkId].usedDate = new Date().toISOString();
+                links[linkId].usedBy = applicant;
+                localStorage.setItem('farmstil_links', JSON.stringify(links));
+            }
+            
+            // Экран успеха
+            document.getElementById('workerContent').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 80px; color: #28a745;">✅</div>
+                    <h2>Лист несоответствия успешно отправлен!</h2>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
+                        <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
+                        <p style="color: #666; margin: 10px 0;">Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
+                        <p style="color: #666; margin: 10px 0;">Подразделение: ${nsData.department}</p>
+                        <p style="color: #666; margin: 10px 0;">Заявитель: ${nsData.applicant}</p>
+                    </div>
+                    <p style="color: #666; margin: 20px 0;">
+                        ✅ Данные успешно сохранены<br>
+                        📧 Менеджер СМК уведомлен о новом ЛН<br>
+                        ⏳ Ожидайте назначения ответственного
+                    </p>
+                    <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
+                        Закрыть окно
+                    </button>
+                </div>
+            `;
+            
+            showNotification(`ЛН ${nsData.nsNumber} успешно создан! Менеджер СМК уведомлен.`, 'success');
+        }
+        
+        function showResponsibleForm(linkId, nsId) {
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            const linkData = links[linkId];
+            
+            if (!linkData || linkData.type !== 'responsible_form' || linkData.nsId !== nsId) {
+                document.getElementById('fillNSContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ссылка недействительна</h2>
+                        <p style="color: #666; margin: 20px 0;">Ссылка устарела или не соответствует ЛН.</p>
+                        <p style="font-size: 12px; color: #999;">Обратитесь к менеджеру СМК для получения новой ссылки</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Загружаем данные ЛН
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const nsData = nsList.find(ns => ns.id === nsId);
+            
+            if (!nsData) {
+                document.getElementById('fillNSContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>ЛН не найден</h2>
+                        <p style="color: #666; margin: 20px 0;">Лист несоответствия был удален или не существует.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            currentNSData = nsData;
+            
+            const html = `
+                <div class="ns-form-container">
+                    <h2>📋 Заполнение Листа Несоответствия</h2>
+                    <p style="color: #666; margin-bottom: 20px;">Вы назначены ответственным за ЛН: <strong>${nsData.nsNumber}</strong></p>
+                    
+                    <div class="form-section">
+                        <h3>📌 Основная информация</h3>
+                        <div style="background: #e8f4ff; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <p><strong>ЛН:</strong> ${nsData.nsNumber}</p>
+                            <p><strong>Подразделение:</strong> ${nsData.department}</p>
+                            <p><strong>Место:</strong> ${nsData.location}</p>
+                            <p><strong>Заявитель:</strong> ${nsData.applicant} (${nsData.applicantPosition})</p>
+                            <p><strong>Дата регистрации:</strong> ${new Date(nsData.created).toLocaleDateString('ru-RU')}</p>
+                        </div>
+                        
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <h4>Описание проблемы:</h4>
+                            <p>${nsData.nsTitle}</p>
+                            <p>${nsData.description}</p>
+                            ${nsData.batchNumber ? `<p><strong>Партия:</strong> ${nsData.batchNumber}</p>` : ''}
+                        </div>
+                    </div>
+                    
+                    <form onsubmit="event.preventDefault(); submitResponsibleForm('${linkId}', '${nsId}');">
+                        <div class="form-section">
+                            <h3>🔍 Анализ причины</h3>
+                            <div class="form-group">
+                                <label class="required">Основная причина несоответствия:</label>
+                                <textarea id="rootCause" rows="4" placeholder="Опишите основную причину возникновения несоответствия..." required></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Вторичные причины:</label>
+                                <textarea id="secondaryCauses" rows="3" placeholder="Дополнительные факторы, способствующие возникновению проблемы..."></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Категория причины:</label>
+                                <select id="causeCategory" required>
+                                    <option value="">Выберите категорию</option>
+                                    <option value="human">Человеческий фактор</option>
+                                    <option value="equipment">Оборудование</option>
+                                    <option value="material">Материал</option>
+                                    <option value="method">Метод/Процесс</option>
+                                    <option value="measurement">Измерение</option>
+                                    <option value="environment">Окружающая среда</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>🛠️ Корректирующие действия</h3>
+                            <div class="form-group">
+                                <label class="required">Немедленные действия:</label>
+                                <textarea id="immediateActions" rows="4" placeholder="Какие немедленные действия были/будут предприняты?" required></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Корректирующие действия:</label>
+                                <textarea id="correctiveActions" rows="4" placeholder="Какие действия будут предприняты для устранения причины?" required></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Предупреждающие действия:</label>
+                                <textarea id="preventiveActions" rows="3" placeholder="Какие действия будут предприняты для предотвращения повторения?"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>📅 Планирование</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="required">Дата начала:</label>
+                                    <input type="date" id="startDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="required">Планируемая дата завершения:</label>
+                                    <input type="date" id="plannedCompletion" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Требуемые ресурсы:</label>
+                                <textarea id="requiredResources" rows="3" placeholder="Какие ресурсы требуются для выполнения действий?"></textarea>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Ответственный за выполнение:</label>
+                                <select id="executorSelect">
+                                    <option value="">Выберите исполнителя</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
+                                ✅ Отправить заполненный ЛН
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.getElementById('fillNSContent').innerHTML = html;
+            
+            // Заполняем даты
+            const today = new Date().toISOString().split('T')[0];
+            const nextWeek = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+            document.getElementById('startDate').value = today;
+            document.getElementById('plannedCompletion').value = nextWeek;
+            
+            // Загружаем исполнителей
+            loadExecutorsForSelect();
+        }
+        
+        function loadExecutorsForSelect() {
+            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            const select = document.getElementById('executorSelect');
+            
+            if (!select) return;
+            
+            executors.forEach(exec => {
+                const option = document.createElement('option');
+                option.value = exec.id + '|' + exec.name + '|' + exec.email;
+                option.textContent = `${exec.name} (${exec.department})`;
+                select.appendChild(option);
+            });
+        }
+        
+        function submitResponsibleForm(linkId, nsId) {
+            const rootCause = document.getElementById('rootCause').value;
+            const secondaryCauses = document.getElementById('secondaryCauses').value;
+            const causeCategory = document.getElementById('causeCategory').value;
+            const immediateActions = document.getElementById('immediateActions').value;
+            const correctiveActions = document.getElementById('correctiveActions').value;
+            const preventiveActions = document.getElementById('preventiveActions').value;
+            const startDate = document.getElementById('startDate').value;
+            const plannedCompletion = document.getElementById('plannedCompletion').value;
+            const requiredResources = document.getElementById('requiredResources').value;
+            const executorSelect = document.getElementById('executorSelect').value;
+            
+            if (!rootCause || !causeCategory || !immediateActions || !correctiveActions || !startDate || !plannedCompletion) {
+                showNotification('Заполните все обязательные поля', 'error');
+                return;
+            }
+            
+            // Обновляем данные ЛН
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const nsIndex = nsList.findIndex(ns => ns.id === nsId);
+            
+            if (nsIndex === -1) {
+                showNotification('ЛН не найден', 'error');
+                return;
+            }
+            
+            let executorData = null;
+            if (executorSelect) {
+                const [id, name, email] = executorSelect.split('|');
+                executorData = { id, name, email };
+            }
+            
+            nsList[nsIndex].rootCause = rootCause;
+            nsList[nsIndex].secondaryCauses = secondaryCauses;
+            nsList[nsIndex].causeCategory = causeCategory;
+            nsList[nsIndex].immediateActions = immediateActions;
+            nsList[nsIndex].correctiveActions = correctiveActions;
+            nsList[nsIndex].preventiveActions = preventiveActions;
+            nsList[nsIndex].startDate = startDate;
+            nsList[nsIndex].plannedCompletion = plannedCompletion;
+            nsList[nsIndex].requiredResources = requiredResources;
+            nsList[nsIndex].executor = executorData;
+            nsList[nsIndex].status = WORKFLOW_STATUSES.CORRECTION;
+            nsList[nsIndex].responsibleFilled = true;
+            nsList[nsIndex].responsibleFilledDate = new Date().toISOString();
+            
+            nsList[nsIndex].workflow.push({
+                step: 3,
+                action: 'correction_filled',
+                user: currentNSData.responsiblePerson || 'Ответственный',
+                date: new Date().toISOString(),
+                comment: 'Заполнены корректирующие действия'
+            });
+            
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // Помечаем ссылку как использованную
+            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
+            if (links[linkId]) {
+                links[linkId].used = true;
+                links[linkId].usedDate = new Date().toISOString();
+                links[linkId].filled = true;
+                localStorage.setItem('farmstil_links', JSON.stringify(links));
+            }
+            
+            // Отправляем уведомление менеджеру СМК о заполнении
+            sendSecondNotificationToSMKManager(nsList[nsIndex]);
+            
+            // Экран успеха
+            document.getElementById('fillNSContent').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 80px; color: #28a745;">✅</div>
+                    <h2>ЛН успешно заполнен!</h2>
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
+                        <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsList[nsIndex].nsNumber}</p>
+                        <p style="color: #666; margin: 10px 0;">Дата заполнения: ${new Date().toLocaleString('ru-RU')}</p>
+                        <p style="color: #666; margin: 10px 0;">Статус: Корректирующие действия назначены</p>
+                    </div>
+                    <p style="color: #666; margin: 20px 0;">
+                        ✅ Корректирующие действия успешно зарегистрированы<br>
+                        📧 Менеджер СМК уведомлен о заполнении<br>
+                        ⏳ Ожидайте проверки и назначения исполнителя
+                    </p>
+                    <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
+                        Закрыть окно
+                    </button>
+                </div>
+            `;
+            
+            showNotification(`ЛН ${nsList[nsIndex].nsNumber} успешно заполнен! Менеджер СМК уведомлен.`, 'success');
+        }
+        
+        // ============================================
+        // УВЕДОМЛЕНИЯ
+        // ============================================
+        
+        function sendFirstNotificationToSMKManager(nsData) {
+            const recipient = 'finkart23@mail.ru';
+            const currentUrl = window.location.origin + window.location.pathname;
+            const adminUrl = `${currentUrl}?mode=admin`;
+            
+            const emailBody = `
+🚨 НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ ISO 13485 🚨
+
+📋 ОСНОВНАЯ ИНФОРМАЦИЯ:
+Номер ЛН: ${nsData.nsNumber}
+Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}
+Статус: ОБНАРУЖЕНО
+
+📍 МЕСТО ОБНАРУЖЕНИЯ:
+Подразделение: ${nsData.department}
+Рабочее место: ${nsData.location}
+QR-код: ${nsData.qrCode}
+
+👤 ЗАЯВИТЕЛЬ:
+ФИО: ${nsData.applicant}
+Должность: ${nsData.applicantPosition || 'Не указана'}
+Телефон: ${nsData.applicantPhone || 'Не указан'}
+
+📝 ОПИСАНИЕ ПРОБЛЕМЫ:
+Тип: ${getNSTypeText(nsData.nsType)}
+Заголовок: ${nsData.nsTitle}
+
+📋 ПОДРОБНОЕ ОПИСАНИЕ:
+${nsData.description}
+
+${nsData.batchNumber ? `Партия/изделие: ${nsData.batchNumber}` : ''}
+${nsData.impact ? `Влияние на процесс: ${nsData.impact}` : ''}
+
+🔗 ДЕЙСТВИЯ ДЛЯ МЕНЕДЖЕРА СМК:
+1. Перейдите в административную панель: ${adminUrl}
+2. Проверьте полноту заполнения ЛН
+3. Назначьте ответственного
+4. Отправьте ответственному ссылку для заполнения
+
+---
+Система управления качеством ФАРМСТИЛ
+ISO 13485:2016
+            `.trim();
+            
+            sendEmail(recipient, `🚨 НОВЫЙ ЛН: ${nsData.nsNumber} - требуется проверка`, emailBody);
+        }
+        
+        function sendSecondNotificationToSMKManager(nsData) {
+            const recipient = 'finkart23@mail.ru';
+            const currentUrl = window.location.origin + window.location.pathname;
+            const adminUrl = `${currentUrl}?mode=admin`;
+            
+            const emailBody = `
+✅ ЛИСТ НЕСООТВЕТСТВИЯ ЗАПОЛНЕН ОТВЕТСТВЕННЫМ
+
+📋 ИНФОРМАЦИЯ О ЛН:
+Номер: ${nsData.nsNumber}
+Дата регистрации: ${new Date(nsData.created).toLocaleDateString('ru-RU')}
+Статус: КОРРЕКТИРУЮЩИЕ ДЕЙСТВИЯ НАЗНАЧЕНЫ
+
+👤 ОТВЕТСТВЕННЫЙ:
+${nsData.responsiblePerson || 'Не указан'}
+
+🔍 РЕЗУЛЬТАТЫ АНАЛИЗА:
+Основная причина: ${nsData.rootCause || 'Не указана'}
+Категория: ${nsData.causeCategory || 'Не указана'}
+
+🛠️ НАЗНАЧЕННЫЕ ДЕЙСТВИЯ:
+Немедленные действия: ${nsData.immediateActions || 'Не указаны'}
+Корректирующие действия: ${nsData.correctiveActions || 'Не указаны'}
+${nsData.preventiveActions ? `Предупреждающие действия: ${nsData.preventiveActions}` : ''}
+
+📅 ПЛАНИРОВАНИЕ:
+Дата начала: ${nsData.startDate || 'Не указана'}
+Планируемое завершение: ${nsData.plannedCompletion || 'Не указана'}
+
+${nsData.executor ? `Исполнитель: ${nsData.executor.name}` : 'Исполнитель не назначен'}
+
+🔗 ДЕЙСТВИЯ ДЛЯ МЕНЕДЖЕРА СМК:
+1. Проверьте корректирующие действия: ${adminUrl}
+2. Назначьте исполнителя (если не назначен)
+3. Контролируйте выполнение по срокам
+4. Закройте ЛН после выполнения
+
+---
+Система управления качеством ФАРМСТИЛ
+ISO 13485:2016
+            `.trim();
+            
+            sendEmail(recipient, `✅ ЛН ${nsData.nsNumber} заполнен - требуется проверка КД`, emailBody);
+        }
+        
+        function sendNotificationToResponsible(nsData, responsibleEmail, responsibleName, link) {
+            const subject = `📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ: ${nsData.nsNumber}`;
+            
+            const emailBody = `
+УВАЖАЕМЫЙ ${responsibleName}!
+
+📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ
+
+Номер ЛН: ${nsData.nsNumber}
+Дата регистрации: ${new Date(nsData.created).toLocaleDateString('ru-RU')}
+Подразделение: ${nsData.department}
+Рабочее место: ${nsData.location}
+
+👤 ЗАЯВИТЕЛЬ:
+${nsData.applicant} (${nsData.applicantPosition || 'должность не указана'})
+
+📝 ОПИСАНИЕ ПРОБЛЕМЫ:
+${nsData.nsTitle}
+
+${nsData.description}
+
+🔗 ССЫЛКА ДЛЯ ЗАПОЛНЕНИЯ ЛН:
+${link}
+
+⚠️ ВНИМАНИЕ:
+1. Ссылка действительна 30 дней
+2. Заполните все обязательные поля
+3. Укажите причину и корректирующие действия
+4. Назначьте исполнителя (при необходимости)
+
+📅 СРОК ЗАПОЛНЕНИЯ:
+Пожалуйста, заполните ЛН в течение 3 рабочих дней.
+
+---
+Система управления качеством ФАРМСТИЛ
+ISO 13485:2016
+            `.trim();
+            
+            sendEmail(responsibleEmail, subject, emailBody);
+        }
+        
+        // ============================================
+        // ОСНОВНЫЕ ФУНКЦИИ (АДМИН ПАНЕЛЬ)
+        // ============================================
+        
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.add('active');
+                const buttons = document.querySelectorAll('.menu-btn');
+                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
+                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
+                
+                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'directories') loadDirectories();
+                if (pageId === 'admin') updateStats();
+            }
+        }
+        
+        function loadNSList() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const container = document.getElementById('nsListContainer');
+            
+            if (!container) return;
+            
+            if (nsList.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 40px; color: #666;"><h3>Листов несоответствий нет</h3></div>';
+                return;
+            }
+            
+            nsList.sort((a, b) => new Date(b.created) - new Date(a.created));
+            
+            let html = '<div class="ln-list">';
+            
+            nsList.forEach((ns) => {
+                const statusText = getStatusText(ns.status);
+                const statusClass = `status-${ns.status.replace(/_/g, '-')}`;
+                
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div>
+                            <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
+                            <p>${ns.department} - ${ns.location}</p>
+                            <p>📅 ${new Date(ns.created).toLocaleDateString('ru-RU')} 👤 ${ns.applicant}</p>
+                            ${ns.responsiblePerson ? `<p>👤 Ответственный: ${ns.responsiblePerson}</p>` : ''}
+                            
+                            <div class="action-buttons">
+                                <button class="btn btn-info btn-sm" onclick="viewNSByID('${ns.id}')">👁️ Просмотр</button>
+                                ${ns.status === WORKFLOW_STATUSES.DETECTED ? 
+                                    `<button class="btn btn-warning btn-sm" onclick="reviewNSByID('${ns.id}')">Проверить</button>` : 
+                                    ''}
+                                ${ns.status === WORKFLOW_STATUSES.CORRECTION ? 
+                                    `<button class="btn btn-success btn-sm" onclick="checkCorrection('${ns.id}')">Проверить КД</button>` : 
+                                    ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function reviewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) reviewNS(index);
+        }
+        
+        function viewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) viewNSDetails(index);
+        }
+        
+        function checkCorrection(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) showCorrectionDetails(index);
+        }
+        
+        function reviewNS(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            let photosHTML = '';
+            if (ns.photos && ns.photos.length > 0) {
+                photosHTML = '<h4>📷 Фотографии:</h4><div class="photo-preview-container">';
+                ns.photos.forEach((photo, i) => {
+                    photosHTML += `<img src="${photo.data}" class="photo-preview" style="width: 120px; height: 120px;">`;
+                });
+                photosHTML += '</div>';
+            }
+            
+            const html = `
+                <h3>${ns.nsNumber}</h3>
+                <div style="margin: 20px 0; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                    <div><strong>Дата:</strong> ${new Date(ns.created).toLocaleString('ru-RU')}</div>
+                    <div><strong>Цех:</strong> ${ns.department}</div>
+                    <div><strong>Место:</strong> ${ns.location}</div>
+                    <div><strong>Заявитель:</strong> ${ns.applicant}</div>
+                    <div><strong>Телефон:</strong> ${ns.applicantPhone || 'не указан'}</div>
+                </div>
+                
+                <h4>Описание:</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p style="margin-bottom: 10px;"><strong>Тип:</strong> ${getNSTypeText(ns.nsType)}</p>
+                    <p style="margin-bottom: 10px;"><strong>Заголовок:</strong> ${ns.nsTitle}</p>
+                    <p>${ns.description || 'Не указано'}</p>
+                </div>
+                
+                ${photosHTML}
+                
+                <div class="action-buttons" style="margin-top: 30px;">
+                    <button class="btn btn-success" onclick="approveNS(${index})">✅ Назначить ответственного</button>
+                    <button class="btn btn-danger" onclick="rejectNS(${index})">❌ Вернуть на доработку</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Проверка ЛН';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function approveNS(index) {
+            currentEditingNS = index;
+            
+            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            let options = '<option value="">Выберите ответственного</option>';
+            responsibles.forEach(r => {
+                options += `<option value="${r.id}|${r.name}|${r.email}">${r.name} (${r.email})</option>`;
+            });
+            
+            const html = `
+                <h3>Назначение ответственного</h3>
+                <p style="color: #666; margin-bottom: 15px;">Ответственный получит ссылку для заполнения ЛН</p>
+                
+                <div class="form-group" style="margin: 20px 0;">
+                    <label>Ответственный:</label>
+                    <select id="responsibleSelect" style="margin-bottom: 15px;">
+                        ${options}
+                    </select>
+                    
+                    <label>Комментарий для ответственного:</label>
+                    <textarea id="responsibleComment" rows="3" placeholder="Дополнительные указания или комментарии..."></textarea>
+                    
+                    <label>Срок заполнения (дней):</label>
+                    <select id="fillDeadline">
+                        <option value="1">1 день</option>
+                        <option value="3" selected>3 дня</option>
+                        <option value="5">5 дней</option>
+                        <option value="7">7 дней</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="assignResponsible()">📧 Отправить ссылку</button>
+                    <button class="btn btn-danger" onclick="closeModal()">Отмена</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Назначение ответственного';
+            document.getElementById('modalContent').innerHTML = html;
+        }
+        
+        function assignResponsible() {
+            if (currentEditingNS === null) return;
+            
+            const select = document.getElementById('responsibleSelect');
+            const comment = document.getElementById('responsibleComment').value;
+            const deadlineDays = document.getElementById('fillDeadline').value;
+            
+            if (!select.value) {
+                showNotification('Выберите ответственного', 'error');
+                return;
+            }
+            
+            const [id, name, email] = select.value.split('|');
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[currentEditingNS];
+            
+            // Генерируем ссылку для ответственного
+            const link = generateResponsibleLink(ns.id, email, name);
+            
+            ns.responsibleId = id;
+            ns.responsiblePerson = name;
+            ns.responsibleEmail = email;
+            ns.responsibleComment = comment;
+            ns.fillDeadline = deadlineDays;
+            ns.status = WORKFLOW_STATUSES.ASSIGNED;
+            ns.responsibleLink = link;
+            
+            ns.workflow.push({
+                step: 2,
+                action: 'assigned',
+                user: 'Менеджер СМК',
+                date: new Date().toISOString(),
+                comment: `Назначен ответственный: ${name}. Ссылка отправлена на ${email}`
+            });
+            
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // Отправляем ВТОРОЕ уведомление - ответственному
+            sendNotificationToResponsible(ns, email, name, link);
+            
+            closeModal();
+            loadPendingCount();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            showNotification(`Ссылка отправлена ответственному ${name} на ${email}`, 'success');
+        }
+        
+        function showCorrectionDetails(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            const html = `
+                <h3>${ns.nsNumber} - Проверка корректирующих действий</h3>
+                
+                <div style="margin: 20px 0; background: #e8f4ff; padding: 15px; border-radius: 8px;">
+                    <p><strong>Ответственный:</strong> ${ns.responsiblePerson}</p>
+                    <p><strong>Дата заполнения:</strong> ${new Date(ns.responsibleFilledDate).toLocaleString('ru-RU')}</p>
+                </div>
+                
+                <h4>🔍 Анализ причины:</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p><strong>Основная причина:</strong></p>
+                    <p>${ns.rootCause || 'Не указана'}</p>
+                    
+                    <p><strong>Категория:</strong> ${ns.causeCategory || 'Не указана'}</p>
+                    
+                    ${ns.secondaryCauses ? `
+                        <p><strong>Вторичные причины:</strong></p>
+                        <p>${ns.secondaryCauses}</p>
+                    ` : ''}
+                </div>
+                
+                <h4>🛠️ Корректирующие действия:</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p><strong>Немедленные действия:</strong></p>
+                    <p>${ns.immediateActions || 'Не указаны'}</p>
+                    
+                    <p><strong>Корректирующие действия:</strong></p>
+                    <p>${ns.correctiveActions || 'Не указаны'}</p>
+                    
+                    ${ns.preventiveActions ? `
+                        <p><strong>Предупреждающие действия:</strong></p>
+                        <p>${ns.preventiveActions}</p>
+                    ` : ''}
+                </div>
+                
+                <h4>📅 Планирование:</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p><strong>Дата начала:</strong> ${ns.startDate || 'Не указана'}</p>
+                    <p><strong>Планируемое завершение:</strong> ${ns.plannedCompletion || 'Не указана'}</p>
+                    
+                    ${ns.requiredResources ? `
+                        <p><strong>Требуемые ресурсы:</strong></p>
+                        <p>${ns.requiredResources}</p>
+                    ` : ''}
+                    
+                    ${ns.executor ? `
+                        <p><strong>Исполнитель:</strong> ${ns.executor.name}</p>
+                    ` : '<p><strong>Исполнитель:</strong> Не назначен</p>'}
+                </div>
+                
+                <div class="action-buttons" style="margin-top: 30px;">
+                    <button class="btn btn-success" onclick="approveCorrection(${index})">✅ Одобрить КД</button>
+                    <button class="btn btn-warning" onclick="requestCorrectionChanges(${index})">🔄 Запросить изменения</button>
+                    <button class="btn btn-danger" onclick="closeModal()">Закрыть</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Проверка корректирующих действий';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function approveCorrection(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            ns.status = WORKFLOW_STATUSES.CHECKING_CORRECTION;
+            ns.correctionApproved = true;
+            ns.correctionApprovedDate = new Date().toISOString();
+            
+            ns.workflow.push({
+                step: 4,
+                action: 'correction_approved',
+                user: 'Менеджер СМК',
+                date: new Date().toISOString(),
+                comment: 'Корректирующие действия одобрены'
+            });
+            
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            closeModal();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            showNotification('Корректирующие действия одобрены', 'success');
+        }
+        
+        function requestCorrectionChanges(index) {
+            const html = `
+                <h3>Запрос изменений</h3>
+                <div class="form-group" style="margin: 20px 0;">
+                    <label>Причина запроса изменений:</label>
+                    <textarea id="changeRequest" rows="4" placeholder="Укажите, что именно нужно изменить или дополнить..." required></textarea>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-warning" onclick="sendChangeRequest(${index})">📧 Отправить запрос</button>
+                    <button class="btn btn-danger" onclick="closeModal()">Отмена</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Запрос изменений';
+            document.getElementById('modalContent').innerHTML = html;
+        }
+        
+        function sendChangeRequest(index) {
+            const changeRequest = document.getElementById('changeRequest').value;
+            if (!changeRequest) {
+                showNotification('Укажите причину запроса изменений', 'error');
+                return;
+            }
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            ns.status = WORKFLOW_STATUSES.REJECTED;
+            ns.changeRequest = changeRequest;
+            
+            ns.workflow.push({
+                step: 4,
+                action: 'correction_rejected',
+                user: 'Менеджер СМК',
+                date: new Date().toISOString(),
+                comment: `Запрошены изменения: ${changeRequest}`
+            });
+            
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            closeModal();
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            showNotification('Запрос изменений отправлен', 'success');
+        }
+        
+        // ============================================
+        // ОСТАЛЬНЫЕ ФУНКЦИИ (остаются без изменений)
+        // ============================================
+        
+        function handleWorkerPhotos(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('workerPhotoPreview');
+            
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            photos = [];
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'photo-preview';
+                    preview.appendChild(img);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        function generateNSNumber() {
+            const year = new Date().getFullYear().toString().slice(-2);
+            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const count = nsList.filter(ns => {
+                const nsDate = new Date(ns.created);
+                return nsDate.getFullYear() === new Date().getFullYear() && 
+                       nsDate.getMonth() + 1 === new Date().getMonth() + 1;
+            }).length + 1;
+            return `ЛН-${year}${month}-${count.toString().padStart(3, '0')}`;
+        }
+        
+        function getNSTypeText(type) {
+            const typeMap = {
+                'product': 'Несоответствие продукции',
+                'process': 'Несоответствие процесса',
+                'equipment': 'Неисправность оборудования',
+                'safety': 'Нарушение безопасности',
+                'documentation': 'Ошибка в документации',
+                'material': 'Несоответствие материала',
+                'other': 'Другое'
+            };
+            return typeMap[type] || type;
+        }
+        
+        function sendEmail(to, subject, body) {
+            fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    access_key: WEB3FORMS_ACCESS_KEY,
+                    subject: subject,
+                    from_name: 'ФАРМСТИЛ ISO 13485',
+                    to: to,
+                    message: body
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Email отправлен:', data);
+            })
+            .catch(error => {
+                console.error('Ошибка отправки email:', error);
+            });
+        }
+        
+        function loadPendingCount() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const pending = nsList.filter(ns => ns.status === WORKFLOW_STATUSES.DETECTED).length;
+            const pendingCountEl = document.getElementById('pendingCount');
+            if (pendingCountEl) {
+                pendingCountEl.textContent = pending;
+            }
+        }
+        
+        function showPendingNS() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const pendingNS = nsList.filter(ns => ns.status === WORKFLOW_STATUSES.DETECTED);
+            
+            if (pendingNS.length === 0) {
+                showNotification('Нет ЛН на проверке', 'info');
+                return;
+            }
+            
+            let html = '<h3>🚨 ЛН на проверке</h3><div style="max-height: 400px; overflow-y: auto;">';
+            
+            pendingNS.forEach((ns) => {
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status status-detected">НА ПРОВЕРКЕ</div>
+                        </div>
+                        <div>
+                            <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
+                            <p>${ns.department} - ${ns.location}</p>
+                            <p>Заявитель: ${ns.applicant}</p>
+                            <div class="action-buttons">
+                                <button class="btn btn-info btn-sm" onclick="viewNSByID('${ns.id}')">👁️ Просмотр</button>
+                                <button class="btn btn-success btn-sm" onclick="reviewNSByID('${ns.id}')">✅ Назначить</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            document.getElementById('modalTitle').textContent = 'ЛН на проверке';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function rejectNS(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            if (confirm('Вернуть ЛН на доработку заявителю?')) {
+                ns.status = WORKFLOW_STATUSES.REJECTED;
+                ns.workflow.push({
+                    step: 2,
+                    action: 'rejected',
+                    user: 'Менеджер СМК',
+                    date: new Date().toISOString(),
+                    comment: 'Возвращено на доработку'
+                });
+                
+                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                showNotification('ЛН возвращен на доработку', 'success');
+                closeModal();
+                loadPendingCount();
+                if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            }
+        }
+        
+        function viewNSDetails(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            let photosHTML = '';
+            if (ns.photos && ns.photos.length > 0) {
+                photosHTML = '<h4>📷 Фотографии:</h4><div class="photo-preview-container">';
+                ns.photos.forEach((photo, i) => {
+                    photosHTML += `<img src="${photo.data}" class="photo-preview">`;
+                });
+                photosHTML += '</div>';
+            }
+            
+            let workflowHTML = '';
+            if (ns.workflow && ns.workflow.length > 0) {
+                workflowHTML = '<h4>📋 История workflow:</h4><div style="max-height: 200px; overflow-y: auto;">';
+                ns.workflow.forEach((step, i) => {
+                    workflowHTML += `
+                        <div style="padding: 10px; margin-bottom: 5px; background: #f8f9fa; border-radius: 5px; border-left: 3px solid #1e3c72;">
+                            <div><strong>${step.comment}</strong></div>
+                            <div style="font-size: 12px; color: #666;">
+                                ${new Date(step.date).toLocaleString('ru-RU')} - ${step.user}
+                            </div>
+                        </div>
+                    `;
+                });
+                workflowHTML += '</div>';
+            }
+            
+            const html = `
+                <h3>${ns.nsNumber}</h3>
+                <div style="margin: 20px 0;">
+                    <div><strong>Дата:</strong> ${new Date(ns.created).toLocaleDateString('ru-RU')}</div>
+                    <div><strong>Цех:</strong> ${ns.department}</div>
+                    <div><strong>Место:</strong> ${ns.location}</div>
+                    <div><strong>Заявитель:</strong> ${ns.applicant}</div>
+                    <div><strong>Статус:</strong> ${getStatusText(ns.status)}</div>
+                </div>
+                
+                <h4>Описание:</h4>
+                <p>${ns.description || 'Не указано'}</p>
+                
+                ${photosHTML}
+                ${workflowHTML}
+                
+                <div class="action-buttons" style="margin-top: 30px;">
+                    <button class="btn btn-danger" onclick="closeModal()">Закрыть</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Детали ЛН';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function getStatusText(status) {
+            const statusMap = {
+                [WORKFLOW_STATUSES.DETECTED]: 'ОБНАРУЖЕНО',
+                [WORKFLOW_STATUSES.CHECKING_SMK]: 'НА ПРОВЕРКЕ',
+                [WORKFLOW_STATUSES.ASSIGNED]: 'НАЗНАЧЕНО',
+                [WORKFLOW_STATUSES.CORRECTION]: 'КОРРЕКТИРОВКА',
+                [WORKFLOW_STATUSES.CHECKING_CORRECTION]: 'ПРОВЕРКА КД',
+                [WORKFLOW_STATUSES.EXECUTION]: 'ИСПОЛНЕНИЕ',
+                [WORKFLOW_STATUSES.COMPLETED]: 'ВЫПОЛНЕНО',
+                [WORKFLOW_STATUSES.CLOSED]: 'ЗАКРЫТО',
+                [WORKFLOW_STATUSES.REJECTED]: 'ВОЗВРАЩЕНО'
+            };
+            return statusMap[status] || status.toUpperCase();
+        }
+        
+        function loadDirectories() {
+            loadResponsiblesList();
+            loadExecutorsList();
+        }
+        
+        function loadResponsiblesList() {
+            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            const container = document.getElementById('responsiblesList');
+            
+            if (!container) return;
+            
+            if (responsibles.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">Нет ответственных</p>';
+                return;
+            }
+            
+            let html = '<div style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">';
+            
+            responsibles.forEach((resp) => {
+                html += `
+                    <div class="directory-item">
+                        <div class="directory-item-info">
+                            <div><strong>${resp.name}</strong></div>
+                            <div style="font-size: 12px; color: #666;">${resp.email || 'нет email'} ${resp.role ? ' - ' + resp.role : ''}</div>
+                        </div>
+                        <div class="directory-item-actions">
+                            <button class="btn btn-danger btn-sm" onclick="deleteResponsible(${resp.id})" style="padding: 4px 8px;">✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function loadExecutorsList() {
+            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            const container = document.getElementById('executorsList');
+            
+            if (!container) return;
+            
+            if (executors.length === 0) {
+                container.innerHTML = '<p style="color: #666; text-align: center; padding: 20px;">Нет исполнителей</p>';
+                return;
+            }
+            
+            let html = '<div style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">';
+            
+            executors.forEach((exec) => {
+                html += `
+                    <div class="directory-item">
+                        <div class="directory-item-info">
+                            <div><strong>${exec.name}</strong></div>
+                            <div style="font-size: 12px; color: #666;">${exec.email || 'нет email'} ${exec.department ? ' - ' + exec.department : ''}</div>
+                        </div>
+                        <div class="directory-item-actions">
+                            <button class="btn btn-danger btn-sm" onclick="deleteExecutor(${exec.id})" style="padding: 4px 8px;">✕</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function addResponsible() {
+            const name = document.getElementById('responsibleName').value.trim();
+            const email = document.getElementById('responsibleEmail').value.trim();
+            
+            if (!name) {
+                showNotification('Введите ФИО ответственного', 'error');
+                return;
+            }
+            
+            if (!email || !email.includes('@')) {
+                showNotification('Введите корректный email', 'error');
+                return;
+            }
+            
+            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            const newId = responsibles.length > 0 ? Math.max(...responsibles.map(r => r.id)) + 1 : 1;
+            
+            responsibles.push({
+                id: newId,
+                name: name,
+                email: email,
+                role: 'Ответственный'
+            });
+            
+            localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
+            
+            document.getElementById('responsibleName').value = '';
+            document.getElementById('responsibleEmail').value = '';
+            
+            loadResponsiblesList();
+            showNotification('Ответственный добавлен', 'success');
+        }
+        
+        function addExecutor() {
+            const name = document.getElementById('executorName').value.trim();
+            const email = document.getElementById('executorEmail').value.trim();
+            
+            if (!name) {
+                showNotification('Введите ФИО исполнителя', 'error');
+                return;
+            }
+            
+            if (!email || !email.includes('@')) {
+                showNotification('Введите корректный email', 'error');
+                return;
+            }
+            
+            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            const newId = executors.length > 0 ? Math.max(...executors.map(r => r.id)) + 1 : 1;
+            
+            executors.push({
+                id: newId,
+                name: name,
+                email: email,
+                department: 'Не указан'
+            });
+            
+            localStorage.setItem('farmstil_executors', JSON.stringify(executors));
+            
+            document.getElementById('executorName').value = '';
+            document.getElementById('executorEmail').value = '';
+            
+            loadExecutorsList();
+            showNotification('Исполнитель добавлен', 'success');
+        }
+        
+        function deleteResponsible(id) {
+            if (confirm('Удалить ответственного?')) {
+                let responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+                responsibles = responsibles.filter(r => r.id !== id);
+                localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
+                loadResponsiblesList();
+                showNotification('Ответственный удален', 'success');
+            }
+        }
+        
+        function deleteExecutor(id) {
+            if (confirm('Удалить исполнителя?')) {
+                let executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+                executors = executors.filter(e => e.id !== id);
+                localStorage.setItem('farmstil_executors', JSON.stringify(executors));
+                loadExecutorsList();
+                showNotification('Исполнитель удален', 'success');
+            }
+        }
+        
+        function updateStats() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            
+            const stats = {
+                total: nsList.length,
+                detected: nsList.filter(ns => ns.status === WORKFLOW_STATUSES.DETECTED).length,
+                assigned: nsList.filter(ns => ns.status === WORKFLOW_STATUSES.ASSIGNED).length,
+                correction: nsList.filter(ns => ns.status === WORKFLOW_STATUSES.CORRECTION).length,
+                completed: nsList.filter(ns => ns.status === WORKFLOW_STATUSES.COMPLETED).length + 
+                          nsList.filter(ns => ns.status === WORKFLOW_STATUSES.CLOSED).length
+            };
+            
+            const html = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px;">
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 32px; font-weight: bold; color: #1e3c72;">${stats.total}</div>
+                        <div style="color: #666; font-size: 14px;">Всего ЛН</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 32px; font-weight: bold; color: #ffc107;">${stats.detected}</div>
+                        <div style="color: #666; font-size: 14px;">На проверке</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 32px; font-weight: bold; color: #6f42c1;">${stats.assigned}</div>
+                        <div style="color: #666; font-size: 14px;">Назначено</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 32px; font-weight: bold; color: #fd7e14;">${stats.correction}</div>
+                        <div style="color: #666; font-size: 14px;">На КД</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 32px; font-weight: bold; color: #28a745;">${stats.completed}</div>
+                        <div style="color: #666; font-size: 14px;">Завершено</div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('statsGrid').innerHTML = html;
+        }
+        
+        function backupData() {
+            const data = {
+                farmstil_ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
+                farmstil_responsibles: JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]'),
+                farmstil_executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
+                farmstil_qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
+                farmstil_links: JSON.parse(localStorage.getItem('farmstil_links') || '{}'),
+                timestamp: new Date().toISOString()
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = `farmstil_backup_${new Date().toISOString().split('T')[0]}.json`;
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+            
+            showNotification('Резервная копия создана', 'success');
+        }
+        
+        function restoreData() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        
+                        if (data.farmstil_ns) localStorage.setItem('farmstil_ns', JSON.stringify(data.farmstil_ns));
+                        if (data.farmstil_responsibles) localStorage.setItem('farmstil_responsibles', JSON.stringify(data.farmstil_responsibles));
+                        if (data.farmstil_executors) localStorage.setItem('farmstil_executors', JSON.stringify(data.farmstil_executors));
+                        if (data.farmstil_qrcodes) localStorage.setItem('farmstil_qrcodes', JSON.stringify(data.farmstil_qrcodes));
+                        if (data.farmstil_links) localStorage.setItem('farmstil_links', JSON.stringify(data.farmstil_links));
+                        
+                        showNotification('Данные восстановлены', 'success');
+                        loadDirectories();
+                        updateStats();
+                        loadPendingCount();
+                    } catch (error) {
+                        showNotification('Ошибка при восстановлении данных', 'error');
+                    }
+                };
+                
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+        
+        function clearAllData() {
+            if (confirm('Удалить ВСЕ данные?')) {
+                localStorage.removeItem('farmstil_ns');
+                localStorage.removeItem('farmstil_responsibles');
+                localStorage.removeItem('farmstil_executors');
+                localStorage.removeItem('farmstil_qrcodes');
+                localStorage.removeItem('farmstil_links');
+                
+                initDirectories();
+                showNotification('Данные очищены', 'success');
+                loadDirectories();
+                updateStats();
+                loadPendingCount();
+            }
+        }
+        
+        function exportToCSV() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            if (nsList.length === 0) return;
+            
+            const headers = ['Номер ЛН', 'Дата', 'Цех', 'Место', 'Заявитель', 'Статус', 'Ответственный', 'Дата заполнения'];
+            const csvRows = [headers.join(';')];
+            
+            nsList.forEach(ns => {
+                csvRows.push([
+                    ns.nsNumber,
+                    new Date(ns.created).toLocaleDateString(),
+                    ns.department,
+                    ns.location,
+                    ns.applicant,
+                    getStatusText(ns.status),
+                    ns.responsiblePerson || '',
+                    ns.responsibleFilledDate ? new Date(ns.responsibleFilledDate).toLocaleDateString() : ''
+                ].join(';'));
+            });
+            
+            const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.click();
+        }
+        
+        function showNotification(message, type = 'success', duration = 3000) {
+            const notification = document.getElementById('notification');
+            if (!notification) return;
+            notification.textContent = message;
+            notification.className = 'notification' + (type === 'error' ? ' error' : '');
+            notification.style.display = 'block';
+            setTimeout(() => notification.style.display = 'none', duration);
+        }
+        
+        function closeModal() {
+            document.getElementById('statusModal').style.display = 'none';
+        }
+        
+        function searchNS() {
+            const searchTerm = document.getElementById('searchNS').value.toLowerCase();
+            const cards = document.querySelectorAll('.ln-card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+        
+        // Экспорт функций
+        window.showPage = showPage;
+        window.generateQRCode = generateQRCode;
+        window.testWorkerLink = testWorkerLink;
+        window.printQRCode = printQRCode;
+        window.closeModal = closeModal;
+        window.showPendingNS = showPendingNS;
+        window.reviewNSByID = reviewNSByID;
+        window.viewNSByID = viewNSByID;
+        window.checkCorrection = checkCorrection;
+        window.addResponsible = addResponsible;
+        window.deleteResponsible = deleteResponsible;
+        window.addExecutor = addExecutor;
+        window.deleteExecutor = deleteExecutor;
+        window.backupData = backupData;
+        window.restoreData = restoreData;
+        window.clearAllData = clearAllData;
+        window.exportToCSV = exportToCSV;
+        window.assignResponsible = assignResponsible;
+        window.rejectNS = rejectNS;
+        window.searchNS = searchNS;
+        window.approveCorrection = approveCorrection;
+        window.requestCorrectionChanges = requestCorrectionChanges;
+        window.sendChangeRequest = sendChangeRequest;
+        window.handleWorkerPhotos = handleWorkerPhotos;
+        
     </script>
 </body>
 </html>
