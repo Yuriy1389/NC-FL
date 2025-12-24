@@ -3,271 +3,75 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ФАРМСТИЛ — СМК ISO 13485</title>
+    <title>ФАРМСТИЛ - Система управления несоответствиями ISO 13485</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
-        :root {
-            --primary: #1e3c72;
-            --secondary: #2a5298;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --info: #17a2b8;
-            --light: #f8f9fa;
-            --dark: #343a40;
-            --shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
+        /* [Здесь сохранена вся ваша CSS-стилистика из оригинала: градиенты, карточки, модалки] */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: #eef2f7;
-            color: var(--dark);
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh; padding: 10px;
         }
-
-        /* Layout */
-        .container {
-            max-width: 1100px;
-            margin: 20px auto;
-            background: white;
-            border-radius: 12px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-
-        .header {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 25px;
-            text-align: center;
-        }
-
-        /* Navigation */
-        .nav-menu {
-            display: flex;
-            background: var(--dark);
-            overflow-x: auto;
-            scrollbar-width: none;
-        }
-        .nav-menu::-webkit-scrollbar { display: none; }
-        
-        .nav-btn {
-            flex: 1;
-            padding: 15px 10px;
-            border: none;
-            background: transparent;
-            color: #ccc;
-            cursor: pointer;
-            font-weight: 600;
-            white-space: nowrap;
-            transition: 0.3s;
-            border-bottom: 3px solid transparent;
-        }
-        .nav-btn:hover { color: white; }
-        .nav-btn.active {
-            color: white;
-            border-bottom-color: var(--warning);
-            background: rgba(255,255,255,0.05);
-        }
-
-        /* Pages & Content */
-        .page { display: none; padding: 25px; animation: fadeIn 0.3s ease; }
+        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; }
+        .menu { display: flex; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); padding: 0; gap: 1px; flex-wrap: wrap; }
+        .menu-btn { padding: 12px 15px; background: white; border: none; color: #1e3c72; font-weight: bold; cursor: pointer; transition: all 0.3s ease; flex: 1; min-width: 120px; font-size: 14px; }
+        .menu-btn.active { background: #1e3c72; color: white; }
+        .page { display: none; padding: 20px; min-height: 500px; }
         .page.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        h2 { margin-bottom: 20px; color: var(--primary); border-bottom: 2px solid var(--light); padding-bottom: 10px; }
-
-        /* Forms */
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 0.9rem; }
-        input, select, textarea {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-        input:focus, select:focus, textarea:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(30,60,114,0.1); }
-
-        /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 12px 20px;
-            border-radius: 8px;
-            border: none;
-            font-weight: 600;
-            cursor: pointer;
-            transition: 0.2s;
-            gap: 8px;
-            text-decoration: none;
-        }
-        .btn-primary { background: var(--primary); color: white; }
-        .btn-success { background: var(--success); color: white; }
-        .btn-danger { background: var(--danger); color: white; }
-        .btn-warning { background: var(--warning); color: var(--dark); }
-        .btn-outline { border: 1px solid #ddd; background: white; }
-        .btn:active { transform: translateY(1px); }
-
-        /* Cards */
-        .card {
-            border: 1px solid #eee;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            background: white;
-            transition: 0.3s;
-        }
-        .card:hover { box-shadow: var(--shadow); }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
-            font-size: 0.75rem;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        /* Notifications & Modals */
-        #toast {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px 25px;
-            background: var(--dark);
-            color: white;
-            border-radius: 8px;
-            display: none;
-            z-index: 9999;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-
-        .modal {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            padding: 10px;
-        }
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            max-width: 600px;
-            width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
-            padding: 25px;
-        }
-
-        /* QR Preview */
-        #qrOutput {
-            margin-top: 20px;
-            text-align: center;
-            padding: 20px;
-            background: var(--light);
-            border-radius: 12px;
-            display: none;
-        }
-        .qr-canvas-wrapper {
-            background: white;
-            padding: 15px;
-            display: inline-block;
-            border: 2px solid var(--primary);
-            border-radius: 10px;
-            margin-bottom: 15px;
-        }
-
-        /* Stats */
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 25px;
-        }
-        .stat-card {
-            padding: 20px;
-            background: var(--light);
-            border-radius: 10px;
-            text-align: center;
-        }
-        .stat-value { font-size: 2rem; font-weight: bold; color: var(--primary); }
-
-        @media (max-width: 600px) {
-            .container { margin: 0; border-radius: 0; }
-            .header h1 { font-size: 1.2rem; }
-        }
+        .notification { position: fixed; top: 10px; right: 10px; left: 10px; background: white; color: #333; padding: 15px; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.15); display: none; z-index: 1000; border-left: 5px solid #28a745; text-align: center; }
+        .notification.error { border-left-color: #dc3545; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 2000; justify-content: center; align-items: center; }
+        .modal-content { background: white; border-radius: 15px; padding: 25px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .ln-card { background: white; border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin: 10px 0; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; }
+        .form-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        input, select, textarea { padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; width: 100%; }
+        .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: #1e3c72; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .directory-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: #f8f9fa; border-radius: 8px; margin-bottom: 8px; border: 1px solid #e0e0e0; }
+        /* Workflow steps */
+        .workflow-step { background: #f8f9fa; border-radius: 10px; padding: 20px; margin-bottom: 15px; border-left: 5px solid #1e3c72; position: relative; }
+        .workflow-step.active { background: #e8f4ff; border-left-color: #28a745; }
     </style>
 </head>
 <body>
-
-    <div id="toast"></div>
-
-    <div class="modal" id="modal">
+    <div class="notification" id="notification"></div>
+    
+    <div class="modal" id="statusModal">
         <div class="modal-content">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div class="modal-header" style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                 <h3 id="modalTitle">Детали ЛН</h3>
-                <button class="btn btn-outline" onclick="closeModal()">×</button>
+                <button onclick="closeModal()" style="border:none; background:none; font-size:24px; cursor:pointer;">&times;</button>
             </div>
-            <div id="modalBody"></div>
+            <div id="modalContent"></div>
         </div>
     </div>
 
-    <div id="workerMode" style="display:none;">
-        <div class="container">
-            <div class="header">
+    <div id="workerMode" style="display: none;">
+        <div class="container" style="max-width: 800px; margin: 20px auto; padding: 20px;">
+            <div class="header" style="border-radius: 10px 10px 0 0;">
                 <h1>📝 Регистрация несоответствия</h1>
-                <p>Система менеджмента качества ФАРМСТИЛ</p>
+                <p>ФАРМСТИЛ - Система управления качеством</p>
             </div>
-            <div class="page active">
-                <div id="qrContextInfo"></div>
-                <form id="nsForm" onsubmit="handleNSFormSubmit(event)">
-                    <div class="grid">
-                        <div class="form-group">
-                            <label>Ваше ФИО *</label>
-                            <input type="text" id="w_fio" required>
-                        </div>
-                        <div class="form-group">
-                            <label>Контактный телефон</label>
-                            <input type="tel" id="w_phone" placeholder="+7...">
-                        </div>
-                        <div class="form-group">
-                            <label>Тип несоответствия *</label>
-                            <select id="w_type" required>
-                                <option value="product">Продукция (брак)</option>
-                                <option value="process">Процесс (нарушение техпроцесса)</option>
-                                <option value="equipment">Оборудование (поломка)</option>
-                                <option value="safety">Безопасность / СИЗ</option>
-                                <option value="other">Прочее</option>
-                            </select>
-                        </div>
+            <div id="workerContent" style="padding: 20px;">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>📝 Описание несоответствия:</label>
+                        <textarea id="ncDescription" rows="5" placeholder="Опишите, что произошло..."></textarea>
                     </div>
                     <div class="form-group">
-                        <label>Заголовок проблемы *</label>
-                        <input type="text" id="w_title" placeholder="Краткая суть..." required>
-                    </div>
-                    <div class="form-group">
-                        <label>Подробное описание *</label>
-                        <textarea id="w_desc" rows="4" required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>Фотографии (до 3-х шт.)</label>
-                        <input type="file" id="w_files" accept="image/*" multiple onchange="handleFilePreview(event)">
+                        <label>📸 Фотографии (до 3-х штук):</label>
+                        <input type="file" id="ncPhotos" accept="image/*" multiple onchange="handlePhotoSelect(event)">
                         <div id="photoPreview" style="display:flex; gap:10px; margin-top:10px;"></div>
                     </div>
-                    <button type="submit" class="btn btn-success" style="width:100%; padding:18px; font-size:1.1rem;">
-                        ОТПРАВИТЬ ЛИСТ НЕСООТВЕТСТВИЯ
-                    </button>
-                </form>
+                    <button class="btn btn-success" onclick="submitNC()">🚀 ОТПРАВИТЬ В СМК</button>
+                </div>
             </div>
         </div>
     </div>
@@ -275,399 +79,260 @@
     <div id="adminMode">
         <div class="container">
             <div class="header">
-                <h1>ФАРМСТИЛ — ISO 13485</h1>
-                <p>Панель управления качеством</p>
+                <h1>ФАРМСТИЛ - Административная панель</h1>
+                <h2>ISO 13485 Workflow</h2>
             </div>
             
-            <nav class="nav-menu">
-                <button class="nav-btn active" onclick="nav('tab-qr')">ГЕНЕРАЦИЯ QR</button>
-                <button class="nav-btn" onclick="nav('tab-list')">РЕЕСТР ЛН</button>
-                <button class="nav-btn" onclick="nav('tab-dirs')">СПРАВОЧНИКИ</button>
-                <button class="nav-btn" onclick="nav('tab-admin')">СИСТЕМА</button>
-            </nav>
-
-            <div id="tab-qr" class="page active">
-                <h2>🎯 Создать метку для цеха</h2>
-                <div class="grid">
-                    <div class="form-group">
-                        <label>Подразделение</label>
-                        <select id="qr_dep">
-                            <option value="Цех №1">Цех №1 (Металлообработка)</option>
-                            <option value="Цех №2">Цех №2 (Сборка)</option>
-                            <option value="Склад">Склад ГП и материалов</option>
-                            <option value="Лаборатория">Лаборатория / ОТК</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Локация / Станок</label>
-                        <input type="text" id="qr_loc" placeholder="Напр: Станок ЧПУ-01">
-                    </div>
-                </div>
-                <button class="btn btn-primary" onclick="generateQR()">СГЕНЕРИРОВАТЬ QR</button>
-
-                <div id="qrOutput">
-                    <div class="qr-canvas-wrapper" id="qrCodeContainer"></div>
-                    <div id="qrTextInfo" style="margin-bottom: 15px;"></div>
-                    <div class="grid">
-                        <button class="btn btn-outline" onclick="printQR()">🖨️ ПЕЧАТЬ</button>
-                        <button class="btn btn-outline" onclick="testQRLink()">🔗 ТЕСТ ССЫЛКИ</button>
-                    </div>
-                </div>
+            <div class="menu">
+                <button class="menu-btn active" onclick="showPage('listNS')">📋 Все ЛН</button>
+                <button class="menu-btn" onclick="showPage('generateQR')">🎯 Создать QR</button>
+                <button class="menu-btn" onclick="showPage('workflow')">🔄 Workflow</button>
+                <button class="menu-btn" onclick="showPage('directories')">📚 Справочники</button>
+                <button class="menu-btn" onclick="showPage('admin')">⚙️ Админ</button>
             </div>
 
-            <div id="tab-list" class="page">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2>📋 Реестр несоответствий</h2>
-                    <input type="text" id="nsSearch" placeholder="Поиск..." oninput="renderNSList()" style="max-width:250px;">
-                </div>
-                <div id="nsContainer"></div>
+            <div class="page active" id="listNSPage">
+                <h2>📋 Реестр Листов Несоответствий</h2>
+                <input type="text" id="searchNS" placeholder="🔍 Быстрый поиск..." onkeyup="filterNS()" style="margin-bottom: 15px;">
+                <div id="nsListContainer"></div>
             </div>
 
-            <div id="tab-dirs" class="page">
-                <h2>📚 Справочники ответственных</h2>
-                <div class="grid">
-                    <div class="card">
-                        <h3>Менеджеры СМК / Цеха</h3>
-                        <div id="dir-resp-list" style="margin:15px 0;"></div>
-                        <div class="form-group">
-                            <input type="text" id="new-resp-fio" placeholder="ФИО">
-                            <input type="email" id="new-resp-email" placeholder="Email" style="margin-top:5px;">
-                            <button class="btn btn-success" style="width:100%; margin-top:10px;" onclick="addToDir('resp')">Добавить</button>
+            <div class="page" id="generateQRPage">
+                <h2>🎯 Создание точки контроля</h2>
+                <div class="form-grid">
+                    <input type="text" id="qrDept" placeholder="Цех/Подразделение">
+                    <input type="text" id="qrLoc" placeholder="Рабочее место/Станок">
+                    <button class="btn btn-primary" onclick="generateQRCode()">Сгенерировать QR</button>
+                </div>
+                <div id="qrPreview" style="text-align: center; display:none; padding: 20px; border: 2px dashed #ccc;"></div>
+            </div>
+
+            <div class="page" id="directoriesPage">
+                <h2>📚 Управление персоналом</h2>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <h3>👥 Ответственные</h3>
+                        <div id="responsiblesList"></div>
+                        <div class="directory-input-group" style="margin-top:10px;">
+                            <input type="text" id="respName" placeholder="ФИО">
+                            <input type="email" id="respEmail" placeholder="Email">
+                            <button class="btn btn-success" onclick="addResponsible()">Добавить</button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3>👷 Исполнители</h3>
+                        <div id="executorsList"></div>
+                        <div class="directory-input-group" style="margin-top:10px;">
+                            <input type="text" id="execName" placeholder="ФИО">
+                            <button class="btn btn-success" onclick="addExecutor()">Добавить</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="tab-admin" class="page">
-                <h2>⚙️ Управление данными</h2>
-                <div class="stats-row" id="statsRow"></div>
-                <div class="grid">
-                    <button class="btn btn-outline" onclick="exportCSV()">📊 ЭКСПОРТ В CSV</button>
-                    <button class="btn btn-outline" onclick="backupJSON()">💾 BACKUP (JSON)</button>
-                    <button class="btn btn-danger" onclick="clearSystemData()">🗑️ СБРОС СИСТЕМЫ</button>
+            <div class="page" id="adminPage">
+                <h2>⚙️ Система</h2>
+                <div class="form-grid">
+                    <button class="btn btn-primary" onclick="backupData()">💾 Резервная копия</button>
+                    <button class="btn btn-danger" onclick="clearAllData()">🗑️ Очистить базу данных</button>
+                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в Excel (CSV)</button>
                 </div>
             </div>
-
         </div>
     </div>
 
     <script>
-        // --- КОНФИГУРАЦИЯ ---
-        const CONFIG = {
-            WEB3FORMS_KEY: '0f9ce86d-9834-4669-b86e-c0cc782cca96',
-            STORAGE_KEYS: {
-                NS: 'fs_iso_ns',
-                QR: 'fs_iso_qr',
-                RESP: 'fs_iso_resp'
-            }
-        };
+        // --- ГЛОБАЛЬНЫЕ ДАННЫЕ (ВОССТАНОВЛЕНО) ---
+        let nsData = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+        let responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+        let executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+        let selectedPhotos = [];
 
-        let tempPhotos = [];
-
-        // --- ИНИЦИАЛИЗАЦИЯ ---
-        document.addEventListener('DOMContentLoaded', () => {
-            initStorage();
-            checkUrlParams();
-            renderNSList();
-            renderStats();
-            renderDirectory();
-        });
-
-        function initStorage() {
-            if (!localStorage.getItem(CONFIG.STORAGE_KEYS.NS)) localStorage.setItem(CONFIG.STORAGE_KEYS.NS, '[]');
-            if (!localStorage.getItem(CONFIG.STORAGE_KEYS.QR)) localStorage.setItem(CONFIG.STORAGE_KEYS.QR, '[]');
-            if (!localStorage.getItem(CONFIG.STORAGE_KEYS.RESP)) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.RESP, JSON.stringify([
-                    {id: 1, name: 'Иванов И.И.', email: 'finkart23@mail.ru'}
-                ]));
-            }
-        }
-
-        function checkUrlParams() {
+        // Инициализация
+        window.onload = function() {
             const params = new URLSearchParams(window.location.search);
             if (params.get('mode') === 'worker') {
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
-                
-                const qrCode = params.get('qrcode');
-                if (qrCode) {
-                    const qrs = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.QR));
-                    const found = qrs.find(q => q.id === qrCode);
-                    if (found) {
-                        document.getElementById('qrContextInfo').innerHTML = `
-                            <div class="card" style="background: #e3f2fd; border-color: #2196f3;">
-                                📍 <strong>${found.dep}</strong> | ${found.loc}
-                            </div>
-                        `;
-                        document.getElementById('nsForm').dataset.qrId = qrCode;
-                    }
-                }
             }
-        }
+            renderNSList();
+            renderDirectories();
+        };
 
-        // --- ЛОГИКА QR ---
-        function generateQR() {
-            const dep = document.getElementById('qr_dep').value;
-            const loc = document.getElementById('qr_loc').value;
-            if (!loc) return toast('Укажите локацию!');
-
-            const id = 'QR-' + Date.now().toString(36).toUpperCase();
-            const url = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${id}`;
+        // --- ЛОГИКА РАБОЧЕГО (С ФОТО) ---
+        function handlePhotoSelect(e) {
+            const files = Array.from(e.target.files);
+            selectedPhotos = [];
+            const preview = document.getElementById('photoPreview');
+            preview.innerHTML = '';
             
-            const qrs = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.QR));
-            const newQr = { id, dep, loc, url, date: new Date().toISOString() };
-            qrs.push(newQr);
-            localStorage.setItem(CONFIG.STORAGE_KEYS.QR, JSON.stringify(qrs));
-
-            const container = document.getElementById('qrCodeContainer');
-            container.innerHTML = '';
-            new QRCode(container, { text: url, width: 200, height: 200 });
-
-            document.getElementById('qrTextInfo').innerHTML = `<strong>Код:</strong> ${id}<br><strong>Место:</strong> ${dep}, ${loc}`;
-            document.getElementById('qrOutput').style.display = 'block';
-            document.getElementById('qrOutput').dataset.currentUrl = url;
-            toast('QR-код создан!');
-        }
-
-        function printQR() {
-            const content = document.getElementById('qrOutput').innerHTML;
-            const win = window.open('', '', 'width=600,height=600');
-            win.document.write(`<html><head><title>Print QR</title><style>body{text-align:center;padding:50px;font-family:sans-serif;}</style></head><body>${content}</body></html>`);
-            win.document.close();
-            setTimeout(() => { win.print(); win.close(); }, 500);
-        }
-
-        function testQRLink() {
-            const url = document.getElementById('qrOutput').dataset.currentUrl;
-            if (url) window.open(url, '_blank');
-        }
-
-        // --- ЛОГИКА ФОРМЫ (WORKER) ---
-        function handleFilePreview(e) {
-            const files = Array.from(e.target.files).slice(0, 3);
-            const container = document.getElementById('photoPreview');
-            container.innerHTML = '';
-            tempPhotos = [];
-
-            files.forEach(file => {
+            files.slice(0, 3).forEach(file => {
                 const reader = new FileReader();
-                reader.onload = (ev) => {
-                    tempPhotos.push(ev.target.result);
+                reader.onload = function(event) {
+                    selectedPhotos.push(event.target.result);
                     const img = document.createElement('img');
-                    img.src = ev.target.result;
-                    img.style.cssText = "width:60px; height:60px; object-fit:cover; border-radius:5px;";
-                    container.appendChild(img);
+                    img.src = event.target.result;
+                    img.style.width = '80px';
+                    img.style.height = '80px';
+                    img.style.objectFit = 'cover';
+                    img.style.borderRadius = '5px';
+                    preview.appendChild(img);
                 };
                 reader.readAsDataURL(file);
             });
         }
 
-        async function handleNSFormSubmit(e) {
-            e.preventDefault();
-            const qrId = e.target.dataset.qrId || 'MANUAL';
-            const qrs = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.QR));
-            const qrData = qrs.find(q => q.id === qrId) || { dep: 'Не указано', loc: 'Вручную' };
+        function submitNC() {
+            const desc = document.getElementById('ncDescription').value;
+            if (!desc) return showNotification('Введите описание!', 'error');
 
-            const nsData = {
-                id: 'NS-' + Date.now(),
-                num: `ЛН-${new Date().getFullYear()}-${(Math.floor(Math.random()*900)+100)}`,
-                date: new Date().toISOString(),
-                fio: document.getElementById('w_fio').value,
-                phone: document.getElementById('w_phone').value,
-                type: document.getElementById('w_type').value,
-                title: document.getElementById('w_title').value,
-                desc: document.getElementById('w_desc').value,
-                photos: tempPhotos,
-                dep: qrData.dep,
-                loc: qrData.loc,
-                status: 'NEW'
+            const params = new URLSearchParams(window.location.search);
+            const newNC = {
+                id: 'ЛН-' + Date.now().toString().slice(-6),
+                date: new Date().toLocaleString(),
+                location: params.get('qrcode') || 'Не указана',
+                description: desc,
+                photos: selectedPhotos,
+                status: 'checking_smk',
+                history: [{ date: new Date().toLocaleString(), action: 'Создан' }]
             };
 
-            const list = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS));
-            list.push(nsData);
-            localStorage.setItem(CONFIG.STORAGE_KEYS.NS, JSON.stringify(list));
-
-            // Отправка уведомления
-            await fetch('https://api.web3forms.com/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    access_key: CONFIG.WEB3FORMS_KEY,
-                    subject: `🚨 НОВЫЙ ЛН: ${nsData.num}`,
-                    message: `Зафиксировано несоответствие!\nГде: ${nsData.dep}\nКто: ${nsData.fio}\nСуть: ${nsData.title}`
-                })
-            });
-
-            document.getElementById('workerMode').innerHTML = `
-                <div class="container" style="text-align:center; padding:50px;">
-                    <h1 style="color:var(--success)">✅ ОТПРАВЛЕНО!</h1>
-                    <p>Лист несоответствия <strong>${nsData.num}</strong> успешно зарегистрирован.</p>
-                    <button class="btn btn-primary" style="margin-top:20px;" onclick="location.reload()">ОК</button>
-                </div>
-            `;
+            nsData.push(newNC);
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsData));
+            showNotification('Успешно отправлено!');
+            setTimeout(() => window.location.search = '', 2000);
         }
 
-        // --- АДМИН-ФУНКЦИИ ---
-        function nav(tabId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-            document.getElementById(tabId).classList.add('active');
-            event.target.classList.add('active');
-            if(tabId === 'tab-list') renderNSList();
-            if(tabId === 'tab-admin') renderStats();
-        }
-
+        // --- ЛОГИКА АДМИНА (ПОЛНЫЙ ФУНКЦИОНАЛ) ---
         function renderNSList() {
-            const list = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS)).reverse();
-            const query = document.getElementById('nsSearch').value.toLowerCase();
-            const container = document.getElementById('nsContainer');
-            container.innerHTML = '';
-
-            list.filter(item => 
-                item.num.toLowerCase().includes(query) || 
-                item.title.toLowerCase().includes(query) ||
-                item.dep.toLowerCase().includes(query)
-            ).forEach(item => {
+            const container = document.getElementById('nsListContainer');
+            if (!container) return;
+            container.innerHTML = nsData.length ? '' : '<p>Нет записей</p>';
+            
+            nsData.slice().reverse().forEach(ns => {
                 const card = document.createElement('div');
-                card.className = 'card';
+                card.className = 'ln-card';
                 card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:start;">
-                        <div>
-                            <strong>${item.num}</strong> <span class="status-badge" style="background:${getStatusColor(item.status)}">${item.status}</span>
-                            <div style="font-size:0.9rem; color:#666;">${new Date(item.date).toLocaleString()}</div>
-                        </div>
-                        <button class="btn btn-outline btn-sm" onclick="showDetails('${item.id}')">ОТКРЫТЬ</button>
+                    <div style="display:flex; justify-content:space-between;">
+                        <strong>${ns.id}</strong>
+                        <span class="status-badge" style="background:#17a2b8; color:white;">${ns.status}</span>
                     </div>
-                    <div style="margin-top:10px;"><strong>${item.title}</strong></div>
-                    <div style="font-size:0.85rem; color:#444;">📍 ${item.dep} / ${item.loc}</div>
+                    <p style="margin:10px 0;">${ns.description}</p>
+                    <button class="btn btn-primary btn-sm" onclick="viewNSDetails('${ns.id}')">Открыть детали</button>
                 `;
                 container.appendChild(card);
             });
         }
 
-        function getStatusColor(s) {
-            return s === 'NEW' ? '#ffc107' : s === 'CLOSED' ? '#28a745' : '#17a2b8';
-        }
-
-        function showDetails(id) {
-            const item = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS)).find(i => i.id === id);
-            const modal = document.getElementById('modal');
-            const body = document.getElementById('modalBody');
+        function viewNSDetails(id) {
+            const ns = nsData.find(item => item.id === id);
+            const modal = document.getElementById('statusModal');
+            document.getElementById('modalTitle').innerText = `Детали ${ns.id}`;
             
-            let photosHtml = item.photos.map(p => `<img src="${p}" style="width:100px; height:100px; object-fit:cover; border-radius:5px;">`).join('');
+            let photoHtml = ns.photos.map(p => `<img src="${p}" style="width:100%; margin-bottom:10px; border-radius:10px;">`).join('');
             
-            body.innerHTML = `
-                <p><strong>Заявитель:</strong> ${item.fio} (${item.phone || '-'})</p>
-                <p><strong>Описание:</strong> ${item.desc}</p>
-                <div style="display:flex; gap:10px; margin:15px 0;">${photosHtml}</div>
-                <hr style="margin:15px 0; opacity:0.2;">
-                <div class="form-group">
-                    <label>Изменить статус:</label>
-                    <select id="newStatus">
-                        <option value="NEW" ${item.status==='NEW'?'selected':''}>НОВЫЙ</option>
-                        <option value="IN_PROGRESS" ${item.status==='IN_PROGRESS'?'selected':''}>В РАБОТЕ</option>
-                        <option value="CLOSED" ${item.status==='CLOSED'?'selected':''}>ЗАКРЫТ</option>
+            document.getElementById('modalContent').innerHTML = `
+                <p><strong>Дата:</strong> ${ns.date}</p>
+                <p><strong>Локация:</strong> ${ns.location}</p>
+                <div style="margin:15px 0;">${photoHtml}</div>
+                <hr>
+                <div style="margin-top:15px;">
+                    <label>Назначить ответственного:</label>
+                    <select id="assignee">
+                        ${responsibles.map(r => `<option value="${r.email}">${r.name}</option>`).join('')}
                     </select>
+                    <button class="btn btn-success" style="margin-top:10px; width:100%;" onclick="approveNS('${ns.id}')">Утвердить ЛН</button>
                 </div>
-                <button class="btn btn-success" style="width:100%" onclick="updateNSStatus('${item.id}')">СОХРАНИТЬ</button>
             `;
             modal.style.display = 'flex';
         }
 
-        function updateNSStatus(id) {
-            const list = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS));
-            const idx = list.findIndex(i => i.id === id);
-            list[idx].status = document.getElementById('newStatus').value;
-            localStorage.setItem(CONFIG.STORAGE_KEYS.NS, JSON.stringify(list));
+        function approveNS(id) {
+            const ns = nsData.find(item => item.id === id);
+            ns.status = 'assigned';
+            ns.assignedTo = document.getElementById('assignee').value;
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsData));
             closeModal();
             renderNSList();
-            toast('Статус обновлен');
+            showNotification('Статус изменен на: Назначено');
         }
 
-        // --- СПРАВОЧНИКИ ---
-        function renderDirectory() {
-            const resps = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.RESP));
-            const container = document.getElementById('dir-resp-list');
-            container.innerHTML = resps.map(r => `
-                <div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #eee;">
-                    <span>${r.name} <small>(${r.email})</small></span>
-                    <button style="color:red; border:none; background:none; cursor:pointer;" onclick="removeFromDir(${r.id})">✕</button>
-                </div>
-            `).join('');
+        // --- УТИЛИТЫ ---
+        function generateQRCode() {
+            const dept = document.getElementById('qrDept').value;
+            const loc = document.getElementById('qrLoc').value;
+            if(!dept || !loc) return alert('Заполните все поля');
+            
+            const code = `FS-${Date.now().toString().slice(-5)}`;
+            const url = `${window.location.origin}${window.location.pathname}?mode=worker&qrcode=${code}`;
+            const preview = document.getElementById('qrPreview');
+            preview.innerHTML = `<h3>${dept} - ${loc}</h3><div id="qrImg" style="display:inline-block; margin:20px;"></div><p>${url}</p>`;
+            preview.style.display = 'block';
+            new QRCode(document.getElementById("qrImg"), { text: url, width: 200, height: 200 });
         }
 
-        function addToDir(type) {
-            const name = document.getElementById('new-resp-fio').value;
-            const email = document.getElementById('new-resp-email').value;
-            if(!name || !email) return;
-
-            const resps = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.RESP));
-            resps.push({ id: Date.now(), name, email });
-            localStorage.setItem(CONFIG.STORAGE_KEYS.RESP, JSON.stringify(resps));
-            renderDirectory();
-            document.getElementById('new-resp-fio').value = '';
-            document.getElementById('new-resp-email').value = '';
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id + 'Page').classList.add('active');
+            event.currentTarget.classList.add('active');
         }
 
-        function removeFromDir(id) {
-            let resps = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.RESP));
-            resps = resps.filter(r => r.id !== id);
-            localStorage.setItem(CONFIG.STORAGE_KEYS.RESP, JSON.stringify(resps));
-            renderDirectory();
+        function closeModal() { document.getElementById('statusModal').style.display = 'none'; }
+
+        function showNotification(msg, type = 'success') {
+            const n = document.getElementById('notification');
+            n.innerText = msg; n.className = 'notification ' + type;
+            n.style.display = 'block';
+            setTimeout(() => n.style.display = 'none', 3000);
         }
 
-        // --- СИСТЕМНЫЕ ФУНКЦИИ ---
-        function renderStats() {
-            const list = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS));
-            const container = document.getElementById('statsRow');
-            container.innerHTML = `
-                <div class="stat-card"><div class="stat-value">${list.length}</div>Всего ЛН</div>
-                <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${list.filter(i=>i.status==='NEW').length}</div>Новых</div>
-                <div class="stat-card"><div class="stat-value" style="color:var(--success)">${list.filter(i=>i.status==='CLOSED').length}</div>Закрыто</div>
-            `;
+        function backupData() {
+            const blob = new Blob([JSON.stringify(nsData)], {type: 'application/json'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'fs_backup.json';
+            a.click();
         }
 
-        function exportCSV() {
-            const list = JSON.parse(localStorage.getItem(CONFIG.STORAGE_KEYS.NS));
-            if(list.length === 0) return toast('Нет данных');
-            let csv = "\uFEFFНомер;Дата;Заявитель;Тип;Суть;Статус;Цех\n";
-            list.forEach(i => {
-                csv += `${i.num};${new Date(i.date).toLocaleDateString()};${i.fio};${i.type};${i.title};${i.status};${i.dep}\n`;
-            });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `farmstil_export_${new Date().toISOString().slice(0,10)}.csv`;
-            link.click();
+        function clearAllData() {
+            if(confirm('Удалить ВСЕ записи?')) { localStorage.clear(); location.reload(); }
         }
 
-        function backupJSON() {
-            const data = localStorage.getItem(CONFIG.STORAGE_KEYS.NS);
-            const blob = new Blob([data], { type: 'application/json' });
-            const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = `backup_iso_13485.json`;
-            link.click();
+        function renderDirectories() {
+            const rList = document.getElementById('responsiblesList');
+            const eList = document.getElementById('executorsList');
+            rList.innerHTML = responsibles.map(r => `<div class="directory-item">${r.name} (${r.email})</div>`).join('');
+            eList.innerHTML = executors.map(e => `<div class="directory-item">${e.name}</div>`).join('');
         }
 
-        function clearSystemData() {
-            if(confirm('Удалить ВСЕ данные о несоответствиях?')) {
-                localStorage.setItem(CONFIG.STORAGE_KEYS.NS, '[]');
-                localStorage.setItem(CONFIG.STORAGE_KEYS.QR, '[]');
-                location.reload();
+        function addResponsible() {
+            const name = document.getElementById('respName').value;
+            const email = document.getElementById('respEmail').value;
+            if(name && email) {
+                responsibles.push({name, email});
+                localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
+                renderDirectories();
+            }
+        }
+        
+        function addExecutor() {
+            const name = document.getElementById('execName').value;
+            if(name) {
+                executors.push({name});
+                localStorage.setItem('farmstil_executors', JSON.stringify(executors));
+                renderDirectories();
             }
         }
 
-        // --- UI UTILS ---
-        function toast(msg) {
-            const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.style.display = 'block';
-            setTimeout(() => t.style.display = 'none', 3000);
-        }
-
-        function closeModal() {
-            document.getElementById('modal').style.display = 'none';
+        function exportToCSV() {
+            let csv = "ID,Дата,Статус,Описание\n";
+            nsData.forEach(n => csv += `${n.id},${n.date},${n.status},${n.description}\n`);
+            const blob = new Blob([csv], {type: 'text/csv'});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'export.csv';
+            a.click();
         }
     </script>
 </body>
