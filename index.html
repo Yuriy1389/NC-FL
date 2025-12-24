@@ -311,6 +311,26 @@
             content: " *";
             color: #dc3545;
         }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e3c72;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -475,6 +495,9 @@
         // ============================================
         
         const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
+        const SMK_MANAGER_EMAIL = 'finkart23@mail.ru';
+        const KLIMA_EMAIL = 'NC-FL@outlook.com';
+        
         const WORKFLOW_STATUSES = {
             DETECTED: 'detected',
             CHECKING_SMK: 'checking_smk',
@@ -511,35 +534,32 @@
         function initDirectories() {
             if (!localStorage.getItem('farmstil_responsibles')) {
                 const defaultResponsibles = [
-                    { id: 1, name: "Иванов И.И.", email: "finkart23@mail.ru", role: "Начальник цеха" },
-                    { id: 2, name: "Петров П.П.", email: "finkart23@mail.ru", role: "Главный технолог" }
+                    { id: 1, name: "Иванов И.И.", email: KLIMA_EMAIL, role: "Начальник цеха" },
+                    { id: 2, name: "Петров П.П.", email: KLIMA_EMAIL, role: "Главный технолог" },
+                    { id: 3, name: "Климов", email: KLIMA_EMAIL, role: "Ответственный по качеству" }
                 ];
                 localStorage.setItem('farmstil_responsibles', JSON.stringify(defaultResponsibles));
             }
             
             if (!localStorage.getItem('farmstil_executors')) {
                 const defaultExecutors = [
-                    { id: 1, name: "Смирнов А.А.", email: "finkart23@mail.ru", department: "Цех №1" },
-                    { id: 2, name: "Кузнецов Б.Б.", email: "finkart23@mail.ru", department: "Цех №2" }
+                    { id: 1, name: "Смирнов А.А.", email: KLIMA_EMAIL, department: "Цех №1" },
+                    { id: 2, name: "Кузнецов Б.Б.", email: KLIMA_EMAIL, department: "Цех №2" }
                 ];
                 localStorage.setItem('farmstil_executors', JSON.stringify(defaultExecutors));
-            }
-            
-            if (!localStorage.getItem('farmstil_qrcodes')) {
-                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
             }
             
             if (!localStorage.getItem('farmstil_ns')) {
                 localStorage.setItem('farmstil_ns', JSON.stringify([]));
             }
             
-            if (!localStorage.getItem('farmstil_links')) {
-                localStorage.setItem('farmstil_links', JSON.stringify({}));
+            if (!localStorage.getItem('farmstil_active_links')) {
+                localStorage.setItem('farmstil_active_links', JSON.stringify({}));
             }
         }
         
         // ============================================
-        // QR-КОДЫ С УНИКАЛЬНЫМИ ССЫЛКАМИ
+        // QR-КОДЫ С ПАРАМЕТРАМИ В URL
         // ============================================
         
         function generateQRCode() {
@@ -553,11 +573,10 @@
             }
             
             const code = `FS-${Date.now().toString().slice(-8)}`;
-            const uniqueId = generateUniqueId();
             const currentUrl = window.location.origin + window.location.pathname;
             
-            // Создаем ссылку для рабочего
-            const qrUrl = `${currentUrl}?mode=worker&id=${uniqueId}`;
+            // Создаем URL с параметрами в GET-запросе
+            const qrUrl = `${currentUrl}?mode=worker&department=${encodeURIComponent(department)}&location=${encodeURIComponent(location)}&code=${code}&responsible=${encodeURIComponent(responsible || '')}`;
             
             currentQRData = {
                 code: code,
@@ -565,56 +584,16 @@
                 location: location,
                 responsible: responsible,
                 url: qrUrl,
-                uniqueId: uniqueId,
                 created: new Date().toISOString()
             };
             
-            // Сохраняем ссылку в отдельном хранилище
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            links[uniqueId] = {
-                type: 'worker_form',
-                department: department,
-                location: location,
-                responsible: responsible,
-                code: code,
-                created: new Date().toISOString(),
-                status: 'active'
-            };
-            localStorage.setItem('farmstil_links', JSON.stringify(links));
-            
-            // Сохраняем QR код
+            // Сохраняем QR код для истории
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
             qrcodes.push(currentQRData);
             localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
             
             displayQRCode(qrUrl, code, department, location, responsible);
             showNotification('QR-код успешно создан!', 'success');
-        }
-        
-        function generateUniqueId() {
-            return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        }
-        
-        function generateResponsibleLink(nsId, responsibleEmail, responsibleName) {
-            const uniqueId = generateUniqueId();
-            const currentUrl = window.location.origin + window.location.pathname;
-            const link = `${currentUrl}?mode=fillNS&id=${uniqueId}&ns=${nsId}`;
-            
-            // Сохраняем ссылку для ответственного
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            links[uniqueId] = {
-                type: 'responsible_form',
-                nsId: nsId,
-                responsibleEmail: responsibleEmail,
-                responsibleName: responsibleName,
-                link: link,
-                created: new Date().toISOString(),
-                expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 дней
-                status: 'active'
-            };
-            localStorage.setItem('farmstil_links', JSON.stringify(links));
-            
-            return link;
         }
         
         function displayQRCode(qrUrl, code, department, location, responsible) {
@@ -659,7 +638,7 @@
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                     <p><strong>Подразделение:</strong> ${department}</p>
                     <p><strong>Место:</strong> ${location}</p>
-                    ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
+                    ${responsible ? `<p><strong>Ответственный за зону:</strong> ${responsible}</p>` : ''}
                     <p><strong>Код:</strong> <code>${code}</code></p>
                     <p><strong>Ссылка:</strong> <small style="word-break: break-all; color: #666;">${qrUrl}</small></p>
                     <div style="margin-top: 15px;">
@@ -700,7 +679,7 @@
                     <div class="info">
                         <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
                         <p><strong>Место:</strong> ${currentQRData.location}</p>
-                        ${currentQRData.responsible ? `<p><strong>Ответственный:</strong> ${currentQRData.responsible}</p>` : ''}
+                        ${currentQRData.responsible ? `<p><strong>Ответственный за зону:</strong> ${currentQRData.responsible}</p>` : ''}
                         <p><strong>Код:</strong> ${currentQRData.code}</p>
                     </div>
                     
@@ -750,26 +729,55 @@
         }
         
         // ============================================
+        // ГЕНЕРАЦИЯ УНИКАЛЬНЫХ ССЫЛОК ДЛЯ ОТВЕТСТВЕННОГО
+        // ============================================
+        
+        function generateResponsibleLink(nsId, responsibleEmail, responsibleName) {
+            const uniqueId = 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const currentUrl = window.location.origin + window.location.pathname;
+            const link = `${currentUrl}?mode=fillNS&linkId=${uniqueId}&nsId=${nsId}`;
+            
+            // Сохраняем активную ссылку
+            const activeLinks = JSON.parse(localStorage.getItem('farmstil_active_links') || '{}');
+            activeLinks[uniqueId] = {
+                nsId: nsId,
+                responsibleEmail: responsibleEmail,
+                responsibleName: responsibleName,
+                link: link,
+                created: new Date().toISOString(),
+                expires: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 дней
+                status: 'active'
+            };
+            localStorage.setItem('farmstil_active_links', JSON.stringify(activeLinks));
+            
+            return link;
+        }
+        
+        // ============================================
         // РЕЖИМЫ РАБОТЫ СИСТЕМЫ
         // ============================================
         
         function checkMode() {
             const urlParams = new URLSearchParams(window.location.search);
             const mode = urlParams.get('mode');
-            const id = urlParams.get('id');
-            const nsId = urlParams.get('ns');
+            const department = urlParams.get('department');
+            const location = urlParams.get('location');
+            const code = urlParams.get('code');
+            const responsible = urlParams.get('responsible');
+            const linkId = urlParams.get('linkId');
+            const nsId = urlParams.get('nsId');
             
-            if (mode === 'worker' && id) {
+            if (mode === 'worker' && department && location) {
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'block';
                 document.getElementById('fillNSMode').style.display = 'none';
-                showWorkerFormByLink(id);
+                showWorkerFormFromURL(department, location, code, responsible);
             } 
-            else if (mode === 'fillNS' && id && nsId) {
+            else if (mode === 'fillNS' && linkId && nsId) {
                 document.getElementById('adminMode').style.display = 'none';
                 document.getElementById('workerMode').style.display = 'none';
                 document.getElementById('fillNSMode').style.display = 'block';
-                showResponsibleForm(id, nsId);
+                showResponsibleForm(linkId, nsId);
             }
             else {
                 document.getElementById('adminMode').style.display = 'block';
@@ -779,37 +787,20 @@
             }
         }
         
-        function showWorkerFormByLink(linkId) {
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            const linkData = links[linkId];
-            
-            if (!linkData || linkData.type !== 'worker_form') {
-                document.getElementById('workerContent').innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 80px; color: #dc3545;">❌</div>
-                        <h2>Ссылка недействительна</h2>
-                        <p style="color: #666; margin: 20px 0;">QR-код устарел или не зарегистрирован в системе.</p>
-                        <button class="btn btn-primary" onclick="window.close()">
-                            Закрыть окно
-                        </button>
-                    </div>
-                `;
-                return;
-            }
-            
+        function showWorkerFormFromURL(department, location, code, responsible) {
             const html = `
                 <div class="ns-form-container">
                     <h2>🚨 Регистрация несоответствия</h2>
                     
                     <div class="form-section">
                         <h3>📍 Место обнаружения</h3>
-                        <p><strong>Подразделение:</strong> ${linkData.department}</p>
-                        <p><strong>Рабочее место:</strong> ${linkData.location}</p>
-                        ${linkData.responsible ? `<p><strong>Ответственный за зону:</strong> ${linkData.responsible}</p>` : ''}
-                        <p><strong>Код QR:</strong> ${linkData.code}</p>
+                        <p><strong>Подразделение:</strong> ${decodeURIComponent(department)}</p>
+                        <p><strong>Рабочее место:</strong> ${decodeURIComponent(location)}</p>
+                        ${responsible ? `<p><strong>Ответственный за зону:</strong> ${decodeURIComponent(responsible)}</p>` : ''}
+                        ${code ? `<p><strong>Код QR:</strong> ${code}</p>` : ''}
                     </div>
                     
-                    <form onsubmit="event.preventDefault(); submitWorkerForm('${linkId}');">
+                    <form onsubmit="event.preventDefault(); submitWorkerForm('${department}', '${location}', '${code || ''}', '${responsible || ''}');">
                         <div class="form-section">
                             <h3>👤 Информация о заявителе</h3>
                             <div class="form-grid">
@@ -875,10 +866,6 @@
                             </div>
                         </div>
                         
-                        <input type="hidden" id="workerDepartment" value="${linkData.department}">
-                        <input type="hidden" id="workerLocation" value="${linkData.location}">
-                        <input type="hidden" id="workerQRCode" value="${linkData.code}">
-                        
                         <div style="margin: 30px 0; text-align: center;">
                             <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
                                 📤 Отправить Лист Несоответствия
@@ -891,16 +878,13 @@
             document.getElementById('workerContent').innerHTML = html;
         }
         
-        function submitWorkerForm(linkId) {
+        function submitWorkerForm(department, location, code, responsible) {
             const applicant = document.getElementById('workerApplicant').value;
             const phone = document.getElementById('workerPhone').value;
             const position = document.getElementById('workerPosition').value;
             const nsType = document.getElementById('workerNsType').value;
             const title = document.getElementById('workerTitle').value;
             const description = document.getElementById('workerDescription').value;
-            const department = document.getElementById('workerDepartment').value;
-            const location = document.getElementById('workerLocation').value;
-            const qrCode = document.getElementById('workerQRCode').value;
             const batch = document.getElementById('workerBatch').value;
             const impact = document.getElementById('workerImpact').value;
             
@@ -913,9 +897,10 @@
                 id: 'ns_' + Date.now(),
                 nsNumber: generateNSNumber(),
                 created: new Date().toISOString(),
-                department: department,
-                location: location,
-                qrCode: qrCode,
+                department: decodeURIComponent(department),
+                location: decodeURIComponent(location),
+                qrCode: code || '',
+                zoneResponsible: responsible ? decodeURIComponent(responsible) : '',
                 applicant: applicant,
                 applicantPhone: phone,
                 applicantPosition: position,
@@ -926,7 +911,6 @@
                 impact: impact,
                 photos: photos,
                 status: WORKFLOW_STATUSES.DETECTED,
-                linkId: linkId,
                 workflow: [{
                     step: 1,
                     action: 'detected',
@@ -943,15 +927,6 @@
             
             // Отправляем уведомление менеджеру СМК (ПЕРВОЕ УВЕДОМЛЕНИЕ)
             sendFirstNotificationToSMKManager(nsData);
-            
-            // Помечаем ссылку как использованную
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            if (links[linkId]) {
-                links[linkId].used = true;
-                links[linkId].usedDate = new Date().toISOString();
-                links[linkId].usedBy = applicant;
-                localStorage.setItem('farmstil_links', JSON.stringify(links));
-            }
             
             // Экран успеха
             document.getElementById('workerContent').innerHTML = `
@@ -979,15 +954,30 @@
         }
         
         function showResponsibleForm(linkId, nsId) {
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            const linkData = links[linkId];
+            // Проверяем активную ссылку
+            const activeLinks = JSON.parse(localStorage.getItem('farmstil_active_links') || '{}');
+            const linkData = activeLinks[linkId];
             
-            if (!linkData || linkData.type !== 'responsible_form' || linkData.nsId !== nsId) {
+            if (!linkData || linkData.nsId !== nsId) {
                 document.getElementById('fillNSContent').innerHTML = `
                     <div style="text-align: center; padding: 40px;">
                         <div style="font-size: 80px; color: #dc3545;">❌</div>
                         <h2>Ссылка недействительна</h2>
                         <p style="color: #666; margin: 20px 0;">Ссылка устарела или не соответствует ЛН.</p>
+                        <p style="font-size: 12px; color: #999;">Обратитесь к менеджеру СМК для получения новой ссылки</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Проверяем срок действия
+            const expires = new Date(linkData.expires);
+            if (expires < new Date()) {
+                document.getElementById('fillNSContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ссылка устарела</h2>
+                        <p style="color: #666; margin: 20px 0;">Срок действия ссылки истек.</p>
                         <p style="font-size: 12px; color: #999;">Обратитесь к менеджеру СМК для получения новой ссылки</p>
                     </div>
                 `;
@@ -1028,9 +1018,10 @@
                         
                         <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                             <h4>Описание проблемы:</h4>
-                            <p>${nsData.nsTitle}</p>
+                            <p><strong>${nsData.nsTitle}</strong></p>
                             <p>${nsData.description}</p>
                             ${nsData.batchNumber ? `<p><strong>Партия:</strong> ${nsData.batchNumber}</p>` : ''}
+                            ${nsData.impact ? `<p><strong>Влияние:</strong> ${nsData.impact}</p>` : ''}
                         </div>
                     </div>
                     
@@ -1098,7 +1089,7 @@
                             </div>
                             
                             <div class="form-group">
-                                <label>Ответственный за выполнение:</label>
+                                <label>Ответственный за выполнение (исполнитель):</label>
                                 <select id="executorSelect">
                                     <option value="">Выберите исполнителя</option>
                                 </select>
@@ -1189,7 +1180,7 @@
             nsList[nsIndex].workflow.push({
                 step: 3,
                 action: 'correction_filled',
-                user: currentNSData.responsiblePerson || 'Ответственный',
+                user: nsList[nsIndex].responsiblePerson || 'Ответственный',
                 date: new Date().toISOString(),
                 comment: 'Заполнены корректирующие действия'
             });
@@ -1197,15 +1188,15 @@
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
             // Помечаем ссылку как использованную
-            const links = JSON.parse(localStorage.getItem('farmstil_links') || '{}');
-            if (links[linkId]) {
-                links[linkId].used = true;
-                links[linkId].usedDate = new Date().toISOString();
-                links[linkId].filled = true;
-                localStorage.setItem('farmstil_links', JSON.stringify(links));
+            const activeLinks = JSON.parse(localStorage.getItem('farmstil_active_links') || '{}');
+            if (activeLinks[linkId]) {
+                activeLinks[linkId].used = true;
+                activeLinks[linkId].usedDate = new Date().toISOString();
+                activeLinks[linkId].filled = true;
+                localStorage.setItem('farmstil_active_links', JSON.stringify(activeLinks));
             }
             
-            // Отправляем уведомление менеджеру СМК о заполнении
+            // Отправляем уведомление менеджеру СМК о заполнении (ВТОРОЕ УВЕДОМЛЕНИЕ)
             sendSecondNotificationToSMKManager(nsList[nsIndex]);
             
             // Экран успеха
@@ -1220,7 +1211,7 @@
                     </div>
                     <p style="color: #666; margin: 20px 0;">
                         ✅ Корректирующие действия успешно зарегистрированы<br>
-                        📧 Менеджер СМК уведомлен о заполнении<br>
+                        📧 Менеджер СМК и Климов уведомлены о заполнении<br>
                         ⏳ Ожидайте проверки и назначения исполнителя
                     </p>
                     <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
@@ -1229,20 +1220,20 @@
                 </div>
             `;
             
-            showNotification(`ЛН ${nsList[nsIndex].nsNumber} успешно заполнен! Менеджер СМК уведомлен.`, 'success');
+            showNotification(`ЛН ${nsList[nsIndex].nsNumber} успешно заполнен! Уведомления отправлены.`, 'success');
         }
         
         // ============================================
-        // УВЕДОМЛЕНИЯ
+        // УВЕДОМЛЕНИЯ - ИСПРАВЛЕННЫЕ
         // ============================================
         
         function sendFirstNotificationToSMKManager(nsData) {
-            const recipient = 'finkart23@mail.ru';
+            const subject = `🚨 НОВЫЙ ЛН: ${nsData.nsNumber} - требуется проверка`;
             const currentUrl = window.location.origin + window.location.pathname;
-            const adminUrl = `${currentUrl}?mode=admin`;
+            const adminUrl = `${currentUrl}`;
             
             const emailBody = `
-🚨 НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ ISO 13485 🚨
+НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ ISO 13485
 
 📋 ОСНОВНАЯ ИНФОРМАЦИЯ:
 Номер ЛН: ${nsData.nsNumber}
@@ -1252,7 +1243,7 @@
 📍 МЕСТО ОБНАРУЖЕНИЯ:
 Подразделение: ${nsData.department}
 Рабочее место: ${nsData.location}
-QR-код: ${nsData.qrCode}
+${nsData.zoneResponsible ? `Ответственный за зону: ${nsData.zoneResponsible}` : ''}
 
 👤 ЗАЯВИТЕЛЬ:
 ФИО: ${nsData.applicant}
@@ -1280,16 +1271,22 @@ ${nsData.impact ? `Влияние на процесс: ${nsData.impact}` : ''}
 ISO 13485:2016
             `.trim();
             
-            sendEmail(recipient, `🚨 НОВЫЙ ЛН: ${nsData.nsNumber} - требуется проверка`, emailBody);
+            // Отправляем менеджеру СМК
+            sendEmail(SMK_MANAGER_EMAIL, subject, emailBody);
+            
+            // Дублируем Климову
+            sendEmail(KLIMA_EMAIL, subject, emailBody);
+            
+            console.log('Первое уведомление отправлено менеджеру СМК и Климову');
         }
         
         function sendSecondNotificationToSMKManager(nsData) {
-            const recipient = 'finkart23@mail.ru';
+            const subject = `✅ ЛН ${nsData.nsNumber} заполнен - требуется проверка КД`;
             const currentUrl = window.location.origin + window.location.pathname;
-            const adminUrl = `${currentUrl}?mode=admin`;
+            const adminUrl = `${currentUrl}`;
             
             const emailBody = `
-✅ ЛИСТ НЕСООТВЕТСТВИЯ ЗАПОЛНЕН ОТВЕТСТВЕННЫМ
+ЛИСТ НЕСОТВЕТСТВИЯ ЗАПОЛНЕН ОТВЕТСТВЕННЫМ
 
 📋 ИНФОРМАЦИЯ О ЛН:
 Номер: ${nsData.nsNumber}
@@ -1325,16 +1322,22 @@ ${nsData.executor ? `Исполнитель: ${nsData.executor.name}` : 'Исп�
 ISO 13485:2016
             `.trim();
             
-            sendEmail(recipient, `✅ ЛН ${nsData.nsNumber} заполнен - требуется проверка КД`, emailBody);
+            // Отправляем менеджеру СМК
+            sendEmail(SMK_MANAGER_EMAIL, subject, emailBody);
+            
+            // Дублируем Климову
+            sendEmail(KLIMA_EMAIL, subject, emailBody);
+            
+            console.log('Второе уведомление отправлено менеджеру СМК и Климову');
         }
         
         function sendNotificationToResponsible(nsData, responsibleEmail, responsibleName, link) {
-            const subject = `📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ: ${nsData.nsNumber}`;
+            const subject = `📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСОТВЕТСТВИЯ: ${nsData.nsNumber}`;
             
             const emailBody = `
 УВАЖАЕМЫЙ ${responsibleName}!
 
-📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ
+📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСОТВЕТСТВИЯ
 
 Номер ЛН: ${nsData.nsNumber}
 Дата регистрации: ${new Date(nsData.created).toLocaleDateString('ru-RU')}
@@ -1367,6 +1370,109 @@ ISO 13485:2016
             `.trim();
             
             sendEmail(responsibleEmail, subject, emailBody);
+            
+            // Дублируем Климову для информации
+            const klimaSubject = `📋 Назначен ответственный по ЛН: ${nsData.nsNumber}`;
+            const klimaBody = `
+Информация о назначении ответственного:
+
+ЛН: ${nsData.nsNumber}
+Ответственный: ${responsibleName}
+Email: ${responsibleEmail}
+Ссылка отправлена: ${new Date().toLocaleString('ru-RU')}
+
+---
+Система управления качеством ФАРМСТИЛ
+            `.trim();
+            
+            sendEmail(KLIMA_EMAIL, klimaSubject, klimaBody);
+        }
+        
+        function sendThirdNotificationAfterCorrectionApproval(nsData) {
+            const subject = `✅ ЛН ${nsData.nsNumber} - КД утверждены`;
+            
+            const emailBody = `
+УВЕДОМЛЕНИЕ: КОРРЕКТИРУЮЩИЕ ДЕЙСТВИЯ УТВЕРЖДЕНЫ
+
+📋 ИНФОРМАЦИЯ О ЛН:
+Номер: ${nsData.nsNumber}
+Дата утверждения: ${new Date().toLocaleDateString('ru-RU')}
+Статус: КД ПРОВЕРЕНЫ И УТВЕРЖДЕНЫ
+
+👤 ОТВЕТСТВЕННЫЙ:
+${nsData.responsiblePerson || 'Не указан'}
+
+${nsData.executor ? `👷 ИСПОЛНИТЕЛЬ: ${nsData.executor.name}` : ''}
+
+📅 ПЛАНИРОВАНИЕ:
+Дата начала: ${nsData.startDate || 'Не указана'}
+Планируемое завершение: ${nsData.plannedCompletion || 'Не указана'}
+
+🛠️ УТВЕРЖДЕННЫЕ ДЕЙСТВИЯ:
+Корректирующие действия: ${nsData.correctiveActions || 'Не указаны'}
+
+---
+Система управления качеством ФАРМСТИЛ
+ISO 13485:2016
+            `.trim();
+            
+            // Отправляем менеджеру СМК
+            sendEmail(SMK_MANAGER_EMAIL, subject, emailBody);
+            
+            // Отправляем Климову
+            sendEmail(KLIMA_EMAIL, subject, emailBody);
+            
+            // Отправляем ответственному
+            if (nsData.responsibleEmail) {
+                sendEmail(nsData.responsibleEmail, subject, emailBody);
+            }
+            
+            // Отправляем исполнителю если есть
+            if (nsData.executor && nsData.executor.email) {
+                const executorSubject = `📋 Вам назначены действия по ЛН: ${nsData.nsNumber}`;
+                const executorBody = `
+УВАЖАЕМЫЙ ${nsData.executor.name}!
+
+Вам назначены действия по Листу Несоответствия:
+
+Номер ЛН: ${nsData.nsNumber}
+Ответственный: ${nsData.responsiblePerson}
+Срок выполнения: ${nsData.plannedCompletion}
+
+Действия к выполнению:
+${nsData.correctiveActions}
+
+---
+Система управления качеством ФАРМСТИЛ
+                `.trim();
+                
+                sendEmail(nsData.executor.email, executorSubject, executorBody);
+            }
+            
+            console.log('Третье уведомление отправлено всем участникам');
+        }
+        
+        function sendEmail(to, subject, body) {
+            fetch('https://api.web3forms.com/submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    access_key: WEB3FORMS_ACCESS_KEY,
+                    subject: subject,
+                    from_name: 'ФАРМСТИЛ ISO 13485',
+                    to: to,
+                    message: body
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(`Email отправлен на ${to}:`, data);
+            })
+            .catch(error => {
+                console.error(`Ошибка отправки email на ${to}:`, error);
+            });
         }
         
         // ============================================
@@ -1578,7 +1684,7 @@ ISO 13485:2016
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
-            // Отправляем ВТОРОЕ уведомление - ответственному
+            // Отправляем уведомление ответственному
             sendNotificationToResponsible(ns, email, name, link);
             
             closeModal();
@@ -1671,9 +1777,12 @@ ISO 13485:2016
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
+            // Отправляем ТРЕТЬЕ уведомление - об утверждении КД
+            sendThirdNotificationAfterCorrectionApproval(ns);
+            
             closeModal();
             if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
-            showNotification('Корректирующие действия одобрены', 'success');
+            showNotification('Корректирующие действия одобрены! Уведомления отправлены.', 'success');
         }
         
         function requestCorrectionChanges(index) {
@@ -1722,7 +1831,7 @@ ISO 13485:2016
         }
         
         // ============================================
-        // ОСТАЛЬНЫЕ ФУНКЦИИ (остаются без изменений)
+        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
         // ============================================
         
         function handleWorkerPhotos(event) {
@@ -1779,29 +1888,6 @@ ISO 13485:2016
                 'other': 'Другое'
             };
             return typeMap[type] || type;
-        }
-        
-        function sendEmail(to, subject, body) {
-            fetch('https://api.web3forms.com/submit', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    access_key: WEB3FORMS_ACCESS_KEY,
-                    subject: subject,
-                    from_name: 'ФАРМСТИЛ ISO 13485',
-                    to: to,
-                    message: body
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log('Email отправлен:', data);
-            })
-            .catch(error => {
-                console.error('Ошибка отправки email:', error);
-            });
         }
         
         function loadPendingCount() {
@@ -2142,7 +2228,7 @@ ISO 13485:2016
                 farmstil_responsibles: JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]'),
                 farmstil_executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
                 farmstil_qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
-                farmstil_links: JSON.parse(localStorage.getItem('farmstil_links') || '{}'),
+                farmstil_active_links: JSON.parse(localStorage.getItem('farmstil_active_links') || '{}'),
                 timestamp: new Date().toISOString()
             };
             
@@ -2176,7 +2262,7 @@ ISO 13485:2016
                         if (data.farmstil_responsibles) localStorage.setItem('farmstil_responsibles', JSON.stringify(data.farmstil_responsibles));
                         if (data.farmstil_executors) localStorage.setItem('farmstil_executors', JSON.stringify(data.farmstil_executors));
                         if (data.farmstil_qrcodes) localStorage.setItem('farmstil_qrcodes', JSON.stringify(data.farmstil_qrcodes));
-                        if (data.farmstil_links) localStorage.setItem('farmstil_links', JSON.stringify(data.farmstil_links));
+                        if (data.farmstil_active_links) localStorage.setItem('farmstil_active_links', JSON.stringify(data.farmstil_active_links));
                         
                         showNotification('Данные восстановлены', 'success');
                         loadDirectories();
@@ -2199,7 +2285,7 @@ ISO 13485:2016
                 localStorage.removeItem('farmstil_responsibles');
                 localStorage.removeItem('farmstil_executors');
                 localStorage.removeItem('farmstil_qrcodes');
-                localStorage.removeItem('farmstil_links');
+                localStorage.removeItem('farmstil_active_links');
                 
                 initDirectories();
                 showNotification('Данные очищены', 'success');
