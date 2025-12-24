@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ФАРМСТИЛ - Система управления несоответствиями ISO 13485</title>
     
-    <!-- Библиотеки -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <style>
@@ -290,10 +289,8 @@
     </style>
 </head>
 <body>
-    <!-- Уведомления -->
     <div class="notification" id="notification"></div>
     
-    <!-- Модальные окна -->
     <div class="modal" id="statusModal">
         <div class="modal-content">
             <div class="modal-header">
@@ -304,7 +301,6 @@
         </div>
     </div>
     
-    <!-- Режимы -->
     <div id="workerMode" style="display: none;">
         <div class="worker-container">
             <div class="worker-header">
@@ -317,13 +313,11 @@
     
     <div id="adminMode">
         <div class="container">
-            <!-- Шапка -->
             <div class="header">
                 <h1>ФАРМСТИЛ - Административная панель</h1>
                 <h2>ISO 13485 Workflow + Google Sheets</h2>
             </div>
             
-            <!-- Меню -->
             <div class="menu">
                 <button class="menu-btn active" onclick="showPage('generateQR')">🎯 Создать QR</button>
                 <button class="menu-btn" onclick="showPage('listNS')">📋 Все ЛН</button>
@@ -332,7 +326,6 @@
                 <button class="menu-btn" onclick="showPage('admin')">⚙️ Админ</button>
             </div>
             
-            <!-- Страницы -->
             <div class="page active" id="generateQRPage">
                 <h2>🎯 Генерация QR-кода для цеха</h2>
                 <div class="form-grid">
@@ -359,8 +352,7 @@
                     🎯 Сгенерировать QR-код
                 </button>
                 <div id="qrPreview">
-                    <!-- QR код будет здесь -->
-                </div>
+                    </div>
             </div>
             
             <div class="page" id="listNSPage">
@@ -994,19 +986,21 @@
             // Отправляем email через Web3Forms
             sendEmailToSMKManager(nsData);
             
+            // ИЗМЕНЕНО: Экран успеха теперь без кнопки возврата в админку
             document.getElementById('workerContent').innerHTML = `
                 <div style="text-align: center; padding: 40px;">
                     <div style="font-size: 80px; color: #28a745;">✅</div>
-                    <h2>Лист несоответствия создан!</h2>
+                    <h2>Лист несоответствия отправлен!</h2>
                     <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
-                    <p style="color: #666; margin: 20px 0;">Менеджер СМК получил уведомление</p>
-                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
-                        Вернуться на главную
+                    <p style="color: #666; margin: 20px 0;">Данные успешно сохранены. Менеджер СМК уведомлен.</p>
+                    <button class="btn btn-primary" onclick="window.close();">
+                        Закрыть окно
                     </button>
+                    <p style="font-size: 12px; color: #999; margin-top: 15px;">(Если кнопка не сработала, просто закройте вкладку)</p>
                 </div>
             `;
             
-            showNotification(`ЛН ${nsData.nsNumber} успешно создан! Email отправлен менеджеру.`, 'success');
+            showNotification(`ЛН ${nsData.nsNumber} успешно создан!`, 'success');
         }
         
         function generateNSNumber() {
@@ -1022,7 +1016,9 @@
         }
         
         function sendEmailToSMKManager(nsData) {
-            const recipient = 'finkart23@mail.ru'; // Email менеджера СМК
+            const recipient = 'finkart23@mail.ru'; 
+            // Добавляем ссылку на текущую страницу для менеджера
+            const currentUrl = window.location.origin + window.location.pathname;
             
             const emailBody = `
 НОВЫЙ ЛИСТ НЕСООТВЕТСТВИЯ ISO 13485
@@ -1040,7 +1036,8 @@
 📋 ПОДРОБНОЕ ОПИСАНИЕ:
 ${nsData.description}
 
-Количество фотографий: ${nsData.photos ? nsData.photos.length : 0}
+🔗 ССЫЛКА НА СИСТЕМУ:
+${currentUrl}
 
 Для обработки перейдите в административную панель системы.
             `.trim();
@@ -1118,10 +1115,11 @@ ${nsData.description}
             
             let html = '<div class="ln-list">';
             
-            nsList.forEach((ns, index) => {
+            nsList.forEach((ns) => {
                 const statusText = getStatusText(ns.status);
                 const statusClass = `status-${ns.status.replace(/_/g, '-')}`;
                 
+                // ИЗМЕНЕНО: кнопки теперь используют ID объекта вместо индекса массива
                 html += `
                     <div class="ln-card">
                         <div class="ln-card-header">
@@ -1134,8 +1132,8 @@ ${nsData.description}
                             <p>📅 ${new Date(ns.created).toLocaleDateString('ru-RU')} 👤 ${ns.applicant}</p>
                             
                             <div class="action-buttons">
-                                <button class="btn btn-info btn-sm" onclick="viewNSDetails(${index})">👁️ Просмотр</button>
-                                ${getActionButton(ns, index)}
+                                <button class="btn btn-info btn-sm" onclick="viewNSByID('${ns.id}')">👁️ Просмотр</button>
+                                ${ns.status === WORKFLOW_STATUSES.DETECTED ? `<button class="btn btn-warning btn-sm" onclick="reviewNSByID('${ns.id}')">Проверить</button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1145,14 +1143,18 @@ ${nsData.description}
             html += '</div>';
             container.innerHTML = html;
         }
-        
-        function getActionButton(ns, index) {
-            switch(ns.status) {
-                case WORKFLOW_STATUSES.DETECTED:
-                    return `<button class="btn btn-warning btn-sm" onclick="reviewNS(${index})">Проверить</button>`;
-                default:
-                    return '';
-            }
+
+        // Вспомогательные функции для поиска по ID (решает проблему некорректной работы кнопок)
+        function viewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) viewNSDetails(index);
+        }
+
+        function reviewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) reviewNS(index);
         }
         
         function loadPendingCount() {
@@ -1175,7 +1177,7 @@ ${nsData.description}
             
             let html = '<h3>🚨 ЛН на проверке</h3><div style="max-height: 400px; overflow-y: auto;">';
             
-            pendingNS.forEach((ns, index) => {
+            pendingNS.forEach((ns) => {
                 html += `
                     <div class="ln-card">
                         <div class="ln-card-header">
@@ -1187,8 +1189,8 @@ ${nsData.description}
                             <p>${ns.department} - ${ns.location}</p>
                             <p>Заявитель: ${ns.applicant}</p>
                             <div class="action-buttons">
-                                <button class="btn btn-info btn-sm" onclick="reviewNS(${index})">👁️ Просмотр</button>
-                                <button class="btn btn-success btn-sm" onclick="approveNS(${index})">✅ Назначить</button>
+                                <button class="btn btn-info btn-sm" onclick="viewNSByID('${ns.id}')">👁️ Просмотр</button>
+                                <button class="btn btn-success btn-sm" onclick="reviewNSByID('${ns.id}')">✅ Назначить</button>
                             </div>
                         </div>
                     </div>
@@ -1242,6 +1244,7 @@ ${nsData.description}
             
             document.getElementById('modalTitle').textContent = 'Проверка ЛН';
             document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
         }
         
         function approveNS(index) {
@@ -1305,45 +1308,34 @@ ${nsData.description}
             
             localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
             
-            // Отправляем email ответственному
             sendEmailToResponsible(ns, email, name, deadline);
             
             closeModal();
             loadPendingCount();
-            showNotification(`Ответственный ${name} назначен. Email отправлен.`, 'success');
+            if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
+            showNotification(`Ответственный ${name} назначен.`, 'success');
         }
         
         function sendEmailToResponsible(nsData, responsibleEmail, responsibleName, deadline) {
-            const subject = `НАЗНАЧЕНИЕ: ЛН ${nsData.nsNumber} - Требуются корректирующие действия`;
-            
+            const subject = `НАЗНАЧЕНИЕ: ЛН ${nsData.nsNumber}`;
+            const currentUrl = window.location.origin + window.location.pathname;
+
             const emailBody = `
 УВАЖАЕМЫЙ ${responsibleName}!
 
-📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ ДЛЯ РЕШЕНИЯ
+📋 ВАМ НАЗНАЧЕН ЛИСТ НЕСООТВЕТСТВИЯ
 
 Номер ЛН: ${nsData.nsNumber}
-Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}
-Подразделение: ${nsData.department || 'Не указано'}
-Рабочее место: ${nsData.location || 'Не указано'}
-Заявитель: ${nsData.applicant || 'Не указан'}
-
 📅 СРОК ИСПОЛНЕНИЯ: ${deadline ? new Date(deadline).toLocaleDateString('ru-RU') : 'Не установлен'}
 
-📝 ОПИСАНИЕ ПРОБЛЕМЫ:
+📝 ОПИСАНИЕ:
 ${nsData.description || 'Не указано'}
 
-⚠️ ТРЕБУЕТСЯ:
-1. Проанализировать проблему
-2. Разработать корректирующие действия
-3. Связаться с менеджером СМК
-4. Выполнить в установленный срок
-
-📞 Контакт для связи: Менеджер СМК
+🔗 ССЫЛКА НА СИСТЕМУ:
+${currentUrl}
 
 ---
 Система управления качеством ФАРМСТИЛ
-ISO 13485 Workflow
-${new Date().toLocaleDateString('ru-RU')}
             `.trim();
             
             sendEmail(responsibleEmail, subject, emailBody);
@@ -1367,6 +1359,7 @@ ${new Date().toLocaleDateString('ru-RU')}
                 showNotification('ЛН возвращен на доработку', 'success');
                 closeModal();
                 loadPendingCount();
+                if(document.getElementById('listNSPage').classList.contains('active')) loadNSList();
             }
         }
         
@@ -1413,11 +1406,9 @@ ${new Date().toLocaleDateString('ru-RU')}
                 <p>${ns.description || 'Не указано'}</p>
                 
                 ${photosHTML}
-                
                 ${workflowHTML}
                 
                 <div class="action-buttons" style="margin-top: 30px;">
-                    <button class="btn btn-primary" onclick="printNS(${index})">🖨️ Печать</button>
                     <button class="btn btn-danger" onclick="closeModal()">Закрыть</button>
                 </div>
             `;
@@ -1533,14 +1524,14 @@ ${new Date().toLocaleDateString('ru-RU')}
         }
         
         function clearAllData() {
-            if (confirm('ВНИМАНИЕ! Вы собираетесь удалить ВСЕ данные. Это действие нельзя отменить. Продолжить?')) {
+            if (confirm('Удалить ВСЕ данные?')) {
                 localStorage.removeItem('farmstil_ns');
                 localStorage.removeItem('farmstil_responsibles');
                 localStorage.removeItem('farmstil_executors');
                 localStorage.removeItem('farmstil_qrcodes');
                 
                 initDirectories();
-                showNotification('Все данные очищены', 'success');
+                showNotification('Данные очищены', 'success');
                 loadDirectories();
                 updateStats();
                 loadPendingCount();
@@ -1549,56 +1540,28 @@ ${new Date().toLocaleDateString('ru-RU')}
         
         function exportToCSV() {
             const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            if (nsList.length === 0) return;
             
-            if (nsList.length === 0) {
-                showNotification('Нет данных для экспорта', 'warning');
-                return;
-            }
-            
-            const headers = ['Номер ЛН', 'Дата создания', 'Подразделение', 'Место', 'Заявитель', 'Телефон', 'Тип', 'Описание', 'Статус', 'Ответственный', 'Срок', 'Дата закрытия'];
-            
-            const csvRows = [];
-            csvRows.push(headers.join(';'));
+            const headers = ['Номер ЛН', 'Дата', 'Цех', 'Заявитель', 'Статус'];
+            const csvRows = [headers.join(';')];
             
             nsList.forEach(ns => {
-                const row = [
-                    ns.nsNumber || '',
-                    ns.created ? new Date(ns.created).toLocaleDateString('ru-RU') : '',
-                    ns.department || '',
-                    ns.location || '',
-                    ns.applicant || '',
-                    ns.applicantPhone || '',
-                    getNSTypeText(ns.nsType),
-                    ns.description ? `"${ns.description.replace(/"/g, '""').substring(0, 100)}"` : '',
-                    getStatusText(ns.status),
-                    ns.responsiblePerson || '',
-                    ns.deadline || '',
-                    ns.closedDate ? new Date(ns.closedDate).toLocaleDateString('ru-RU') : ''
-                ];
-                csvRows.push(row.join(';'));
+                csvRows.push([ns.nsNumber, new Date(ns.created).toLocaleDateString(), ns.department, ns.applicant, getStatusText(ns.status)].join(';'));
             });
             
-            const csvContent = csvRows.join('\n');
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
+            const blob = new Blob(['\uFEFF' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
-            link.href = url;
-            link.download = `farmstil_export_${new Date().toISOString().split('T')[0]}.csv`;
+            link.href = URL.createObjectURL(blob);
+            link.download = `export_${new Date().toISOString().split('T')[0]}.csv`;
             link.click();
-            
-            showNotification(`Экспортировано ${nsList.length} записей в CSV`, 'success');
         }
         
         function showNotification(message, type = 'success', duration = 3000) {
             const notification = document.getElementById('notification');
             if (!notification) return;
-            
             notification.textContent = message;
-            notification.className = 'notification';
-            if (type === 'error') notification.classList.add('error');
+            notification.className = 'notification' + (type === 'error' ? ' error' : '');
             notification.style.display = 'block';
-            
             setTimeout(() => notification.style.display = 'none', duration);
         }
         
@@ -1624,8 +1587,11 @@ ${new Date().toLocaleDateString('ru-RU')}
         window.restoreData = restoreData;
         window.clearAllData = clearAllData;
         window.exportToCSV = exportToCSV;
+        window.viewNSByID = viewNSByID;
+        window.reviewNSByID = reviewNSByID;
+        window.assignResponsible = assignResponsible;
+        window.rejectNS = rejectNS;
         
-        console.log('✅ Все функции экспортированы');
     </script>
 </body>
 </html>
