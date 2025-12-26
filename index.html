@@ -4,222 +4,1686 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ФАРМСТИЛ - Система управления несоответствиями ISO 13485</title>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
     <style>
-        /* Весь ваш оригинальный CSS полностью сохранен */
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 10px; }
-        .container { max-width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; }
-        #qrPreview { margin-top: 20px; padding: 20px; border: 2px dashed #ddd; display: none; text-align: center; }
-        .header { background: #1e3c72; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .nav-tabs { display: flex; background: #f8f9fa; border-bottom: 1px solid #dee2e6; }
-        .nav-tab { padding: 15px 25px; cursor: pointer; border: none; background: none; font-weight: 600; color: #666; transition: 0.3s; }
-        .nav-tab.active { color: #1e3c72; border-bottom: 3px solid #1e3c72; background: white; }
-        .page { display: none; padding: 20px; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        /* QR код стили */
+        #qrPreview {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+            display: none;
+        }
+        
+        .qr-container {
+            display: inline-block;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #1e3c72;
+            margin: 10px 0;
+        }
+        
+        .notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            background: white;
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            border-left: 5px solid #28a745;
+            text-align: center;
+        }
+        
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 10px;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e3c72;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .ln-card {
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+        }
+        
+        .ln-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .ln-number {
+            font-weight: bold;
+            color: #1e3c72;
+            font-size: 18px;
+        }
+        
+        .ln-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-detected { background: #ffc107; color: #212529; }
+        .status-checking_smk { background: #17a2b8; color: white; }
+        .status-assigned { background: #6f42c1; color: white; }
+        .status-correction { background: #fd7e14; color: white; }
+        .status-checking_correction { background: #20c997; color: white; }
+        .status-execution { background: #007bff; color: white; }
+        .status-completed { background: #28a745; color: white; }
+        .status-closed { background: #6c757d; color: white; }
+        .status-rejected { background: #dc3545; color: white; }
+        
+        .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; }
+        .menu { display: flex; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); padding: 0; gap: 1px; flex-wrap: wrap; }
+        .menu-btn { padding: 12px 15px; background: white; border: none; color: #1e3c72; font-weight: bold; cursor: pointer; transition: all 0.3s ease; flex: 1; min-width: 120px; font-size: 14px; }
+        .menu-btn.active { background: #1e3c72; color: white; }
+        .menu-btn:hover { background: #f8f9fa; }
+        .page { display: none; padding: 20px; min-height: 500px; }
         .page.active { display: block; }
-        .ns-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .ns-table th, .ns-table td { padding: 12px; text-align: left; border-bottom: 1px solid #eee; }
-        .status-badge { padding: 5px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; font-weight: 600; color: #444; }
-        input, select, textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
-        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.3s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-success { background: #28a745; color: white; }
+        .form-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
+        .form-group { display: flex; flex-direction: column; width: 100%; }
+        label { margin-bottom: 6px; font-weight: 600; color: #333; font-size: 14px; }
+        input, select, textarea { padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; width: 100%; }
+        input:focus, select:focus, textarea:focus { border-color: #1e3c72; outline: none; }
+        .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin: 5px 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
         .btn-primary { background: #1e3c72; color: white; }
-        .btn-warning { background: #ffc107; color: #333; }
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
-        .modal-content { background: white; width: 90%; max-width: 600px; margin: 50px auto; border-radius: 15px; padding: 20px; max-height: 80vh; overflow-y: auto; }
-        .photo-preview-container { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
-        .photo-preview { width: 100px; height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid #ddd; }
-        .notification { position: fixed; bottom: 20px; right: 20px; padding: 15px 25px; border-radius: 8px; color: white; z-index: 2000; display: none; }
-        .sync-status { background: #e9ecef; padding: 10px 20px; border-radius: 8px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-        .workflow-step { background: #f8f9fa; border-radius: 8px; padding: 15px; margin-bottom: 10px; border-left: 4px solid #1e3c72; }
+        .btn-primary:hover { background: #2a5298; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .btn-warning { background: #ffc107; color: #212529; }
+        .btn-warning:hover { background: #e0a800; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-info { background: #17a2b8; color: white; }
+        .btn-info:hover { background: #138496; }
+        .btn-sm { padding: 8px 12px; font-size: 14px; }
+        
+        .photo-preview-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .photo-preview {
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+        
+        /* Стили для рабочего интерфейса */
+        .worker-container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .worker-header {
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        /* Справочники - исправленные стили */
+        .directory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .directory-item-info {
+            flex: 1;
+        }
+        
+        .directory-item-actions {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .directory-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .directory-input-group input {
+            flex: 1;
+        }
+        
+        /* Workflow steps */
+        .workflow-step {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 5px solid #1e3c72;
+            position: relative;
+        }
+        
+        .workflow-step.active {
+            background: #e8f4ff;
+            border-left-color: #28a745;
+        }
+        
+        .workflow-step-number {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            width: 30px;
+            height: 30px;
+            background: #1e3c72;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        
+        .workflow-step.active .workflow-step-number {
+            background: #28a745;
+        }
+        
+        @media (min-width: 768px) {
+            .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+            .btn { width: auto; }
+        }
+        
+        .ns-form-container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .form-section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #1e3c72;
+        }
+        
+        .form-section h3 {
+            color: #1e3c72;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        
+        .required::after {
+            content: " *";
+            color: #dc3545;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #1e3c72;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Стили для статуса синхронизации */
+        .sync-status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 10px;
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        
+        .sync-status.success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        
+        .sync-status.error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        
+        .sync-status.warning {
+            background: #fff3cd;
+            border-color: #ffeaa7;
+            color: #856404;
+        }
+        
+        .sync-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .sync-time {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        /* Стили для управления Google Sheets */
+        .sheets-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <div id="notification" class="notification"></div>
+    <div class="notification" id="notification"></div>
     
-    <div id="adminApp" class="container">
-        <div class="header">
-            <div><h1>ФАРМСТИЛ</h1><p>Управление несоответствиями ISO 13485</p></div>
-        </div>
-        <div class="nav-tabs">
-            <button class="nav-tab active" onclick="showPage('list')">Список ЛН</button>
-            <button class="nav-tab" onclick="showPage('generator')">Генератор QR</button>
-            <button class="nav-tab" onclick="showPage('settings')">Настройки</button>
-        </div>
-
-        <div id="listPage" class="page active">
-            <div class="sync-status">
-                <div>Последнее обновление: <strong id="lastSyncTime">Никогда</strong></div>
-                <button class="btn btn-primary" onclick="loadFromGoogleSheets()">🔄 Обновить из Google</button>
+    <div class="modal" id="statusModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle"></div>
+                <button class="modal-close" onclick="closeModal()">×</button>
             </div>
-            <table class="ns-table">
-                <thead><tr><th>№</th><th>Дата</th><th>Участок</th><th>Проблема</th><th>Статус</th><th>Действие</th></tr></thead>
-                <tbody id="nsTableBody"></tbody>
-            </table>
-        </div>
-
-        <div id="generatorPage" class="page">
-            <div class="form-group"><label>Отдел</label><input type="text" id="qrDept"></div>
-            <div class="form-group"><label>Место</label><input type="text" id="qrLoc"></div>
-            <button class="btn btn-success" onclick="generateQRCode()">Создать QR</button>
-            <div id="qrPreview"><div id="qrcode"></div><p id="qrLabel"></p></div>
-        </div>
-
-        <div id="settingsPage" class="page">
-            <div class="form-group"><label>URL Google Script</label><input type="text" id="scriptUrl"></div>
-            <button class="btn btn-primary" onclick="saveSettings()">Сохранить</button>
+            <div id="modalContent"></div>
         </div>
     </div>
-
-    <div id="workerInterface" class="container" style="display:none; padding:20px;">
-        <div id="workerContent"></div>
+    
+    <div id="workerMode" style="display: none;">
+        <div class="worker-container">
+            <div class="worker-header">
+                <h1>📝 Регистрация несоответствия ISO 13485</h1>
+                <p>ФАРМСТИЛ - Система управления качеством</p>
+            </div>
+            <div id="workerContent"></div>
+        </div>
     </div>
-
-    <div id="nsModal" class="modal">
-        <div class="modal-content"><h2 id="modalTitle"></h2><div id="modalBody"></div><button class="btn" onclick="closeModal()">Закрыть</button></div>
+    
+    <div id="fillNSMode" style="display: none;">
+        <div class="worker-container">
+            <div class="worker-header">
+                <h1>📋 Заполнение Листа Несоответствия</h1>
+                <p>ФАРМСТИЛ - Система управления качеством</p>
+            </div>
+            <div id="fillNSContent"></div>
+        </div>
+    </div>
+    
+    <div id="adminMode">
+        <div class="container">
+            <div class="header">
+                <h1>ФАРМСТИЛ - Административная панель</h1>
+                <h2>ISO 13485 Workflow + Google Sheets</h2>
+            </div>
+            
+            <div class="menu">
+                <button class="menu-btn active" onclick="showPage('generateQR')">🎯 Создать QR</button>
+                <button class="menu-btn" onclick="showPage('listNS')">📋 Все ЛН</button>
+                <button class="menu-btn" onclick="showPage('workflow')">🔄 Workflow</button>
+                <button class="menu-btn" onclick="showPage('directories')">📚 Справочники</button>
+                <button class="menu-btn" onclick="showPage('admin')">⚙️ Админ</button>
+            </div>
+            
+            <div class="page active" id="generateQRPage">
+                <h2>🎯 Генерация QR-кода для цеха</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>🏭 Подразделение:</label>
+                        <select id="qrDepartment">
+                            <option value="">Выберите подразделение</option>
+                            <option value="Цех №1">Цех №1 - Производство</option>
+                            <option value="Цех №2">Цех №2 - Сборка</option>
+                            <option value="Склад">Склад материалов</option>
+                            <option value="ОТК">Отдел технического контроля</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>📍 Рабочее место/Станок:</label>
+                        <input type="text" id="qrLocation" placeholder="Например: Станок ЧПУ-5, Стол сборки №3">
+                    </div>
+                    <div class="form-group">
+                        <label>👤 Ответственный за зону:</label>
+                        <input type="text" id="qrResponsible" placeholder="ФИО ответственного">
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="generateQRCode()">
+                    🎯 Сгенерировать QR-код
+                </button>
+                <div id="qrPreview"></div>
+            </div>
+            
+            <div class="page" id="listNSPage">
+                <h2>📋 Все Листы Несоответствий</h2>
+                <div class="form-grid">
+                    <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." onkeyup="searchNS()">
+                    <button class="btn btn-info" onclick="loadNSList(true)">🔄 Обновить список</button>
+                    <button class="btn btn-success" onclick="loadFromGoogleSheets()">🔄 Загрузить из Google Sheets</button>
+                </div>
+                <div id="syncStatus" class="sync-status">
+                    <div class="sync-info">
+                        <span>Статус синхронизации:</span>
+                        <span class="sync-time" id="lastSyncTime">Никогда</span>
+                    </div>
+                </div>
+                <div id="nsListContainer"></div>
+            </div>
+            
+            <div class="page" id="workflowPage">
+                <h2>🔄 Workflow ISO 13485</h2>
+                <div class="workflow-step active">
+                    <div class="workflow-step-number">1</div>
+                    <h3>🚨 Обнаружение несоответствия</h3>
+                    <p>Сотрудник сканирует QR, заполняет ЛН с фотографиями</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">2</div>
+                    <h3>📧 Проверка менеджера СМК</h3>
+                    <p>Менеджер проверяет полноту заполнения и назначает ответственного</p>
+                    <button class="btn btn-info" onclick="showPendingNS()">Показать ЛН на проверке (<span id="pendingCount">0</span>)</button>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">3</div>
+                    <h3>📨 Уведомление ответственного</h3>
+                    <p>Ответственный получает ссылку для заполнения ЛН</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">4</div>
+                    <h3>🛠️ Разработка решений</h3>
+                    <p>Ответственный заполняет Корректирующие действия</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">5</div>
+                    <h3>✅ Проверка и исполнение</h3>
+                    <p>Менеджер проверяет и назначает исполнителя</p>
+                </div>
+                <div class="workflow-step">
+                    <div class="workflow-step-number">6</div>
+                    <h3>📋 Закрытие и подписание</h3>
+                    <p>Закрытие ЛН, печать и подписание у руководства</p>
+                </div>
+            </div>
+            
+            <div class="page" id="directoriesPage">
+                <h2>📚 Справочники системы</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <h3>👥 Ответственные за решения</h3>
+                        <div id="responsiblesList"></div>
+                        <div class="directory-input-group">
+                            <input type="text" id="responsibleName" placeholder="ФИО ответственного" style="flex: 2;">
+                            <input type="email" id="responsibleEmail" placeholder="Email" style="flex: 2;">
+                            <button class="btn btn-success" onclick="addResponsible()" style="flex: 1;">Добавить</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <h3>👷 Исполнители</h3>
+                        <div id="executorsList"></div>
+                        <div class="directory-input-group">
+                            <input type="text" id="executorName" placeholder="ФИО исполнителя" style="flex: 2;">
+                            <input type="email" id="executorEmail" placeholder="Email" style="flex: 2;">
+                            <button class="btn btn-success" onclick="addExecutor()" style="flex: 1;">Добавить</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="page" id="adminPage">
+                <h2>⚙️ Администрирование</h2>
+                
+                <div class="sheets-controls">
+                    <button class="btn btn-success" onclick="loadFromGoogleSheets()">
+                        🔄 Загрузить из Google Sheets
+                    </button>
+                    <button class="btn btn-info" onclick="openGoogleSheets()">
+                        📊 Открыть Google Sheets
+                    </button>
+                </div>
+                
+                <div id="syncStatusAdmin" class="sync-status">
+                    <div class="sync-info">
+                        <span>Статус синхронизации:</span>
+                        <span class="sync-time" id="lastSyncTimeAdmin">Никогда</span>
+                    </div>
+                </div>
+                
+                <div id="statsGrid"></div>
+                
+                <h3>📁 Управление данными</h3>
+                <div class="form-grid">
+                    <button class="btn btn-primary" onclick="backupData()">💾 Резервная копия</button>
+                    <button class="btn btn-info" onclick="restoreData()">🔄 Восстановить</button>
+                    <button class="btn btn-warning" onclick="clearAllData()">🗑️ Очистить все</button>
+                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт ЛН в CSV</button>
+                </div>
+                
+                <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px;">
+                    <h3>📊 Статистика системы</h3>
+                    <div id="systemStats"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
-        // ИСПРАВЛЕННАЯ ЛОГИКА (БЕЗ УРЕЗАНИЯ)
-        const WORKFLOW_STATUSES = { DETECTED: 'detected', CLOSED: 'closed' };
-        let workerCapturedPhotos = [];
-
-        // 1. ПОЧИНИЛИ ФОТО (сохранение в Base64)
-        function handleWorkerPhotos(event) {
-            const preview = document.getElementById('workerPhotoPreview');
-            preview.innerHTML = '';
-            workerCapturedPhotos = [];
-            Array.from(event.target.files).slice(0, 2).forEach(file => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    workerCapturedPhotos.push(e.target.result);
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'photo-preview';
-                    preview.appendChild(img);
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // 2. УДАЛИЛИ ТЕЛЕФОН ИЗ ОТПРАВКИ И ФОРМЫ
-        function showWorkerFormFromURL(dept, loc) {
-            document.getElementById('workerContent').innerHTML = `
-                <h2>Регистрация проблемы</h2>
-                <p>📍 ${dept} | ${loc}</p>
-                <form onsubmit="event.preventDefault(); submitWorkerForm('${dept}','${loc}');">
-                    <div class="form-group"><label>ФИО *</label><input type="text" id="wApplicant" required></div>
-                    <div class="form-group"><label>Должность *</label><input type="text" id="wPos" required></div>
-                    <div class="form-group"><label>Что случилось? *</label><input type="text" id="wTitle" required></div>
-                    <div class="form-group"><label>Описание</label><textarea id="wDesc" rows="4"></textarea></div>
-                    <div class="form-group">
-                        <label>Фото (макс 2)</label>
-                        <input type="file" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
-                        <div id="workerPhotoPreview" class="photo-preview-container"></div>
-                    </div>
-                    <button type="submit" class="btn btn-success" style="width:100%">ОТПРАВИТЬ ЛН</button>
-                </form>
-            `;
-        }
-
-        async function submitWorkerForm(dept, loc) {
-            const nsData = {
-                id: 'ns_' + Date.now(),
-                nsNumber: 'ЛН-' + Math.floor(1000 + Math.random() * 9000),
-                created: new Date().toISOString(),
-                department: dept,
-                location: loc,
-                applicant: document.getElementById('wApplicant').value,
-                applicantPosition: document.getElementById('wPos').value,
-                nsTitle: document.getElementById('wTitle').value,
-                description: document.getElementById('wDesc').value,
-                photos: workerCapturedPhotos, // Фото теперь сохраняются
-                status: 'detected'
-            };
-
-            const list = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            list.push(nsData);
-            localStorage.setItem('farmstil_ns', JSON.stringify(list));
-            localStorage.setItem('farmstil_last_sync', new Date().toISOString());
-
-            // Отправка текста в Google (фото не шлем в URL, чтобы не было ошибки)
-            const url = localStorage.getItem('farmstil_google_url');
-            if(url) {
-                const syncData = {...nsData, photos: []}; 
-                fetch(`${url}?action=add_ns&data=${encodeURIComponent(JSON.stringify({nsData: syncData}))}`, {mode:'no-cors'});
-            }
-            alert('ЛН успешно зарегистрирован!');
-            location.search = ''; 
-        }
-
-        // 3. ПОЛНЫЙ ФУНКЦИОНАЛ СПИСКА И QR
-        function loadNSList() {
-            const list = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const tbody = document.getElementById('nsTableBody');
-            tbody.innerHTML = '';
-            list.reverse().forEach(ns => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${ns.nsNumber}</td><td>${new Date(ns.created).toLocaleDateString()}</td><td>${ns.department}</td><td>${ns.nsTitle}</td><td>${ns.status}</td><td><button class="btn btn-primary" onclick="viewNSByID('${ns.id}')">Открыть</button></td>`;
-                tbody.appendChild(tr);
-            });
+        // ============================================
+        // КОНСТАНТЫ И КОНФИГУРАЦИЯ
+        // ============================================
+        
+        const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
+        const SMK_MANAGER_EMAIL = 'finkart23@mail.ru';
+        const KLIMA_EMAIL = 'NC-FL@outlook.com';
+        const APP_NAME = 'farmstil_ns_system';
+        
+        // ============================================
+        // GOOGLE SHEETS API КОНФИГУРАЦИЯ
+        // ============================================
+        
+        const GOOGLE_SHEETS_CONFIG = {
+            SPREADSHEET_ID: '1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU',
+            SHEET_NAME: 'ЛН_ISO13485',
+            // Веб-приложение Google Apps Script
+            WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzC-ySCf4MqMDd1Kl_DHPgfz8Q7OhgLNKtMQv2E1XzHHZc2G7S1isL7ubWt7xcdclEC/exec'
+        };
+        
+        const WORKFLOW_STATUSES = {
+            DETECTED: 'detected',
+            CHECKING_SMK: 'checking_smk',
+            ASSIGNED: 'assigned',
+            CORRECTION: 'correction',
+            CHECKING_CORRECTION: 'checking_correction',
+            EXECUTION: 'execution',
+            COMPLETED: 'completed',
+            CLOSED: 'closed',
+            REJECTED: 'rejected'
+        };
+        
+        let currentQRData = null;
+        let photos = [];
+        let currentEditingNS = null;
+        let currentNSData = null;
+        
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
+            
+            initDirectories();
+            checkMode();
+            loadDirectories();
+            updateStats();
+            loadPendingCount();
             updateLastSyncTime();
+            
+            console.log('✅ Система готова к работе');
+        });
+        
+        function initDirectories() {
+            if (!localStorage.getItem('farmstil_responsibles')) {
+                const defaultResponsibles = [
+                    { id: 1, name: "Иванов И.И.", email: KLIMA_EMAIL, role: "Начальник цеха" },
+                    { id: 2, name: "Петров П.П.", email: KLIMA_EMAIL, role: "Главный технолог" },
+                    { id: 3, name: "Климов", email: KLIMA_EMAIL, role: "Ответственный по качеству" }
+                ];
+                localStorage.setItem('farmstil_responsibles', JSON.stringify(defaultResponsibles));
+            }
+            
+            if (!localStorage.getItem('farmstil_executors')) {
+                const defaultExecutors = [
+                    { id: 1, name: "Смирнов А.А.", email: KLIMA_EMAIL, department: "Цех №1" },
+                    { id: 2, name: "Кузнецов Б.Б.", email: KLIMA_EMAIL, department: "Цех №2" }
+                ];
+                localStorage.setItem('farmstil_executors', JSON.stringify(defaultExecutors));
+            }
+            
+            if (!localStorage.getItem('farmstil_ns')) {
+                localStorage.setItem('farmstil_ns', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('farmstil_qrcodes')) {
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
+            }
+            
+            if (!localStorage.getItem('farmstil_last_sync')) {
+                localStorage.setItem('farmstil_last_sync', '');
+            }
         }
-
-        function viewNSByID(id) {
-            const list = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const ns = list.find(i => i.id === id);
-            document.getElementById('modalTitle').textContent = ns.nsNumber;
-            document.getElementById('modalBody').innerHTML = `
-                <p><strong>Заявитель:</strong> ${ns.applicant}</p>
-                <p><strong>Описание:</strong> ${ns.description || 'Нет'}</p>
-                <div class="photo-preview-container">
-                    ${(ns.photos || []).map(p => `<img src="${p}" class="photo-preview" onclick="window.open('${p}')">`).join('')}
+        
+        // ============================================
+        // GOOGLE SHEETS ФУНКЦИИ (РАБОТАЮЩИЕ)
+        // ============================================
+        
+        /**
+         * Загрузка данных из Google Sheets в реальном времени
+         */
+        async function loadFromGoogleSheets() {
+            try {
+                showNotification('Загрузка данных из Google Sheets...', 'success');
+                
+                const syncStatus = document.getElementById('syncStatus') || document.getElementById('syncStatusAdmin');
+                if (syncStatus) {
+                    syncStatus.innerHTML = '<div class="sync-info"><span>Статус: ⏳ Загрузка данных...</span></div>';
+                    syncStatus.className = 'sync-status';
+                }
+                
+                // Используем прямой запрос к Google Sheets API через веб-приложение
+                const url = `${GOOGLE_SHEETS_CONFIG.WEB_APP_URL}?action=get_data&timestamp=${Date.now()}`;
+                
+                console.log('Запрашиваю данные по URL:', url);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Очищаем локальные данные и загружаем из Google Sheets
+                    localStorage.setItem('farmstil_ns', JSON.stringify(data.nsList || []));
+                    
+                    // Обновляем интерфейс
+                    loadNSList();
+                    updateSystemStats();
+                    
+                    // Сохраняем время синхронизации
+                    localStorage.setItem('farmstil_last_sync', new Date().toISOString());
+                    updateLastSyncTime();
+                    
+                    if (syncStatus) {
+                        syncStatus.innerHTML = `
+                            <div class="sync-info">
+                                <span>✅ Данные успешно загружены из Google Sheets!</span>
+                                <span class="sync-time">${new Date().toLocaleTimeString('ru-RU')}</span>
+                            </div>
+                            <div style="margin-top: 10px; font-size: 12px;">
+                                Загружено ${data.nsList?.length || 0} записей
+                            </div>
+                        `;
+                        syncStatus.className = 'sync-status success';
+                    }
+                    
+                    showNotification(`Загружено ${data.nsList?.length || 0} записей из Google Sheets`, 'success');
+                    
+                } else {
+                    throw new Error(data.error || 'Ошибка загрузки данных');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка загрузки данных:', error);
+                
+                const syncStatus = document.getElementById('syncStatus') || document.getElementById('syncStatusAdmin');
+                if (syncStatus) {
+                    syncStatus.innerHTML = `
+                        <div class="sync-info">
+                            <span>❌ Ошибка загрузки данных</span>
+                            <span class="sync-time">${new Date().toLocaleTimeString('ru-RU')}</span>
+                        </div>
+                        <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                            ${error.message}<br>
+                            Проверьте настройки Google Apps Script
+                        </div>
+                    `;
+                    syncStatus.className = 'sync-status error';
+                }
+                
+                showNotification('Ошибка загрузки данных: ' + error.message, 'error');
+            }
+        }
+        
+        /**
+         * Добавление нового ЛН в Google Sheets
+         */
+        async function addNSToGoogleSheets(nsData) {
+            try {
+                console.log('Добавляю ЛН в Google Sheets:', nsData.nsNumber);
+                
+                // Подготавливаем данные для отправки
+                const dataToSend = {
+                    action: 'add_ns',
+                    nsData: {
+                        ...nsData,
+                        // Не отправляем фото в Google Sheets (только ссылки)
+                        photos: nsData.photos ? nsData.photos.map(photo => ({
+                            name: photo.name,
+                            hasPhoto: true,
+                            timestamp: photo.timestamp
+                        })) : []
+                    }
+                };
+                
+                const url = `${GOOGLE_SHEETS_CONFIG.WEB_APP_URL}?action=add_ns&data=${encodeURIComponent(JSON.stringify(dataToSend))}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('ЛН успешно добавлен в Google Sheets:', nsData.nsNumber);
+                    return true;
+                } else {
+                    throw new Error(result.error || 'Ошибка добавления ЛН');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка добавления ЛН в Google Sheets:', error);
+                
+                // Сохраняем в локальное хранилище для повторной попытки
+                saveToLocalQueue('ns', nsData);
+                
+                return false;
+            }
+        }
+        
+        /**
+         * Обновление ЛН в Google Sheets
+         */
+        async function updateNSInGoogleSheets(nsData) {
+            try {
+                const dataToSend = {
+                    action: 'update_ns',
+                    nsData: {
+                        ...nsData,
+                        photos: nsData.photos ? nsData.photos.map(photo => ({
+                            name: photo.name,
+                            hasPhoto: true
+                        })) : []
+                    }
+                };
+                
+                const url = `${GOOGLE_SHEETS_CONFIG.WEB_APP_URL}?action=update_ns&data=${encodeURIComponent(JSON.stringify(dataToSend))}`;
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ошибка: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    console.log('ЛН успешно обновлен в Google Sheets:', nsData.nsNumber);
+                    return true;
+                } else {
+                    throw new Error(result.error || 'Ошибка обновления ЛН');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка обновления ЛН в Google Sheets:', error);
+                saveToLocalQueue('update_ns', nsData);
+                return false;
+            }
+        }
+        
+        /**
+         * Сохранение в локальную очередь для повторной отправки
+         */
+        function saveToLocalQueue(type, data) {
+            const queue = JSON.parse(localStorage.getItem('farmstil_sync_queue') || '[]');
+            queue.push({
+                type: type,
+                data: data,
+                timestamp: new Date().toISOString(),
+                attempts: 0
+            });
+            localStorage.setItem('farmstil_sync_queue', JSON.stringify(queue));
+            console.log('Данные сохранены в очередь:', type, data.nsNumber);
+        }
+        
+        /**
+         * Открытие Google Sheets в новой вкладке
+         */
+        function openGoogleSheets() {
+            const sheetsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID}/edit`;
+            window.open(sheetsUrl, '_blank');
+            showNotification('Открываю Google Sheets...', 'success');
+        }
+        
+        /**
+         * Обновление времени последней синхронизации
+         */
+        function updateLastSyncTime() {
+            const lastSync = localStorage.getItem('farmstil_last_sync');
+            const elements = [
+                document.getElementById('lastSyncTime'),
+                document.getElementById('lastSyncTimeAdmin')
+            ];
+            
+            elements.forEach(el => {
+                if (el) {
+                    if (lastSync) {
+                        const date = new Date(lastSync);
+                        el.textContent = date.toLocaleString('ru-RU');
+                    } else {
+                        el.textContent = 'Никогда';
+                    }
+                }
+            });
+        }
+        
+        // ============================================
+        // QR-КОДЫ
+        // ============================================
+        
+        function generateQRCode() {
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocation').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            if (!department || !location) {
+                showNotification('Заполните обязательные поля: Подразделение и Место', 'error');
+                return;
+            }
+            
+            const code = `FS-${Date.now().toString().slice(-8)}`;
+            const currentUrl = window.location.origin + window.location.pathname;
+            
+            // Создаем URL с параметрами в GET-запросе
+            const qrUrl = `${currentUrl}?mode=worker&department=${encodeURIComponent(department)}&location=${encodeURIComponent(location)}&code=${code}&responsible=${encodeURIComponent(responsible || '')}`;
+            
+            currentQRData = {
+                code: code,
+                department: department,
+                location: location,
+                responsible: responsible,
+                url: qrUrl,
+                created: new Date().toISOString()
+            };
+            
+            // Сохраняем QR код для истории
+            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            qrcodes.push(currentQRData);
+            localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+            
+            displayQRCode(qrUrl, code, department, location, responsible);
+            showNotification('QR-код успешно создан!', 'success');
+        }
+        
+        function displayQRCode(qrUrl, code, department, location, responsible) {
+            const qrcodeDiv = document.getElementById('qrPreview');
+            qrcodeDiv.innerHTML = '';
+            
+            const qrContainer = document.createElement('div');
+            qrContainer.className = 'qr-container';
+            
+            const qrCodeDiv = document.createElement('div');
+            qrCodeDiv.id = 'qrcode-' + Date.now();
+            qrContainer.appendChild(qrCodeDiv);
+            qrcodeDiv.appendChild(qrContainer);
+            
+            try {
+                if (typeof QRCode !== 'undefined') {
+                    new QRCode(qrCodeDiv, {
+                        text: qrUrl,
+                        width: 200,
+                        height: 200,
+                        colorDark: "#1e3c72",
+                        colorLight: "#ffffff",
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+                } else {
+                    throw new Error('Библиотека QRCode не загружена');
+                }
+            } catch (error) {
+                console.error('Ошибка генерации QR:', error);
+                qrCodeDiv.innerHTML = `
+                    <div style="width: 200px; height: 200px; background: #1e3c72; color: white; 
+                         display: flex; align-items: center; justify-content: center; border-radius: 10px; margin: 0 auto;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 24px; font-weight: bold;">QR</div>
+                            <div style="font-size: 14px; margin-top: 10px;">${code}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            qrcodeDiv.innerHTML += `
+                <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                    <p><strong>Подразделение:</strong> ${department}</p>
+                    <p><strong>Место:</strong> ${location}</p>
+                    ${responsible ? `<p><strong>Ответственный за зону:</strong> ${responsible}</p>` : ''}
+                    <p><strong>Код:</strong> <code>${code}</code></p>
+                    <p><strong>Ссылка:</strong> <small style="word-break: break-all; color: #666;">${qrUrl}</small></p>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать</button>
+                        <button class="btn btn-info" onclick="testWorkerLink('${qrUrl}')">📱 Тест</button>
+                    </div>
                 </div>
             `;
-            document.getElementById('nsModal').style.display = 'block';
+            
+            qrcodeDiv.style.display = 'block';
         }
-
-        function generateQRCode() {
-            const dept = document.getElementById('qrDept').value;
-            const loc = document.getElementById('qrLoc').value;
-            const url = `${window.location.origin}${window.location.pathname}?dept=${encodeURIComponent(dept)}&loc=${encodeURIComponent(loc)}`;
-            const qrCont = document.getElementById('qrcode');
-            qrCont.innerHTML = '';
-            new QRCode(qrCont, url);
-            document.getElementById('qrPreview').style.display = 'block';
-            document.getElementById('qrLabel').textContent = dept + ' - ' + loc;
+        
+        function testWorkerLink(url) {
+            window.open(url, '_blank');
         }
-
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(id + 'Page').classList.add('active');
+        
+        function printQRCode() {
+            if (!currentQRData) return;
+            
+            const printContent = `
+                <html>
+                <head>
+                    <title>QR код - ${currentQRData.department}</title>
+                    <style>
+                        body { font-family: Arial; text-align: center; padding: 40px; }
+                        h1 { color: #1e3c72; margin-bottom: 20px; }
+                        .info { margin: 20px 0; font-size: 16px; text-align: left; }
+                        @media print { 
+                            body { padding: 20px; }
+                            .no-print { display: none; }
+                        }
+                    </style>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
+                </head>
+                <body>
+                    <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
+                    
+                    <div class="info">
+                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
+                        <p><strong>Место:</strong> ${currentQRData.location}</p>
+                        ${currentQRData.responsible ? `<p><strong>Ответственный за зону:</strong> ${currentQRData.responsible}</p>` : ''}
+                        <p><strong>Код:</strong> ${currentQRData.code}</p>
+                    </div>
+                    
+                    <div id="qrcode" style="margin: 20px auto; width: 300px; height: 300px;"></div>
+                    <p style="margin-top: 20px; font-size: 14px;">Отсканируйте для регистрации несоответствия</p>
+                    
+                    <p class="no-print" style="color: #666; font-size: 12px; margin-top: 30px;">
+                        Сгенерировано: ${new Date().toLocaleString('ru-RU')}
+                    </p>
+                    
+                    <script>
+                        setTimeout(function() {
+                            try {
+                                new QRCode(document.getElementById('qrcode'), {
+                                    text: '${currentQRData.url}',
+                                    width: 300,
+                                    height: 300,
+                                    colorDark: "#1e3c72",
+                                    colorLight: "#ffffff"
+                                });
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            } catch(e) {
+                                document.getElementById('qrcode').innerHTML = 
+                                    '<div style="width: 300px; height: 300px; background: #1e3c72; color: white; ' +
+                                    'display: flex; align-items: center; justify-content: center; margin: 0 auto;">' +
+                                    '<div style="text-align: center;">' +
+                                    '<div style="font-size: 32px; font-weight: bold;">QR</div>' +
+                                    '<div style="font-size: 16px;">${currentQRData.code}</div>' +
+                                    '</div></div>';
+                                setTimeout(function() {
+                                    window.print();
+                                    setTimeout(function() { window.close(); }, 500);
+                                }, 500);
+                            }
+                        }, 100);
+                    <\/script>
+                </body>
+                </html>
+            `;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(printContent);
+            printWindow.document.close();
         }
-
-        function updateLastSyncTime() {
-            const last = localStorage.getItem('farmstil_last_sync');
-            document.getElementById('lastSyncTime').textContent = last ? new Date(last).toLocaleString() : 'Никогда';
-        }
-
-        function saveSettings() {
-            localStorage.setItem('farmstil_google_url', document.getElementById('scriptUrl').value);
-            alert('Настройки сохранены');
-        }
-
-        function closeModal() { document.getElementById('nsModal').style.display = 'none'; }
-
-        window.onload = () => {
-            const params = new URLSearchParams(window.location.search);
-            if(params.has('dept')) {
-                document.getElementById('adminApp').style.display = 'none';
-                document.getElementById('workerInterface').style.display = 'block';
-                showWorkerFormFromURL(params.get('dept'), params.get('loc'));
-            } else {
-                document.getElementById('scriptUrl').value = localStorage.getItem('farmstil_google_url') || '';
-                loadNSList();
+        
+        // ============================================
+        // РЕЖИМЫ РАБОТЫ СИСТЕМЫ
+        // ============================================
+        
+        function checkMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const department = urlParams.get('department');
+            const location = urlParams.get('location');
+            const code = urlParams.get('code');
+            const responsible = urlParams.get('responsible');
+            const linkId = urlParams.get('linkId');
+            const nsId = urlParams.get('nsId');
+            
+            if (mode === 'worker' && department && location) {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
+                document.getElementById('fillNSMode').style.display = 'none';
+                showWorkerFormFromURL(department, location, code, responsible);
+            } 
+            else if (mode === 'fillNS' && linkId && nsId) {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'none';
+                document.getElementById('fillNSMode').style.display = 'block';
+                showResponsibleForm(linkId, nsId);
             }
-        };
+            else {
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
+                document.getElementById('fillNSMode').style.display = 'none';
+                showPage('generateQR');
+            }
+        }
+        
+        function showWorkerFormFromURL(department, location, code, responsible) {
+            const html = `
+                <div class="ns-form-container">
+                    <h2>🚨 Регистрация несоответствия</h2>
+                    
+                    <div class="form-section">
+                        <h3>📍 Место обнаружения</h3>
+                        <p><strong>Подразделение:</strong> ${decodeURIComponent(department)}</p>
+                        <p><strong>Рабочее место:</strong> ${decodeURIComponent(location)}</p>
+                        ${responsible ? `<p><strong>Ответственный за зону:</strong> ${decodeURIComponent(responsible)}</p>` : ''}
+                        ${code ? `<p><strong>Код QR:</strong> ${code}</p>` : ''}
+                    </div>
+                    
+                    <form id="workerForm" onsubmit="event.preventDefault(); submitWorkerForm('${department}', '${location}', '${code || ''}', '${responsible || ''}');">
+                        <div class="form-section">
+                            <h3>👤 Информация о заявителе</h3>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="required">ФИО:</label>
+                                    <input type="text" id="workerApplicant" placeholder="Иванов Иван Иванович" required>
+                                </div>
+                                <div class="form-group">
+                                    <label class="required">Должность:</label>
+                                    <input type="text" id="workerPosition" placeholder="Оператор станка" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>📋 Описание несоответствия</h3>
+                            <div class="form-group">
+                                <label class="required">Тип несоответствия:</label>
+                                <select id="workerNsType" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="product">Несоответствие продукции</option>
+                                    <option value="process">Несоответствие процесса</option>
+                                    <option value="equipment">Неисправность оборудования</option>
+                                    <option value="safety">Нарушение безопасности</option>
+                                    <option value="documentation">Ошибка в документации</option>
+                                    <option value="material">Несоответствие материала</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Краткое описание:</label>
+                                <input type="text" id="workerTitle" placeholder="Краткое описание проблемы" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label class="required">Подробное описание:</label>
+                                <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины..." required></textarea>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <h3>📷 Доказательная база</h3>
+                            <div class="form-group">
+                                <label>Фотографии (макс. 2, опционально):</label>
+                                <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
+                                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                                    Можно сделать фото общего плана и деталей проблемы<br>
+                                    <strong>Важно:</strong> Фото будут сохранены в системе
+                                </p>
+                                <div id="workerPhotoPreview" class="photo-preview-container"></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Номер партии/изделия:</label>
+                                <input type="text" id="workerBatch" placeholder="При наличии">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label>Влияние на процесс/продукцию:</label>
+                                <textarea id="workerImpact" rows="3" placeholder="Опишите влияние на качество продукции или процесс производства"></textarea>
+                            </div>
+                        </div>
+                        
+                        <div id="uploadStatus" style="display: none;"></div>
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="submit" class="btn btn-success" style="padding: 15px 40px; font-size: 18px;">
+                                📤 Отправить Лист Несоответствия
+                            </button>
+                            <p style="font-size: 12px; color: #666; margin-top: 10px;">
+                                Данные автоматически сохранятся в Google Sheets
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            `;
+            
+            document.getElementById('workerContent').innerHTML = html;
+        }
+        
+        function handleWorkerPhotos(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('workerPhotoPreview');
+            
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            photos = [];
+            
+            for (let i = 0; i < Math.min(files.length, 2); i++) {
+                const file = files[i];
+                
+                // Проверяем размер файла (максимум 1MB)
+                if (file.size > 1 * 1024 * 1024) {
+                    showNotification(`Файл ${file.name} слишком большой (макс. 1MB)`, 'error');
+                    continue;
+                }
+                
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    // Сжимаем изображение
+                    compressImage(e.target.result, 600, 0.6).then(compressedData => {
+                        photos.push({
+                            name: file.name,
+                            data: compressedData,
+                            type: file.type,
+                            size: compressedData.length,
+                            timestamp: Date.now()
+                        });
+                        
+                        const img = document.createElement('img');
+                        img.src = compressedData;
+                        img.className = 'photo-preview';
+                        preview.appendChild(img);
+                    });
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        // Функция сжатия изображения
+        function compressImage(dataUrl, maxWidth, quality) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.src = dataUrl;
+                
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    // Изменяем размер если нужно
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    // Получаем сжатое изображение
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                    resolve(compressedDataUrl);
+                };
+                
+                img.onerror = function() {
+                    resolve(dataUrl); // Возвращаем оригинал если ошибка
+                };
+            });
+        }
+        
+        async function submitWorkerForm(department, location, code, responsible) {
+            const applicant = document.getElementById('workerApplicant').value;
+            const position = document.getElementById('workerPosition').value;
+            const nsType = document.getElementById('workerNsType').value;
+            const title = document.getElementById('workerTitle').value;
+            const description = document.getElementById('workerDescription').value;
+            const batch = document.getElementById('workerBatch').value;
+            const impact = document.getElementById('workerImpact').value;
+            
+            if (!applicant || !position || !nsType || !title || !description) {
+                showNotification('Заполните все обязательные поля', 'error');
+                return;
+            }
+            
+            // Показываем статус загрузки
+            const uploadStatus = document.getElementById('uploadStatus');
+            if (uploadStatus) {
+                uploadStatus.innerHTML = '<div class="sync-status"><div class="sync-info"><span>⏳ Отправка ЛН в Google Sheets...</span></div></div>';
+                uploadStatus.style.display = 'block';
+            }
+            
+            // Блокируем форму
+            const submitBtn = document.querySelector('#workerForm button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Отправка...';
+            }
+            
+            try {
+                const nsData = {
+                    id: 'ns_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    nsNumber: generateNSNumber(),
+                    created: new Date().toISOString(),
+                    department: decodeURIComponent(department),
+                    location: decodeURIComponent(location),
+                    qrCode: code || '',
+                    zoneResponsible: responsible ? decodeURIComponent(responsible) : '',
+                    applicant: applicant,
+                    applicantPosition: position,
+                    nsType: nsType,
+                    nsTitle: title,
+                    description: description,
+                    batchNumber: batch,
+                    impact: impact,
+                    photos: photos, // Фото сохраняем локально
+                    photoCount: photos.length,
+                    status: WORKFLOW_STATUSES.DETECTED,
+                    workflow: [{
+                        step: 1,
+                        action: 'detected',
+                        user: applicant,
+                        date: new Date().toISOString(),
+                        comment: `Несоответствие зарегистрировано сотрудником ${applicant} (${position})`
+                    }]
+                };
+                
+                // 1. Отправляем ЛН в Google Sheets
+                const sheetsResult = await addNSToGoogleSheets(nsData);
+                
+                // 2. Сохраняем в локальное хранилище (для фото)
+                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                nsList.push(nsData);
+                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                
+                // 3. Отправляем уведомление менеджеру СМК
+                sendFirstNotificationToSMKManager(nsData);
+                
+                // Экран успеха
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #28a745;">✅</div>
+                        <h2>Лист несоответствия успешно отправлен!</h2>
+                        <div style="background: #f8f9fa; padding: 20px; border-radius: 10px; margin: 30px auto; max-width: 500px;">
+                            <p style="font-size: 18px; margin: 10px 0;"><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
+                            <p style="color: #666; margin: 10px 0;">Дата регистрации: ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
+                            <p style="color: #666; margin: 10px 0;">Подразделение: ${nsData.department}</p>
+                            <p style="color: #666; margin: 10px 0;">Заявитель: ${nsData.applicant}</p>
+                            <p style="color: #666; margin: 10px 0;">Количество фото: ${nsData.photoCount}</p>
+                            <p style="color: ${sheetsResult ? '#28a745' : '#ffc107'};">${sheetsResult ? '✅ Данные отправлены в Google Sheets' : '⚠️ Данные сохранены локально, будет отправлено позже'}</p>
+                        </div>
+                        <p style="color: #666; margin: 20px 0;">
+                            ✅ ЛН зарегистрирован в системе<br>
+                            📧 Менеджер СМК уведомлен о новом ЛН<br>
+                            ⏳ Ожидайте назначения ответственного
+                        </p>
+                        <button class="btn btn-primary" onclick="window.close();" style="margin-top: 20px;">
+                            Закрыть окно
+                        </button>
+                    </div>
+                `;
+                
+                showNotification(`ЛН ${nsData.nsNumber} успешно создан! ${sheetsResult ? 'Отправлен в Google Sheets' : 'Сохранен локально'}`, 'success');
+                
+            } catch (error) {
+                console.error('Ошибка при отправке ЛН:', error);
+                
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ошибка при отправке ЛН</h2>
+                        <p style="color: #666; margin: 20px 0;">
+                            ${error.message || 'Произошла ошибка при отправке ЛН. Данные сохранены локально.'}
+                        </p>
+                        <button class="btn btn-primary" onclick="location.reload();" style="margin-top: 20px;">
+                            Попробовать снова
+                        </button>
+                    </div>
+                `;
+                
+                showNotification('Ошибка при отправке ЛН: ' + error.message, 'error');
+            }
+        }
+        
+        // ============================================
+        // АДМИН ПАНЕЛЬ
+        // ============================================
+        
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.add('active');
+                const buttons = document.querySelectorAll('.menu-btn');
+                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
+                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
+                
+                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'directories') loadDirectories();
+                if (pageId === 'admin') {
+                    updateStats();
+                    updateSystemStats();
+                }
+            }
+        }
+        
+        function loadNSList() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const container = document.getElementById('nsListContainer');
+            
+            if (!container) return;
+            
+            if (nsList.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: #666;">
+                        <h3>Листов несоответствий нет</h3>
+                        <p style="margin-top: 10px;">Нажмите "Загрузить из Google Sheets" для получения данных</p>
+                        <button class="btn btn-info" onclick="loadFromGoogleSheets()" style="margin-top: 15px;">
+                            🔄 Загрузить из Google Sheets
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Сортируем по дате создания (новые сначала)
+            nsList.sort((a, b) => new Date(b.created) - new Date(a.created));
+            
+            let html = '<div class="ln-list">';
+            
+            nsList.forEach((ns) => {
+                const statusText = getStatusText(ns.status);
+                const statusClass = `status-${ns.status.replace(/_/g, '-')}`;
+                
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status ${statusClass}">${statusText}</div>
+                        </div>
+                        <div>
+                            <p><strong>${ns.nsTitle || 'Без названия'}</strong></p>
+                            <p>${ns.department} - ${ns.location}</p>
+                            <p>📅 ${new Date(ns.created).toLocaleDateString('ru-RU')} 👤 ${ns.applicant}</p>
+                            ${ns.photoCount > 0 ? `<p>📷 Фото: ${ns.photoCount}</p>` : ''}
+                            ${ns.responsiblePerson ? `<p>👤 Ответственный: ${ns.responsiblePerson}</p>` : ''}
+                            
+                            <div class="action-buttons">
+                                <button class="btn btn-info btn-sm" onclick="viewNSByID('${ns.id}')">👁️ Просмотр</button>
+                                ${ns.status === WORKFLOW_STATUSES.DETECTED ? 
+                                    `<button class="btn btn-warning btn-sm" onclick="reviewNSByID('${ns.id}')">Проверить</button>` : 
+                                    ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+        
+        function reviewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) reviewNS(index);
+        }
+        
+        function viewNSByID(id) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const index = nsList.findIndex(item => item.id === id);
+            if (index !== -1) viewNSDetails(index);
+        }
+        
+        function reviewNS(index) {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[index];
+            
+            let photosHTML = '';
+            if (ns.photos && ns.photos.length > 0) {
+                photosHTML = '<h4>📷 Фотографии:</h4><div class="photo-preview-container">';
+                ns.photos.forEach((photo, i) => {
+                    photosHTML += `<img src="${photo.data}" class="photo-preview" style="width: 120px; height: 120px;" onclick="openPhotoModal('${photo.data}')">`;
+                });
+                photosHTML += '</div>';
+            }
+            
+            const html = `
+                <h3>${ns.nsNumber}</h3>
+                <div style="margin: 20px 0; background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                    <div><strong>Дата:</strong> ${new Date(ns.created).toLocaleString('ru-RU')}</div>
+                    <div><strong>Цех:</strong> ${ns.department}</div>
+                    <div><strong>Место:</strong> ${ns.location}</div>
+                    <div><strong>Заявитель:</strong> ${ns.applicant}</div>
+                </div>
+                
+                <h4>Описание:</h4>
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0;">
+                    <p style="margin-bottom: 10px;"><strong>Тип:</strong> ${getNSTypeText(ns.nsType)}</p>
+                    <p style="margin-bottom: 10px;"><strong>Заголовок:</strong> ${ns.nsTitle}</p>
+                    <p>${ns.description || 'Не указано'}</p>
+                </div>
+                
+                ${photosHTML}
+                
+                <div class="action-buttons" style="margin-top: 30px;">
+                    <button class="btn btn-success" onclick="approveNS(${index})">✅ Назначить ответственного</button>
+                    <button class="btn btn-danger" onclick="rejectNS(${index})">❌ Вернуть на доработку</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Проверка ЛН';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function openPhotoModal(photoData) {
+            const html = `
+                <div style="text-align: center;">
+                    <img src="${photoData}" style="max-width: 100%; max-height: 70vh; border-radius: 10px;">
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="downloadPhoto('${photoData}')">📥 Скачать</button>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Просмотр фото';
+            document.getElementById('modalContent').innerHTML = html;
+            document.getElementById('statusModal').style.display = 'flex';
+        }
+        
+        function downloadPhoto(photoData) {
+            const link = document.createElement('a');
+            link.href = photoData;
+            link.download = `photo_${Date.now()}.jpg`;
+            link.click();
+        }
+        
+        function approveNS(index) {
+            currentEditingNS = index;
+            
+            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            let options = '<option value="">Выберите ответственного</option>';
+            responsibles.forEach(r => {
+                options += `<option value="${r.id}|${r.name}|${r.email}">${r.name} (${r.email})</option>`;
+            });
+            
+            const html = `
+                <h3>Назначение ответственного</h3>
+                <p style="color: #666; margin-bottom: 15px;">Ответственный получит ссылку для заполнения ЛН</p>
+                
+                <div class="form-group" style="margin: 20px 0;">
+                    <label>Ответственный:</label>
+                    <select id="responsibleSelect" style="margin-bottom: 15px;">
+                        ${options}
+                    </select>
+                    
+                    <label>Комментарий для ответственного:</label>
+                    <textarea id="responsibleComment" rows="3" placeholder="Дополнительные указания или комментарии..."></textarea>
+                    
+                    <label>Срок заполнения (дней):</label>
+                    <select id="fillDeadline">
+                        <option value="1">1 день</option>
+                        <option value="3" selected>3 дня</option>
+                        <option value="5">5 дней</option>
+                        <option value="7">7 дней</option>
+                    </select>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn btn-success" onclick="assignResponsible()">📧 Отправить ссылку</button>
+                    <button class="btn btn-danger" onclick="closeModal()">Отмена</button>
+                </div>
+            `;
+            
+            document.getElementById('modalTitle').textContent = 'Назначение ответственного';
+            document.getElementById('modalContent').innerHTML = html;
+        }
+        
+        async function assignResponsible() {
+            if (currentEditingNS === null) return;
+            
+            const select = document.getElementById('responsibleSelect');
+            const comment = document.getElementById('responsibleComment').value;
+            const deadlineDays = document.getElementById('fillDeadline').value;
+            
+            if (!select.value) {
+                showNotification('Выберите ответственного', 'error');
+                return;
+            }
+            
+            const [id, name, email] = select.value.split('|');
+            
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const ns = nsList[currentEditingNS];
+            
+            // Генерируем уникальную ссылку для ответственного
+            const uniqueId = 'link_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            const currentUrl = window.location.origin + window.location.pathname;
+            const link = `${currentUrl}?mode=fillNS&linkId=${uniqueId}&nsId=${ns.id}`;
+            
+            ns.responsibleId = id;
+            ns.responsiblePerson = name;
+            ns.responsibleEmail = email;
+            ns.responsibleComment = comment;
+            ns.fillDeadline = deadlineDays;
+            ns.status = WORKFLOW_STATUSES.ASSIGNED;
+            ns.responsibleLink = link;
+            
+            ns.workflow.push({
+                step: 2,
+                action: 'assigned',
+                user: 'Менеджер СМК',
+                date: new Date().toISOString(),
+                comment: `Назначен ответственный: ${name}. Ссылка отправлена на ${email}`
+            });
+            
+            // 1. Обновляем локально
+            localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+            
+            // 2. Обновляем в Google Sheets
+            await updateNSInGoogleSheets(ns);
+            
+            // 3. Отправляем уведомление ответственному
+            sendNotificationToResponsible(ns, email, name, link);
+            
+            closeModal();
+            loadPendingCount();
+            loadNSList();
+            showNotification(`Ответственный назначен и уведомлен на ${email}`, 'success');
+        }
+        
+        // ============================================
+        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // ============================================
+        
+        function generateNSNumber() {
+            const year = new Date().getFullYear().toString().slice(-2);
+            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const count = nsList.filter(ns => {
+                const nsDate = new Date(ns.created);
+                return nsDate.getFullYear() === new Date().getFullYear() && 
+                       nsDate.getMonth() + 1 === new Date().getMonth() + 1;
+            }).length + 1;
+            return `ЛН-${year}${month}-${count.toString().padStart(3, '0')}`;
+        }
+        
+        function getNSTypeText(type) {
+            const typeMap = {
+                'product': 'Несоответствие продукции',
+                'process': 'Несоответствие процесса',
+                'equipment': 'Неисправность оборудования',
+                'safety': 'Нарушение безопасности',
+                'documentation': 'Ошибка в документации',
+                'material': 'Несоответствие материала',
+                'other': 'Другое'
+            };
+            return typeMap[type] || type;
+        }
+        
+        function getStatusText(status) {
+            const statusMap = {
+                [WORKFLOW_STATUSES.DETECTED]: 'ОБНАРУЖЕНО',
+                [WORKFLOW_STATUSES.CHECKING_SMK]: 'НА ПРОВЕРКЕ',
+                [WORKFLOW_STATUSES.ASSIGNED]: 'НАЗНАЧЕНО',
+                [WORKFLOW_STATUSES.CORRECTION]: 'КОРРЕКТИРОВКА',
+                [WORKFLOW_STATUSES.CHECKING_CORRECTION]: 'ПРОВЕРКА КД',
+                [WORKFLOW_STATUSES.EXECUTION]: 'ИСПОЛНЕНИЕ',
+                [WORKFLOW_STATUSES.COMPLETED]: 'ВЫПОЛНЕНО',
+                [WORKFLOW_STATUSES.CLOSED]: 'ЗАКРЫТО',
+                [WORKFLOW_STATUSES.REJECTED]: 'ВОЗВРАЩЕНО'
+            };
+            return statusMap[status] || status.toUpperCase();
+        }
+        
+        // ============================================
+        // ЭКСПОРТ ФУНКЦИЙ
+        // ============================================
+        
+        window.showPage = showPage;
+        window.generateQRCode = generateQRCode;
+        window.testWorkerLink = testWorkerLink;
+        window.printQRCode = printQRCode;
+        window.closeModal = closeModal;
+        window.reviewNSByID = reviewNSByID;
+        window.viewNSByID = viewNSByID;
+        window.handleWorkerPhotos = handleWorkerPhotos;
+        window.loadFromGoogleSheets = loadFromGoogleSheets;
+        window.openGoogleSheets = openGoogleSheets;
+        window.updateLastSyncTime = updateLastSyncTime;
+        window.loadNSList = loadNSList;
+        
     </script>
 </body>
 </html>
