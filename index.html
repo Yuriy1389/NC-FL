@@ -11,7 +11,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         // ============================================
-        // FIREBASE ИМПОРТ И КОНФИГУРАЦИЯ (МОДУЛЬ)
+        // FIREBASE ИМПОРТ И КОНФИГУРАЦИЯ
         // ============================================
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
         import { 
@@ -21,10 +21,7 @@
             getDocs, 
             query, 
             orderBy,
-            serverTimestamp,
-            doc,
-            updateDoc,
-            onSnapshot
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
         // Конфигурация Firebase
@@ -42,208 +39,308 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Экспортируем Firebase функции в глобальную область видимости
-        window.firebaseApp = app;
+        // ============================================
+        // ОПТИМИЗИРОВАННЫЕ FIREBASE ФУНКЦИИ
+        // ============================================
+
+        // Глобальные Firebase функции
         window.firebaseDB = db;
         window.firebaseServerTimestamp = serverTimestamp;
-        
-        // Firestore функции для глобального использования
+
+        // 1. Минималистичное сохранение ЛН
         window.saveNSFirestore = async function(nsData) {
             try {
-                console.log('Сохраняю ЛН в Firestore:', nsData.nsNumber);
-                
-                // Создаем упрощенную версию фотографий для Firestore
-                const simplifiedPhotos = nsData.photos ? nsData.photos.map(photo => ({
-                    name: photo.name || 'photo.jpg',
-                    size: photo.size || 0,
-                    type: photo.type || 'image/jpeg',
-                    uploaded: true
-                })) : [];
-                
-                const firestoreData = {
-                    nsNumber: nsData.nsNumber || '',
-                    created: nsData.created || new Date().toISOString(),
-                    detectionDate: nsData.detectionDate || '',
-                    department: nsData.department || 'Не указано',
-                    location: nsData.location || 'Не указано',
-                    applicant: nsData.applicant || '',
-                    applicantPhone: nsData.applicantPhone || '',
-                    nsType: nsData.nsType || '',
-                    nsTitle: nsData.nsTitle || '',
-                    description: nsData.description || '',
-                    urgency: nsData.urgency || 'medium',
-                    photos: simplifiedPhotos,
-                    photosCount: simplifiedPhotos.length,
-                    status: nsData.status || 'detected',
-                    qrCode: nsData.qrCode || '',
-                    workflow: nsData.workflow || [],
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                    firebaseSaved: true
+                // СЖАТЫЕ ДАННЫЕ для экономии квоты
+                const compressedData = {
+                    // Основные поля (сокращенные имена)
+                    n: nsData.nsNumber?.substring(0, 20) || '', // Номер
+                    d: nsData.department?.substring(0, 30) || '', // Подразделение
+                    a: nsData.applicant?.substring(0, 40) || '', // Заявитель
+                    t: nsData.nsTitle?.substring(0, 80) || '', // Название
+                    s: nsData.status || 'd', // Статус (d = detected)
+                    
+                    // Опциональные поля (только если есть значения)
+                    l: nsData.location ? nsData.location.substring(0, 40) : undefined,
+                    ty: nsData.nsType || undefined,
+                    u: nsData.urgency || undefined,
+                    q: nsData.qrCode || undefined,
+                    p: nsData.applicantPhone ? nsData.applicantPhone.substring(0, 20) : undefined,
+                    
+                    // Компрессия описания
+                    desc: nsData.description ? 
+                        nsData.description.substring(0, 300).replace(/\s+/g, ' ').trim() : undefined,
+                    
+                    // Количество фото (без самих фото для экономии)
+                    pc: nsData.photos?.length || 0,
+                    
+                    // Даты в числовом формате
+                    c: Date.now(), // created timestamp
+                    dd: nsData.detectionDate || undefined,
+                    
+                    // Технические поля
+                    ts: serverTimestamp(),
+                    v: 1 // версия формата
                 };
+
+                // УДАЛЯЕМ ПУСТЫЕ ПОЛЯ (экономия места)
+                Object.keys(compressedData).forEach(key => {
+                    if (compressedData[key] === undefined || compressedData[key] === '') {
+                        delete compressedData[key];
+                    }
+                });
+
+                console.log('📦 Сжатые данные для Firestore:', 
+                    JSON.stringify(compressedData).length + ' байт');
+
+                // Сохраняем в оптимизированную коллекцию
+                const docRef = await addDoc(collection(db, "nc"), compressedData);
                 
-                const docRef = await addDoc(collection(db, "non_conformities"), firestoreData);
-                console.log('✅ ЛН сохранен в Firestore с ID:', docRef.id);
+                console.log('✅ ЛН сохранен в Firestore:', docRef.id);
                 
                 return { 
                     success: true, 
                     id: docRef.id,
                     nsNumber: nsData.nsNumber 
                 };
+                
             } catch (error) {
-                console.error('❌ Ошибка сохранения в Firestore:', error);
+                console.error('❌ Ошибка Firestore:', error.code, error.message);
+                
+                // Специальная обработка ошибки квоты
+                if (error.code === 'resource-exhausted') {
+                    console.log('⚠️ Достигнут лимит Firebase. Сохраняю в локальную очередь.');
+                    
+                    // Сохраняем в очередь для отправки позже
+                    const pendingQueue = JSON.parse(localStorage.getItem('fb_pending') || '[]');
+                    pendingQueue.push({
+                        data: nsData,
+                        time: Date.now(),
+                        tries: 0
+                    });
+                    localStorage.setItem('fb_pending', JSON.stringify(pendingQueue));
+                    
+                    return { 
+                        success: 'queued', 
+                        message: 'Данные в очереди на отправку',
+                        nsNumber: nsData.nsNumber 
+                    };
+                }
+                
                 return { 
                     success: false, 
-                    error: error.message,
-                    code: error.code 
+                    error: error.message 
                 };
             }
         };
 
+        // 2. Загрузка ЛН с дешифровкой
         window.getAllNSFirestore = async function() {
             try {
-                console.log('Загружаю ЛН из Firestore...');
+                // Проверяем и отправляем данные из очереди
+                await processPendingQueue();
                 
-                const q = query(
-                    collection(db, "non_conformities"), 
-                    orderBy("created", "desc")
-                );
+                // Загружаем данные из Firestore
+                const q = query(collection(db, "nc"), orderBy("c", "desc"));
+                const snapshot = await getDocs(q);
                 
-                const querySnapshot = await getDocs(q);
                 const nsList = [];
                 
-                querySnapshot.forEach((doc) => {
+                snapshot.forEach((doc) => {
                     const data = doc.data();
+                    
+                    // ВОССТАНАВЛИВАЕМ оригинальные названия полей
                     nsList.push({
                         firestoreId: doc.id,
-                        ...data,
-                        created: data.created ? data.created : new Date().toISOString(),
-                        createdAt: data.createdAt ? 
-                            (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : 
+                        nsNumber: data.n || `ЛН-${doc.id.substring(0, 8)}`,
+                        department: data.d || 'Не указано',
+                        applicant: data.a || 'Не указано',
+                        nsTitle: data.t || 'Без названия',
+                        status: data.s || 'd',
+                        location: data.l || '',
+                        nsType: data.ty || '',
+                        urgency: data.u || 'medium',
+                        qrCode: data.q || '',
+                        applicantPhone: data.p || '',
+                        description: data.desc || '',
+                        photosCount: data.pc || 0,
+                        created: new Date(data.c || Date.now()).toISOString(),
+                        detectionDate: data.dd || '',
+                        createdAt: data.ts ? 
+                            (data.ts.toDate ? data.ts.toDate().toISOString() : data.ts) : 
                             new Date().toISOString()
                     });
                 });
                 
                 console.log(`✅ Загружено ${nsList.length} ЛН из Firestore`);
-                return nsList;
+                
+                // Объединяем с локальными данными из очереди
+                const pendingData = getLocalPendingData();
+                return [...nsList, ...pendingData];
+                
             } catch (error) {
-                console.error('❌ Ошибка загрузки из Firestore:', error);
-                return [];
+                console.error('❌ Ошибка загрузки:', error);
+                
+                // При ошибке возвращаем только локальные данные
+                return getLocalPendingData();
             }
         };
 
-        window.updateNSStatusFirestore = async function(nsId, newStatus, comment = '') {
+        // 3. Обработка очереди отложенных данных
+        async function processPendingQueue() {
             try {
-                const nsRef = doc(db, "non_conformities", nsId);
+                const pendingQueue = JSON.parse(localStorage.getItem('fb_pending') || '[]');
                 
-                await updateDoc(nsRef, {
-                    status: newStatus,
-                    updatedAt: serverTimestamp(),
-                    lastAction: {
-                        date: new Date().toISOString(),
-                        comment: comment
+                if (pendingQueue.length === 0) return;
+                
+                console.log(`🔄 Обработка очереди: ${pendingQueue.length} записей`);
+                
+                // Ограничиваем попытки (макс 3 записи за раз)
+                const toProcess = pendingQueue.slice(0, 3);
+                const remaining = pendingQueue.slice(3);
+                
+                for (const item of toProcess) {
+                    if (item.tries < 3) { // Макс 3 попытки
+                        try {
+                            const result = await window.saveNSFirestore(item.data);
+                            
+                            if (result.success === true) {
+                                console.log('✅ Отправлено из очереди:', item.data.nsNumber);
+                            } else {
+                                // Оставляем в очереди, увеличиваем счетчик
+                                item.tries = (item.tries || 0) + 1;
+                                remaining.push(item);
+                            }
+                        } catch (e) {
+                            item.tries = (item.tries || 0) + 1;
+                            remaining.push(item);
+                        }
+                    } else {
+                        // Слишком много попыток - оставляем как локальные данные
+                        console.log('⚠️ Превышено кол-во попыток:', item.data.nsNumber);
+                    }
+                }
+                
+                // Сохраняем оставшиеся в очереди
+                localStorage.setItem('fb_pending', JSON.stringify(remaining));
+                
+            } catch (error) {
+                console.error('Ошибка обработки очереди:', error);
+            }
+        }
+
+        // 4. Получение локальных данных из очереди
+        function getLocalPendingData() {
+            const pendingQueue = JSON.parse(localStorage.getItem('fb_pending') || '[]');
+            
+            return pendingQueue.map(item => ({
+                firestoreId: 'local_' + item.time,
+                nsNumber: item.data.nsNumber || `ЛОКАЛЬ-${item.time.toString().slice(-6)}`,
+                department: item.data.department || 'Не указано',
+                applicant: item.data.applicant || 'Не указано',
+                nsTitle: item.data.nsTitle || 'Без названия',
+                status: 'queued', // Специальный статус для очереди
+                location: item.data.location || '',
+                nsType: item.data.nsType || '',
+                urgency: item.data.urgency || 'medium',
+                qrCode: item.data.qrCode || '',
+                applicantPhone: item.data.applicantPhone || '',
+                description: item.data.description || '',
+                photosCount: item.data.photos?.length || 0,
+                created: new Date(item.time).toISOString(),
+                detectionDate: item.data.detectionDate || '',
+                createdAt: new Date(item.time).toISOString(),
+                isLocal: true,
+                tries: item.tries || 0
+            }));
+        }
+
+        // 5. Сохранение QR-кода
+        window.saveQRCodeFirestore = async function(qrData) {
+            try {
+                const compressedData = {
+                    c: qrData.code,
+                    d: qrData.department?.substring(0, 30) || '',
+                    l: qrData.location?.substring(0, 40) || '',
+                    r: qrData.responsible?.substring(0, 40) || undefined,
+                    u: qrData.url,
+                    t: Date.now(),
+                    ts: serverTimestamp(),
+                    v: 1
+                };
+                
+                // Удаляем пустые поля
+                Object.keys(compressedData).forEach(key => {
+                    if (compressedData[key] === undefined) {
+                        delete compressedData[key];
                     }
                 });
                 
-                console.log(`✅ Статус ЛН ${nsId} обновлен на: ${newStatus}`);
-                return { success: true };
-            } catch (error) {
-                console.error('❌ Ошибка обновления статуса:', error);
-                return { success: false, error: error.message };
-            }
-        };
-
-        window.saveQRCodeFirestore = async function(qrData) {
-            try {
-                const dataToSave = {
-                    ...qrData,
-                    createdAt: serverTimestamp(),
-                    firebaseSaved: true
-                };
-                
-                const docRef = await addDoc(collection(db, "qrcodes"), dataToSave);
-                console.log('✅ QR-код сохранен в Firestore:', qrData.code);
+                const docRef = await addDoc(collection(db, "qr"), compressedData);
+                console.log('✅ QR сохранен в Firestore');
                 return { success: true, id: docRef.id };
             } catch (error) {
-                console.error('❌ Ошибка сохранения QR-кода:', error);
+                console.error('❌ Ошибка сохранения QR:', error);
                 return { success: false, error: error.message };
             }
         };
 
-        window.getAllQRCodesFirestore = async function() {
-            try {
-                const querySnapshot = await getDocs(collection(db, "qrcodes"));
-                const qrCodes = [];
-                
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    qrCodes.push({
-                        firestoreId: doc.id,
-                        ...data
-                    });
-                });
-                
-                return qrCodes;
-            } catch (error) {
-                console.error('❌ Ошибка загрузки QR-кодов:', error);
-                return [];
-            }
-        };
-
+        // 6. Тест подключения
         window.testFirebaseConnection = async function() {
             try {
-                showNotification('Тестирую подключение к Firebase...', 'success');
-                
-                const testQuery = query(collection(db, "non_conformities"), orderBy("created", "desc"));
+                const testQuery = query(collection(db, "nc"), orderBy("c", "desc"));
                 const snapshot = await getDocs(testQuery);
                 
-                showNotification(`✅ Подключение успешно! Найдено ${snapshot.size} записей`, 'success');
+                const pendingQueue = JSON.parse(localStorage.getItem('fb_pending') || '[]');
                 
-                document.getElementById('dbStatus').innerHTML = `
-                    <p>✅ Соединение с Firebase установлено</p>
-                    <p style="font-size: 12px;">Найдено записей: ${snapshot.size}</p>
-                `;
-                document.getElementById('dbStatus').className = 'firebase-status connected';
-                
-                return true;
+                return {
+                    success: true,
+                    firestoreCount: snapshot.size,
+                    pendingCount: pendingQueue.length,
+                    message: `Firestore: ${snapshot.size} записей, Очередь: ${pendingQueue.length}`
+                };
             } catch (error) {
-                console.error('❌ Ошибка подключения к Firebase:', error);
-                showNotification(`❌ Ошибка подключения: ${error.message}`, 'error');
-                
-                document.getElementById('dbStatus').innerHTML = `
-                    <p>❌ Ошибка подключения</p>
-                    <p style="font-size: 12px;">${error.message}</p>
-                `;
-                document.getElementById('dbStatus').className = 'firebase-status error';
-                
-                return false;
+                return {
+                    success: false,
+                    error: error.message,
+                    code: error.code
+                };
             }
         };
 
-        // Обновляем статус подключения
+        // ============================================
+        // ИНИЦИАЛИЗАЦИЯ ИНТЕРФЕЙСА
+        // ============================================
         document.addEventListener('DOMContentLoaded', function() {
             setTimeout(() => {
-                document.getElementById('firebaseStatus').innerHTML = `
-                    <p>✅ Подключено к Firebase Cloud</p>
-                    <p style="font-size: 12px; color: #666;">Проект: fl-nc-37e11 | База данных: Firestore</p>
-                `;
-                document.getElementById('firebaseStatus').className = 'firebase-status connected';
-                
-                document.getElementById('dbConnectionStatus').textContent = '✅ Подключено';
-                document.getElementById('dbStatus').innerHTML = '<p>✅ Соединение с Firebase установлено</p>';
-                document.getElementById('dbStatus').className = 'firebase-status connected';
-                
-                console.log('✅ Firebase инициализирован');
-                
-                // Запускаем инициализацию системы
-                if (window.initSystem) {
-                    window.initSystem();
+                const statusEl = document.getElementById('firebaseStatus');
+                if (statusEl) {
+                    statusEl.innerHTML = `
+                        <p>✅ Подключено к Firebase</p>
+                        <p style="font-size: 12px; color: #666;">Проект: fl-nc-37e11 | Оптимизированный режим</p>
+                    `;
+                    statusEl.className = 'firebase-status connected';
                 }
+                
+                // Обновляем статус в админке
+                const dbStatusEl = document.getElementById('dbConnectionStatus');
+                if (dbStatusEl) {
+                    dbStatusEl.textContent = '✅ Подключено';
+                }
+                
+                console.log('✅ Firebase инициализирован (оптимизированная версия)');
+                
+                // Запускаем систему
+                if (window.initFarmstilSystem) {
+                    window.initFarmstilSystem();
+                }
+                
             }, 500);
         });
+
     </script>
 
     <style>
+        /* ОПТИМИЗИРОВАННЫЕ СТИЛИ */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
         body {
@@ -262,92 +359,180 @@
             overflow: hidden;
         }
         
-        /* QR код стили */
-        #qrPreview {
-            margin-top: 20px;
-            padding: 20px;
-            background: white;
-            border-radius: 10px;
-            border: 2px solid #e0e0e0;
-            text-align: center;
-            display: none;
-        }
-        
-        .qr-container {
-            display: inline-block;
-            padding: 15px;
-            background: white;
-            border-radius: 10px;
-            border: 2px solid #1e3c72;
+        /* Статус подключения */
+        .firebase-status {
+            padding: 10px;
             margin: 10px 0;
-        }
-        
-        .notification {
-            position: fixed;
-            top: 10px;
-            right: 10px;
-            left: 10px;
-            background: white;
-            color: #333;
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
-            display: none;
-            z-index: 1000;
-            border-left: 5px solid #28a745;
+            border-radius: 8px;
+            background: #e8f4ff;
+            border-left: 4px solid #1e3c72;
             text-align: center;
         }
         
-        .notification.error {
+        .firebase-status.connected {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .firebase-status.warning {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+        
+        .firebase-status.error {
             border-left-color: #dc3545;
+            background: #f8d7da;
         }
         
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 2000;
-            justify-content: center;
-            align-items: center;
+        /* Заголовок и меню */
+        .header { 
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); 
+            color: white; 
+            padding: 20px; 
+            text-align: center; 
         }
         
-        .modal-content {
-            background: white;
-            border-radius: 15px;
-            padding: 25px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
+        .menu { 
+            display: flex; 
+            background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); 
+            padding: 0; 
+            gap: 1px; 
+            flex-wrap: wrap; 
         }
         
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 2px solid #e9ecef;
-            padding-bottom: 10px;
+        .menu-btn { 
+            padding: 12px 15px; 
+            background: white; 
+            border: none; 
+            color: #1e3c72; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: all 0.3s ease; 
+            flex: 1; 
+            min-width: 120px; 
+            font-size: 14px; 
         }
         
-        .modal-title {
-            font-size: 20px;
-            font-weight: bold;
-            color: #1e3c72;
+        .menu-btn.active { 
+            background: #1e3c72; 
+            color: white; 
         }
         
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: #666;
+        .menu-btn:hover { 
+            background: #f8f9fa; 
         }
         
+        /* Страницы */
+        .page { 
+            display: none; 
+            padding: 20px; 
+            min-height: 500px; 
+        }
+        
+        .page.active { 
+            display: block; 
+        }
+        
+        /* Формы */
+        .form-grid { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            margin: 20px 0; 
+        }
+        
+        @media (min-width: 768px) {
+            .form-grid { 
+                display: grid; 
+                grid-template-columns: repeat(2, 1fr); 
+                gap: 20px; 
+            }
+        }
+        
+        .form-group { 
+            display: flex; 
+            flex-direction: column; 
+            width: 100%; 
+        }
+        
+        label { 
+            margin-bottom: 6px; 
+            font-weight: 600; 
+            color: #333; 
+            font-size: 14px; 
+        }
+        
+        input, select, textarea { 
+            padding: 12px; 
+            border: 2px solid #e0e0e0; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            width: 100%; 
+        }
+        
+        input:focus, select:focus, textarea:focus { 
+            border-color: #1e3c72; 
+            outline: none; 
+        }
+        
+        /* Кнопки */
+        .btn { 
+            padding: 14px 20px; 
+            border: none; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            font-weight: 600; 
+            cursor: pointer; 
+            transition: all 0.3s; 
+            margin: 5px 0; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            gap: 8px; 
+        }
+        
+        .btn-primary { 
+            background: #1e3c72; 
+            color: white; 
+        }
+        
+        .btn-primary:hover { 
+            background: #2a5298; 
+        }
+        
+        .btn-success { 
+            background: #28a745; 
+            color: white; 
+        }
+        
+        .btn-success:hover { 
+            background: #218838; 
+        }
+        
+        .btn-warning { 
+            background: #ffc107; 
+            color: #212529; 
+        }
+        
+        .btn-warning:hover { 
+            background: #e0a800; 
+        }
+        
+        .btn-danger { 
+            background: #dc3545; 
+            color: white; 
+        }
+        
+        .btn-danger:hover { 
+            background: #c82333; 
+        }
+        
+        .btn-sm { 
+            padding: 8px 12px; 
+            font-size: 14px; 
+        }
+        
+        /* Карточки ЛН */
         .ln-card {
             background: white;
             border: 1px solid #e0e0e0;
@@ -386,32 +571,54 @@
         .status-completed { background: #28a745; color: white; }
         .status-closed { background: #6c757d; color: white; }
         .status-rejected { background: #dc3545; color: white; }
+        .status-queued { background: #6f42c1; color: white; }
         
-        .header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; }
-        .menu { display: flex; background: linear-gradient(90deg, #4b6cb7 0%, #182848 100%); padding: 0; gap: 1px; flex-wrap: wrap; }
-        .menu-btn { padding: 12px 15px; background: white; border: none; color: #1e3c72; font-weight: bold; cursor: pointer; transition: all 0.3s ease; flex: 1; min-width: 120px; font-size: 14px; }
-        .menu-btn.active { background: #1e3c72; color: white; }
-        .menu-btn:hover { background: #f8f9fa; }
-        .page { display: none; padding: 20px; min-height: 500px; }
-        .page.active { display: block; }
-        .form-grid { display: flex; flex-direction: column; gap: 15px; margin: 20px 0; }
-        .form-group { display: flex; flex-direction: column; width: 100%; }
-        label { margin-bottom: 6px; font-weight: 600; color: #333; font-size: 14px; }
-        input, select, textarea { padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 16px; width: 100%; }
-        input:focus, select:focus, textarea:focus { border-color: #1e3c72; outline: none; }
-        .btn { padding: 14px 20px; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s; margin: 5px 0; display: flex; align-items: center; justify-content: center; gap: 8px; }
-        .btn-primary { background: #1e3c72; color: white; }
-        .btn-primary:hover { background: #2a5298; }
-        .btn-success { background: #28a745; color: white; }
-        .btn-success:hover { background: #218838; }
-        .btn-warning { background: #ffc107; color: #212529; }
-        .btn-warning:hover { background: #e0a800; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-danger:hover { background: #c82333; }
-        .btn-info { background: #17a2b8; color: white; }
-        .btn-info:hover { background: #138496; }
-        .btn-sm { padding: 8px 12px; font-size: 14px; }
+        /* QR код */
+        #qrPreview {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+            display: none;
+        }
         
+        .qr-container {
+            display: inline-block;
+            padding: 15px;
+            background: white;
+            border-radius: 10px;
+            border: 2px solid #1e3c72;
+            margin: 10px 0;
+        }
+        
+        /* Уведомления */
+        .notification {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            left: 10px;
+            background: white;
+            color: #333;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            border-left: 5px solid #28a745;
+            text-align: center;
+        }
+        
+        .notification.error {
+            border-left-color: #dc3545;
+        }
+        
+        .notification.warning {
+            border-left-color: #ffc107;
+        }
+        
+        /* Фото */
         .photo-preview-container {
             display: flex;
             flex-wrap: wrap;
@@ -427,14 +634,7 @@
             border: 2px solid #ddd;
         }
         
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            margin-top: 15px;
-        }
-        
-        /* Стили для рабочего интерфейса */
+        /* Рабочий интерфейс */
         .worker-container {
             max-width: 800px;
             margin: 20px auto;
@@ -453,38 +653,7 @@
             margin-bottom: 20px;
         }
         
-        /* Справочники - исправленные стили */
-        .directory-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            margin-bottom: 8px;
-            border: 1px solid #e0e0e0;
-        }
-        
-        .directory-item-info {
-            flex: 1;
-        }
-        
-        .directory-item-actions {
-            display: flex;
-            gap: 5px;
-        }
-        
-        .directory-input-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .directory-input-group input {
-            flex: 1;
-        }
-        
-        /* Workflow steps */
+        /* Workflow */
         .workflow-step {
             background: #f8f9fa;
             border-radius: 10px;
@@ -518,63 +687,47 @@
             background: #28a745;
         }
         
-        @media (min-width: 768px) {
-            .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
-            .btn { width: auto; }
-        }
-        
-        .sync-status {
+        /* Справочники */
+        .directory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             padding: 10px;
-            margin: 10px 0;
-            border-radius: 8px;
             background: #f8f9fa;
-            border-left: 4px solid #17a2b8;
-        }
-        
-        .sync-status.success {
-            border-left-color: #28a745;
-            background: #d4edda;
-        }
-        
-        .sync-status.error {
-            border-left-color: #dc3545;
-            background: #f8d7da;
-        }
-        
-        .firebase-status {
-            padding: 10px;
-            margin: 10px 0;
             border-radius: 8px;
-            background: #e8f4ff;
-            border-left: 4px solid #1e3c72;
-            text-align: center;
+            margin-bottom: 8px;
+            border: 1px solid #e0e0e0;
         }
         
-        .firebase-status.connected {
-            border-left-color: #28a745;
-            background: #d4edda;
+        .directory-input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
         }
         
-        .firebase-status.error {
-            border-left-color: #dc3545;
-            background: #f8d7da;
+        /* Локальный статус */
+        .local-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: #6f42c1;
+            color: white;
+            border-radius: 10px;
+            font-size: 11px;
+            margin-left: 5px;
+        }
+        
+        .queue-info {
+            background: #fff3cd;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #ffc107;
         }
     </style>
 </head>
 <body>
     <!-- Уведомления -->
     <div class="notification" id="notification"></div>
-    
-    <!-- Модальные окна -->
-    <div class="modal" id="statusModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title" id="modalTitle"></div>
-                <button class="modal-close" onclick="closeModal()">×</button>
-            </div>
-            <div id="modalContent"></div>
-        </div>
-    </div>
     
     <!-- Режимы -->
     <div id="workerMode" style="display: none;">
@@ -587,12 +740,13 @@
         </div>
     </div>
     
+    <!-- Админ панель -->
     <div id="adminMode">
         <div class="container">
             <!-- Шапка -->
             <div class="header">
                 <h1>ФАРМСТИЛ - Административная панель</h1>
-                <h2>ISO 13485 Workflow + Firebase</h2>
+                <h2>ISO 13485 Workflow + Firebase (Оптимизировано)</h2>
                 <div id="firebaseStatus" class="firebase-status">
                     ⏳ Подключение к облачной базе данных...
                 </div>
@@ -633,18 +787,17 @@
                 <button class="btn btn-primary" onclick="generateQRCode()">
                     🎯 Сгенерировать QR-код
                 </button>
-                <div id="qrPreview">
-                    <!-- QR код будет здесь -->
-                </div>
+                <div id="qrPreview"></div>
             </div>
             
             <div class="page" id="listNSPage">
                 <h2>📋 Все Листы Несоответствий</h2>
                 <div class="form-grid">
-                    <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." onkeyup="searchNS()">
+                    <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." 
+                           onkeyup="searchNS()">
                 </div>
                 <div id="nsListContainer">
-                    <p style="text-align: center; padding: 20px;">⏳ Загружаю данные из облачной базы...</p>
+                    <p style="text-align: center; padding: 20px;">⏳ Загружаю данные...</p>
                 </div>
             </div>
             
@@ -659,7 +812,9 @@
                     <div class="workflow-step-number">2</div>
                     <h3>📧 Проверка менеджера СМК</h3>
                     <p>Менеджер проверяет полноту заполнения</p>
-                    <button class="btn btn-info" onclick="showPendingNS()">Показать ЛН на проверке (<span id="pendingCount">0</span>)</button>
+                    <button class="btn btn-info" onclick="showPendingNS()">
+                        Показать ЛН на проверке (<span id="pendingCount">0</span>)
+                    </button>
                 </div>
                 <div class="workflow-step">
                     <div class="workflow-step-number">3</div>
@@ -711,8 +866,8 @@
                 <h2>⚙️ Администрирование</h2>
                 <div id="statsGrid">
                     <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
-                        <h3>📊 Статистика системы (Firebase)</h3>
-                        <p>Загружаю данные из облака...</p>
+                        <h3>📊 Статистика системы</h3>
+                        <p>Загружаю данные...</p>
                     </div>
                 </div>
                 <div id="syncSection">
@@ -720,501 +875,111 @@
                     <div class="firebase-status" id="dbStatus">
                         <p>Статус: Проверяю подключение...</p>
                     </div>
-                    <div class="form-grid">
-                        <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
-                        <button class="btn btn-info" onclick="openFirebaseConsole()">🔥 Открыть Firebase Console</button>
-                    </div>
                     <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                        <h4>📋 Информация о базе данных:</h4>
-                        <p><strong>База данных:</strong> Firestore (облачная)</p>
+                        <h4>📋 Информация:</h4>
+                        <p><strong>База данных:</strong> Firestore (оптимизировано)</p>
                         <p><strong>Проект:</strong> fl-nc-37e11</p>
-                        <p><strong>Коллекции:</strong> non_conformities, qrcodes</p>
                         <p><strong>Статус:</strong> <span id="dbConnectionStatus">Проверка...</span></p>
+                        <div id="queueInfo"></div>
                     </div>
                 </div>
                 <div class="form-grid" style="margin-top: 30px;">
-                    <button class="btn btn-primary" onclick="backupData()">💾 Локальная копия</button>
-                    <button class="btn btn-warning" onclick="clearLocalData()">🗑️ Очистить локальные данные</button>
-                    <button class="btn btn-danger" onclick="testFirebaseConnection()">🧪 Тест подключения</button>
+                    <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
+                    <button class="btn btn-info" onclick="openFirebaseConsole()">🔥 Firebase Console</button>
+                    <button class="btn btn-warning" onclick="clearLocalData()">🗑️ Очистить локальные</button>
+                    <button class="btn btn-primary" onclick="refreshAllData()">🔄 Обновить данные</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ОСНОВНОЙ КОД СИСТЕМЫ -->
     <script>
         // ============================================
-        // ОСНОВНЫЕ ФУНКЦИИ СИСТЕМЫ
+        // КОНСТАНТЫ И ПЕРЕМЕННЫЕ
         // ============================================
-        const GOOGLE_SHEETS_CONFIG = {
-            SPREADSHEET_ID: '1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU',
-            SHEET_NAME: 'ЛН_ISO13485',
-            WEB_APP_URL: 'https://script.google.com/macros/s/AKfycbzC-ySCf4MqMDd1Kl_DHPgfz8Q7OhgLNKtMQv2E1XzHHZc2G7S1isL7ubWt7xcdclEC/exec'
+        const WORKFLOW_STATUSES = {
+            DETECTED: 'd',
+            CHECKING_SMK: 'c',
+            ASSIGNED: 'a',
+            CORRECTION: 'r',
+            CHECKING_CORRECTION: 'cc',
+            EXECUTION: 'e',
+            COMPLETED: 'p',
+            CLOSED: 'l',
+            REJECTED: 'j',
+            QUEUED: 'queued'
         };
         
         const WEB3FORMS_ACCESS_KEY = '0f9ce86d-9834-4669-b86e-c0cc782cca96';
         const SMK_MANAGER_EMAIL = 'smk-manager@farmstil.ru';
         
-        const WORKFLOW_STATUSES = {
-            DETECTED: 'detected',
-            CHECKING_SMK: 'checking_smk',
-            ASSIGNED: 'assigned',
-            CORRECTION: 'correction',
-            CHECKING_CORRECTION: 'checking_correction',
-            EXECUTION: 'execution',
-            COMPLETED: 'completed',
-            CLOSED: 'closed',
-            REJECTED: 'rejected'
-        };
-        
         let currentQRData = null;
         let photos = [];
-        let currentEditingNS = null;
-        let firebaseUnsubscribe = null;
-
+        
+        // ============================================
+        // ОСНОВНЫЕ ФУНКЦИИ СИСТЕМЫ
+        // ============================================
+        
         // Инициализация системы
-        window.initSystem = function() {
-            console.log('🚀 Система ФАРМСТИЛ ISO 13485 с Firebase запускается...');
+        window.initFarmstilSystem = function() {
+            console.log('🚀 Система ФАРМСТИЛ запускается...');
             
-            // Инициализируем локальные хранилища
-            initDirectories();
+            initLocalStorage();
             checkMode();
             loadDirectories();
             
-            // Загружаем данные из Firestore
+            // Загружаем данные
             setTimeout(async () => {
                 await updateStats();
-                await loadPendingCount();
-                updateLastSyncTime();
-                
-                // Если открыта страница со списком ЛН - загружаем
-                if (document.getElementById('nsListContainer')) {
-                    await loadNSList();
-                }
-                
-                console.log('✅ Система готова к работе с Firebase');
+                updateQueueInfo();
+                await loadNSList();
+                console.log('✅ Система готова');
             }, 1000);
         };
-
-        function initDirectories() {
-            if (!localStorage.getItem('farmstil_responsibles')) {
-                const defaultResponsibles = [
+        
+        // Инициализация локального хранилища
+        function initLocalStorage() {
+            // Ответственные
+            if (!localStorage.getItem('farm_responsibles')) {
+                localStorage.setItem('farm_responsibles', JSON.stringify([
                     { id: 1, name: "Иванов И.И.", email: "ivanov@farmstil.ru", role: "Начальник цеха" },
                     { id: 2, name: "Петров П.П.", email: "petrov@farmstil.ru", role: "Главный технолог" }
-                ];
-                localStorage.setItem('farmstil_responsibles', JSON.stringify(defaultResponsibles));
+                ]));
             }
             
-            if (!localStorage.getItem('farmstil_executors')) {
-                const defaultExecutors = [
+            // Исполнители
+            if (!localStorage.getItem('farm_executors')) {
+                localStorage.setItem('farm_executors', JSON.stringify([
                     { id: 1, name: "Смирнов А.А.", email: "smirnov@farmstil.ru", department: "Цех №1" },
                     { id: 2, name: "Кузнецов Б.Б.", email: "kuznetsov@farmstil.ru", department: "Цех №2" }
-                ];
-                localStorage.setItem('farmstil_executors', JSON.stringify(defaultExecutors));
+                ]));
             }
             
-            if (!localStorage.getItem('farmstil_qrcodes')) {
-                localStorage.setItem('farmstil_qrcodes', JSON.stringify([]));
+            // QR коды
+            if (!localStorage.getItem('farm_qrcodes')) {
+                localStorage.setItem('farm_qrcodes', JSON.stringify([]));
             }
             
-            if (!localStorage.getItem('farmstil_ns')) {
-                localStorage.setItem('farmstil_ns', JSON.stringify([]));
-            }
-            
-            if (!localStorage.getItem('farmstil_last_sync')) {
-                localStorage.setItem('farmstil_last_sync', '');
+            // Локальные ЛН
+            if (!localStorage.getItem('farm_ns')) {
+                localStorage.setItem('farm_ns', JSON.stringify([]));
             }
         }
-
-        // Функция отправки ЛН (Firebase версия) - ИСПРАВЛЕННАЯ
-        window.submitWorkerForm = async function(qrCode) {
-            try {
-                // Валидация формы
-                const requiredFields = ['workerApplicant', 'workerDate', 'workerNsType', 'workerTitle', 'workerDescription', 'workerUrgency'];
-                for (const fieldId of requiredFields) {
-                    const field = document.getElementById(fieldId);
-                    if (!field || !field.value.trim()) {
-                        showNotification(`Заполните поле: ${field.previousElementSibling?.textContent || fieldId}`, 'error');
-                        field.focus();
-                        return;
-                    }
-                }
-                
-                // Собираем данные
-                const nsData = {
-                    id: 'ns_' + Date.now(),
-                    nsNumber: generateNSNumber(),
-                    created: new Date().toISOString(),
-                    detectionDate: document.getElementById('workerDate').value,
-                    department: document.getElementById('workerDepartment').value || 'Не указано',
-                    location: document.getElementById('workerLocation').value || 'Не указано',
-                    applicant: document.getElementById('workerApplicant').value,
-                    applicantPhone: document.getElementById('workerPhone').value || '',
-                    nsType: document.getElementById('workerNsType').value,
-                    nsTitle: document.getElementById('workerTitle').value,
-                    description: document.getElementById('workerDescription').value,
-                    urgency: document.getElementById('workerUrgency').value,
-                    photos: photos, // Сохраняем фотографии
-                    status: WORKFLOW_STATUSES.DETECTED,
-                    qrCode: qrCode,
-                    workflow: [{
-                        step: 1,
-                        action: 'detected',
-                        user: document.getElementById('workerApplicant').value,
-                        date: new Date().toISOString(),
-                        comment: 'Несоответствие зарегистрировано через QR-код'
-                    }]
-                };
-                
-                console.log('Создаем ЛН:', nsData);
-                
-                // 1. Сохраняем в Firestore (облачная база)
-                const firestoreResult = await window.saveNSFirestore(nsData);
-                
-                if (!firestoreResult.success) {
-                    throw new Error(`Ошибка сохранения в облачную базу: ${firestoreResult.error}`);
-                }
-                
-                // 2. Сохраняем локально для оффлайн-доступа
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                nsList.push({
-                    ...nsData,
-                    firestoreId: firestoreResult.id
-                });
-                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
-                
-                // Показываем сообщение об успехе
-                document.getElementById('workerContent').innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 80px; color: #28a745;">✅</div>
-                        <h2>Лист несоответствия создан!</h2>
-                        <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
-                        <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
-                            <p><strong>📋 Краткая информация:</strong></p>
-                            <p>Цех: ${nsData.department}</p>
-                            <p>Место: ${nsData.location}</p>
-                            <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
-                            <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
-                            <p>Заявитель: ${nsData.applicant}</p>
-                            <p>Фотографий: ${photos.length}</p>
-                        </div>
-                        <div style="margin: 20px 0; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
-                            <p>✅ Данные сохранены в облачной базе Firebase</p>
-                            <p><small>ЛН ${nsData.nsNumber} теперь виден во всех административных панелях</small></p>
-                            <p><small>Фотографии сохранены вместе с ЛН</small></p>
-                        </div>
-                        <div id="emailStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <p>📧 Отправка уведомления менеджеру СМК...</p>
-                        </div>
-                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
-                            Вернуться на главную
-                        </button>
-                    </div>
-                `;
-                
-                // Отправляем email
-                setTimeout(async () => {
-                    const emailStatus = document.getElementById('emailStatus');
-                    try {
-                        await sendEmailToSMKManager(nsData);
-                        emailStatus.innerHTML = '<p>✅ Email успешно отправлен менеджеру СМК</p>';
-                        emailStatus.style.background = '#d4edda';
-                        emailStatus.style.borderLeft = '4px solid #28a745';
-                    } catch (emailError) {
-                        console.error('Ошибка отправки email:', emailError);
-                        emailStatus.innerHTML = '<p>⚠️ Ошибка отправки email. Сообщите менеджеру вручную.</p>';
-                        emailStatus.style.background = '#fff3cd';
-                        emailStatus.style.borderLeft = '4px solid #ffc107';
-                    }
-                }, 100);
-                
-                showNotification(`ЛН ${nsData.nsNumber} успешно создан! Данные в облаке.`, 'success');
-                
-            } catch (error) {
-                console.error('❌ Ошибка при создании ЛН:', error);
-                showNotification(`Ошибка: ${error.message}`, 'error');
-                
-                document.getElementById('workerContent').innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 80px; color: #dc3545;">❌</div>
-                        <h2>Ошибка при создании ЛН</h2>
-                        <p style="color: #666; margin: 20px 0;">
-                            ${error.message}<br>
-                            Попробуйте еще раз или свяжитесь с администратором.
-                        </p>
-                        <button class="btn btn-primary" onclick="window.location.reload()">
-                            ↻ Попробовать снова
-                        </button>
-                        <button class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
-                            ↩️ На главную
-                        </button>
-                    </div>
-                `;
-            }
-        };
-
-        // Загрузка списка ЛН из Firestore
-        window.loadNSList = async function() {
-            try {
-                const nsListContainer = document.getElementById('nsListContainer');
-                if (!nsListContainer) return;
-                
-                nsListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">⏳ Загружаю данные из облака Firebase...</p>';
-                
-                const nsList = await window.getAllNSFirestore();
-                
-                if (nsList.length === 0) {
-                    nsListContainer.innerHTML = `
-                        <div style="text-align: center; padding: 40px; color: #666;">
-                            <p>📭 Нет листов несоответствий в базе</p>
-                            <p style="font-size: 14px; margin-top: 10px;">Создайте первый ЛН через QR-код</p>
-                        </div>
-                    `;
-                    return;
-                }
-                
-                let html = '';
-                nsList.forEach(ns => {
-                    const statusClass = `status-${ns.status}`;
-                    const date = ns.created ? 
-                        new Date(ns.created).toLocaleDateString('ru-RU') : 
-                        'Дата неизвестна';
-                    
-                    html += `
-                        <div class="ln-card" data-ns-id="${ns.firestoreId || ns.id}">
-                            <div class="ln-card-header">
-                                <div class="ln-number">${ns.nsNumber}</div>
-                                <div class="ln-status ${statusClass}">${getStatusText(ns.status)}</div>
-                            </div>
-                            <div style="margin: 10px 0;">
-                                <p><strong>Цех:</strong> ${ns.department}</p>
-                                <p><strong>Место:</strong> ${ns.location}</p>
-                                <p><strong>Заявитель:</strong> ${ns.applicant}</p>
-                                <p><strong>Дата:</strong> ${date}</p>
-                                <p><strong>Описание:</strong> ${ns.nsTitle}</p>
-                                <p><strong>Фотографий:</strong> ${ns.photosCount || 0}</p>
-                                ${ns.qrCode ? `<p><strong>QR-код:</strong> ${ns.qrCode}</p>` : ''}
-                            </div>
-                            <div class="action-buttons">
-                                <button class="btn btn-sm btn-info" onclick="viewNSDetails('${ns.firestoreId || ns.id}')">👁️ Просмотр</button>
-                                <button class="btn btn-sm btn-warning" onclick="editNS('${ns.firestoreId || ns.id}')">✏️ Редактировать</button>
-                                ${ns.status === 'detected' ? 
-                                    `<button class="btn btn-sm btn-success" onclick="approveNS('${ns.firestoreId || ns.id}')">✅ В работу</button>` : ''}
-                            </div>
-                        </div>
-                    `;
-                });
-                
-                nsListContainer.innerHTML = html;
-                
-            } catch (error) {
-                console.error('Ошибка загрузки списка ЛН:', error);
-                const nsListContainer = document.getElementById('nsListContainer');
-                if (nsListContainer) {
-                    nsListContainer.innerHTML = `
-                        <div style="text-align: center; padding: 20px; color: #dc3545;">
-                            <p>❌ Ошибка загрузки данных из облака</p>
-                            <p><small>${error.message}</small></p>
-                            <button class="btn btn-sm btn-primary" onclick="loadNSList()">⟳ Попробовать снова</button>
-                            <button class="btn btn-sm btn-secondary" onclick="loadNSFromLocal()" style="margin-left: 10px;">
-                                📁 Загрузить локальные данные
-                            </button>
-                        </div>
-                    `;
-                }
-            }
-        };
-
-        // Функция загрузки из локального хранилища
-        window.loadNSFromLocal = function() {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const nsListContainer = document.getElementById('nsListContainer');
-            
-            if (!nsListContainer) return;
-            
-            if (nsList.length === 0) {
-                nsListContainer.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">Нет локальных данных</p>';
-                return;
-            }
-            
-            let html = '<div style="padding: 10px; background: #fff3cd; border-radius: 8px; margin-bottom: 15px;">';
-            html += '<p>⚠️ Показаны локальные данные (не синхронизированы с облаком)</p>';
-            html += '</div>';
-            
-            nsList.forEach(ns => {
-                const statusClass = `status-${ns.status}`;
-                const date = ns.created ? 
-                    new Date(ns.created).toLocaleDateString('ru-RU') : 
-                    'Дата неизвестна';
-                
-                html += `
-                    <div class="ln-card">
-                        <div class="ln-card-header">
-                            <div class="ln-number">${ns.nsNumber}</div>
-                            <div class="ln-status ${statusClass}">${getStatusText(ns.status)}</div>
-                        </div>
-                        <div style="margin: 10px 0;">
-                            <p><strong>Цех:</strong> ${ns.department}</p>
-                            <p><strong>Место:</strong> ${ns.location}</p>
-                            <p><strong>Заявитель:</strong> ${ns.applicant}</p>
-                            <p><strong>Дата:</strong> ${date}</p>
-                            <p><strong>Описание:</strong> ${ns.nsTitle}</p>
-                            <p><strong>Фотографий:</strong> ${ns.photos ? ns.photos.length : 0}</p>
-                        </div>
-                    </div>
-                `;
-            });
-            
-            nsListContainer.innerHTML = html;
-            showNotification('Загружены локальные данные', 'success');
-        };
-
-        // Генерация QR-кода с сохранением в Firestore
-        window.generateQRCode = async function() {
-            const department = document.getElementById('qrDepartment').value;
-            const location = document.getElementById('qrLocation').value;
-            const responsible = document.getElementById('qrResponsible').value;
-            
-            if (!department || !location) {
-                showNotification('Заполните обязательные поля: Подразделение и Место', 'error');
-                return;
-            }
-            
-            const code = `FS-${Date.now().toString().slice(-8)}`;
-            const currentUrl = window.location.origin + window.location.pathname;
-            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
-            
-            currentQRData = {
-                code: code,
-                department: department,
-                location: location,
-                responsible: responsible,
-                url: qrUrl,
-                created: new Date().toISOString()
-            };
-            
-            // Сохраняем в Firestore
-            const firestoreResult = await window.saveQRCodeFirestore(currentQRData);
-            
-            if (firestoreResult.success) {
-                // Сохраняем локально
-                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-                qrcodes.push({
-                    ...currentQRData, 
-                    firestoreId: firestoreResult.id
-                });
-                localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
-                
-                displayQRCode(qrUrl, code, department, location, responsible);
-                showNotification('QR-код создан и сохранен в облаке!', 'success');
-                
-                // Обновляем статистику
-                updateStats();
-            } else {
-                showNotification(`Ошибка сохранения QR-кода: ${firestoreResult.error}`, 'error');
-            }
-        };
-
-        // Обновление статистики из Firestore
-        window.updateStats = async function() {
-            try {
-                const nsList = await window.getAllNSFirestore();
-                const statsGrid = document.getElementById('statsGrid');
-                
-                if (statsGrid) {
-                    const activeCount = nsList.filter(ns => 
-                        ns.status !== 'closed' && ns.status !== 'rejected'
-                    ).length;
-                    
-                    const lastNS = nsList.length > 0 ? nsList[0] : null;
-                    
-                    statsGrid.innerHTML = `
-                        <div class="form-grid">
-                            <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
-                                <h3>📊 Статистика системы</h3>
-                                <p><strong>Всего ЛН в облаке:</strong> ${nsList.length}</p>
-                                <p><strong>Активных ЛН:</strong> ${activeCount}</p>
-                                <p><strong>Последний ЛН:</strong> ${lastNS ? lastNS.nsNumber : 'Нет'}</p>
-                                <p><strong>Дата последнего:</strong> ${lastNS ? new Date(lastNS.created).toLocaleDateString('ru-RU') : 'Нет'}</p>
-                                <p><strong>Фотографий всего:</strong> ${nsList.reduce((sum, ns) => sum + (ns.photosCount || 0), 0)}</p>
-                                <p><strong>Источник данных:</strong> 🔥 Firebase Firestore</p>
-                            </div>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Ошибка обновления статистики:', error);
-            }
-        };
-
+        
         // ============================================
-        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // РАБОЧИЙ РЕЖИМ (Регистрация несоответствий)
         // ============================================
-
-        window.showNotification = function(message, type = 'success', duration = 3000) {
-            const notification = document.getElementById('notification');
-            if (!notification) return;
-            
-            notification.textContent = message;
-            notification.className = 'notification';
-            if (type === 'error') notification.classList.add('error');
-            notification.style.display = 'block';
-            
-            setTimeout(() => notification.style.display = 'none', duration);
-        };
-
-        window.closeModal = function() {
-            document.getElementById('statusModal').style.display = 'none';
-        };
-
-        window.showPage = function(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-            
-            const page = document.getElementById(pageId + 'Page');
-            if (page) {
-                page.classList.add('active');
-                const buttons = document.querySelectorAll('.menu-btn');
-                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
-                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
-                
-                if (pageId === 'listNS') loadNSList();
-                if (pageId === 'directories') loadDirectories();
-                if (pageId === 'admin') {
-                    updateStats();
-                    updateLastSyncTime();
-                }
-            }
-        };
-
-        window.checkMode = function() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const mode = urlParams.get('mode');
-            const qrcode = urlParams.get('qrcode');
-            
-            if (mode === 'worker') {
-                document.getElementById('adminMode').style.display = 'none';
-                document.getElementById('workerMode').style.display = 'block';
-                
-                if (qrcode) {
-                    showWorkerFormByQR(qrcode);
-                } else {
-                    showWorkerFormManual();
-                }
-            } else {
-                document.getElementById('adminMode').style.display = 'block';
-                document.getElementById('workerMode').style.display = 'none';
-                showPage('generateQR');
-            }
-        };
-
+        
+        // Отображение формы для работника
         window.showWorkerFormByQR = function(qrCode) {
-            // Загружаем QR-коды из Firestore и локально
-            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+            const qrcodes = JSON.parse(localStorage.getItem('farm_qrcodes') || '[]');
             const qrData = qrcodes.find(qr => qr.code === qrCode);
             
             const html = `
                 <div style="padding: 20px;">
                     <h2>🚨 Регистрация несоответствия ISO 13485</h2>
+                    
                     ${qrData ? `
                         <div style="background: #e8f4ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
                             <h3>📋 Информация о месте</h3>
@@ -1226,7 +991,7 @@
                     ` : `
                         <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
                             <p>⚠️ QR-код "${qrCode}" найден в локальном хранилище</p>
-                            <p>Работаем в оффлайн-режиме</p>
+                            <p>Работаем в локальном режиме</p>
                         </div>
                     `}
                     
@@ -1260,26 +1025,26 @@
                         
                         <div class="form-group">
                             <label>🔍 Краткое описание проблемы:</label>
-                            <input type="text" id="workerTitle" placeholder="Краткое описание проблемы (до 100 символов)" maxlength="100" required>
+                            <input type="text" id="workerTitle" placeholder="Краткое описание (до 100 символов)" maxlength="100" required>
                         </div>
                         
                         <div class="form-group">
                             <label>📋 Подробное описание:</label>
-                            <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины и последствия..." required></textarea>
+                            <textarea id="workerDescription" rows="4" placeholder="Подробно опишите проблему..." required></textarea>
                         </div>
                         
                         <div class="form-group">
                             <label>⚠️ Срочность:</label>
                             <select id="workerUrgency" required>
-                                <option value="low">Низкая (решить в течение недели)</option>
-                                <option value="medium" selected>Средняя (решить в течение 3 дней)</option>
-                                <option value="high">Высокая (решить в течение 24 часов)</option>
-                                <option value="critical">Критическая (остановить производство)</option>
+                                <option value="low">Низкая (неделя)</option>
+                                <option value="medium" selected>Средняя (3 дня)</option>
+                                <option value="high">Высокая (24 часа)</option>
+                                <option value="critical">Критическая (немедленно)</option>
                             </select>
                         </div>
                         
                         <div class="form-group">
-                            <label>📷 Фотографии (макс. 5):</label>
+                            <label>📷 Фотографии (макс. 3):</label>
                             <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
                             <div id="workerPhotoPreview" class="photo-preview-container"></div>
                         </div>
@@ -1288,10 +1053,12 @@
                         <input type="hidden" id="workerLocation" value="${qrData ? qrData.location : ''}">
                         
                         <div style="margin: 30px 0; text-align: center;">
-                            <button type="button" class="btn btn-success" onclick="submitWorkerForm('${qrCode}')" style="padding: 15px 30px; font-size: 18px;">
+                            <button type="button" class="btn btn-success" onclick="submitWorkerForm('${qrCode}')" 
+                                    style="padding: 15px 30px; font-size: 18px;">
                                 📤 Отправить Лист Несоответствия
                             </button>
-                            <button type="button" class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
+                            <button type="button" class="btn btn-secondary" onclick="window.location.href = window.location.pathname" 
+                                    style="margin-left: 15px;">
                                 ↩️ Отмена
                             </button>
                         </div>
@@ -1301,7 +1068,8 @@
             
             document.getElementById('workerContent').innerHTML = html;
         };
-
+        
+        // Обработка фотографий
         window.handleWorkerPhotos = function(event) {
             const files = event.target.files;
             const preview = document.getElementById('workerPhotoPreview');
@@ -1311,14 +1079,16 @@
             preview.innerHTML = '';
             photos = [];
             
-            for (let i = 0; i < Math.min(files.length, 5); i++) {
+            // Ограничиваем 3 фото для экономии
+            for (let i = 0; i < Math.min(files.length, 3); i++) {
                 const file = files[i];
                 const reader = new FileReader();
                 
                 reader.onload = function(e) {
+                    // Сохраняем превью (сжатое)
                     photos.push({
                         name: file.name,
-                        data: e.target.result, // base64 данные
+                        data: e.target.result, // base64
                         type: file.type,
                         size: file.size
                     });
@@ -1332,54 +1102,166 @@
                 reader.readAsDataURL(file);
             }
         };
-
+        
+        // Отправка формы работника
+        window.submitWorkerForm = async function(qrCode) {
+            try {
+                // Валидация
+                const required = ['workerApplicant', 'workerDate', 'workerNsType', 'workerTitle', 'workerDescription', 'workerUrgency'];
+                for (const fieldId of required) {
+                    const field = document.getElementById(fieldId);
+                    if (!field || !field.value.trim()) {
+                        showNotification(`Заполните поле: ${field.previousElementSibling?.textContent || fieldId}`, 'error');
+                        field.focus();
+                        return;
+                    }
+                }
+                
+                // Собираем данные
+                const nsData = {
+                    nsNumber: generateNSNumber(),
+                    created: new Date().toISOString(),
+                    detectionDate: document.getElementById('workerDate').value,
+                    department: document.getElementById('workerDepartment').value || 'Не указано',
+                    location: document.getElementById('workerLocation').value || 'Не указано',
+                    applicant: document.getElementById('workerApplicant').value,
+                    applicantPhone: document.getElementById('workerPhone').value || '',
+                    nsType: document.getElementById('workerNsType').value,
+                    nsTitle: document.getElementById('workerTitle').value,
+                    description: document.getElementById('workerDescription').value,
+                    urgency: document.getElementById('workerUrgency').value,
+                    photos: photos,
+                    status: WORKFLOW_STATUSES.DETECTED,
+                    qrCode: qrCode
+                };
+                
+                console.log('📝 Создаем ЛН:', nsData.nsNumber);
+                
+                // Пытаемся сохранить в Firebase
+                const firebaseResult = await window.saveNSFirestore(nsData);
+                
+                // Всегда сохраняем локально
+                const nsList = JSON.parse(localStorage.getItem('farm_ns') || '[]');
+                nsList.push({
+                    ...nsData,
+                    id: 'local_' + Date.now(),
+                    firestoreId: firebaseResult.id || null
+                });
+                localStorage.setItem('farm_ns', JSON.stringify(nsList));
+                
+                // Показываем результат
+                if (firebaseResult.success === true) {
+                    showSuccessScreen(nsData, '✅ Данные сохранены в облаке');
+                } else if (firebaseResult.success === 'queued') {
+                    showSuccessScreen(nsData, '⚠️ Данные в очереди на отправку в облако');
+                } else {
+                    showSuccessScreen(nsData, '📱 Данные сохранены локально');
+                }
+                
+            } catch (error) {
+                console.error('❌ Ошибка:', error);
+                showNotification(`Ошибка: ${error.message}`, 'error');
+                
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ошибка</h2>
+                        <p>${error.message}</p>
+                        <button class="btn btn-primary" onclick="window.location.reload()">
+                            ↻ Попробовать снова
+                        </button>
+                    </div>
+                `;
+            }
+        };
+        
+        // Экран успеха
+        function showSuccessScreen(nsData, message) {
+            document.getElementById('workerContent').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <div style="font-size: 80px; color: #28a745;">✅</div>
+                    <h2>Лист несоответствия создан!</h2>
+                    <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
+                    
+                    <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
+                        <p><strong>${message}</strong></p>
+                        <hr>
+                        <p><strong>📋 Информация:</strong></p>
+                        <p>Цех: ${nsData.department}</p>
+                        <p>Место: ${nsData.location}</p>
+                        <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
+                        <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
+                        <p>Заявитель: ${nsData.applicant}</p>
+                        <p>Фотографий: ${nsData.photos?.length || 0}</p>
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
+                        Вернуться на главную
+                    </button>
+                </div>
+            `;
+            
+            showNotification(`ЛН ${nsData.nsNumber} создан!`, 'success');
+        }
+        
+        // ============================================
+        // АДМИН ПАНЕЛЬ
+        // ============================================
+        
+        // Генерация номера ЛН
         window.generateNSNumber = function() {
             const year = new Date().getFullYear().toString().slice(-2);
             const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-            return `ЛН-${year}${month}-${Date.now().toString().slice(-4)}`;
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            return `ЛН-${year}${month}-${random}`;
         };
-
-        window.getNSTypeText = function(type) {
-            const typeMap = {
-                'product': 'Несоответствие продукции',
-                'process': 'Несоответствие процесса',
-                'equipment': 'Неисправность оборудования',
-                'documentation': 'Ошибка в документации',
-                'safety': 'Нарушение безопасности',
-                'other': 'Другое'
+        
+        // Генерация QR-кода
+        window.generateQRCode = async function() {
+            const department = document.getElementById('qrDepartment').value;
+            const location = document.getElementById('qrLocation').value;
+            const responsible = document.getElementById('qrResponsible').value;
+            
+            if (!department || !location) {
+                showNotification('Заполните подразделение и место', 'error');
+                return;
+            }
+            
+            const code = `FS-${Date.now().toString().slice(-8)}`;
+            const currentUrl = window.location.origin + window.location.pathname;
+            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
+            
+            currentQRData = {
+                code: code,
+                department: department,
+                location: location,
+                responsible: responsible,
+                url: qrUrl,
+                created: new Date().toISOString()
             };
-            return typeMap[type] || type;
+            
+            // Сохраняем в Firebase
+            const firebaseResult = await window.saveQRCodeFirestore(currentQRData);
+            
+            // Сохраняем локально
+            const qrcodes = JSON.parse(localStorage.getItem('farm_qrcodes') || '[]');
+            qrcodes.push({
+                ...currentQRData,
+                firestoreId: firebaseResult.id || null
+            });
+            localStorage.setItem('farm_qrcodes', JSON.stringify(qrcodes));
+            
+            // Отображаем QR
+            displayQRCode(qrUrl, code, department, location, responsible);
+            showNotification('QR-код создан!', 'success');
         };
-
-        window.getStatusText = function(status) {
-            const statusMap = {
-                'detected': 'ОБНАРУЖЕНО',
-                'checking_smk': 'НА ПРОВЕРКЕ',
-                'assigned': 'НАЗНАЧЕНО',
-                'correction': 'КОРРЕКТИРОВКА',
-                'checking_correction': 'ПРОВЕРКА КД',
-                'execution': 'ИСПОЛНЕНИЕ',
-                'completed': 'ВЫПОЛНЕНО',
-                'closed': 'ЗАКРЫТО',
-                'rejected': 'ВОЗВРАЩЕНО'
-            };
-            return statusMap[status] || status.toUpperCase();
-        };
-
-        window.getUrgencyText = function(urgency) {
-            const urgencyMap = {
-                'low': 'Низкая (неделя)',
-                'medium': 'Средняя (3 дня)',
-                'high': 'Высокая (24 часа)',
-                'critical': 'Критическая (немедленно)'
-            };
-            return urgencyMap[urgency] || urgency;
-        };
-
-        window.displayQRCode = function(qrUrl, code, department, location, responsible) {
+        
+        // Отображение QR-кода
+        function displayQRCode(qrUrl, code, department, location, responsible) {
             const qrcodeDiv = document.getElementById('qrPreview');
             qrcodeDiv.innerHTML = '';
             
+            // Генерация QR
             const qrContainer = document.createElement('div');
             qrContainer.className = 'qr-container';
             
@@ -1395,25 +1277,20 @@
                         width: 200,
                         height: 200,
                         colorDark: "#1e3c72",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.H
+                        colorLight: "#ffffff"
                     });
-                } else {
-                    throw new Error('Библиотека QRCode не загружена');
                 }
             } catch (error) {
-                console.error('Ошибка генерации QR:', error);
+                console.error('Ошибка QR:', error);
                 qrCodeDiv.innerHTML = `
                     <div style="width: 200px; height: 200px; background: #1e3c72; color: white; 
-                         display: flex; align-items: center; justify-content: center; border-radius: 10px; margin: 0 auto;">
-                        <div style="text-align: center;">
-                            <div style="font-size: 24px; font-weight: bold;">QR</div>
-                            <div style="font-size: 14px; margin-top: 10px;">${code}</div>
-                        </div>
+                         display: flex; align-items: center; justify-content: center; border-radius: 10px;">
+                        <div>QR</div>
                     </div>
                 `;
             }
             
+            // Информация
             qrcodeDiv.innerHTML += `
                 <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
                     <h3>📋 Информация о QR-коде</h3>
@@ -1421,209 +1298,301 @@
                     <p><strong>Место:</strong> ${location}</p>
                     ${responsible ? `<p><strong>Ответственный:</strong> ${responsible}</p>` : ''}
                     <p><strong>Код:</strong> <code>${code}</code></p>
-                    <p><strong>Назначение:</strong> Регистрация несоответствия ISO 13485</p>
-                    <p><small style="color: #666;">Сотрудник сканирует QR-код для регистрации несоответствия</small></p>
                     <div style="margin-top: 15px;">
-                        <button class="btn btn-primary" onclick="printQRCode()" style="margin-right: 10px;">🖨️ Печать QR-кода</button>
-                        <button class="btn btn-info" onclick="testQRCode('${code}')">📱 Тест регистрации</button>
+                        <button class="btn btn-info" onclick="testQRCode('${code}')">📱 Тест</button>
                     </div>
                 </div>
             `;
             
             qrcodeDiv.style.display = 'block';
         };
-
-        window.printQRCode = function() {
-            if (!currentQRData) return;
-            
-            const printContent = `
-                <html>
-                <head>
-                    <title>QR код - ${currentQRData.department}</title>
-                    <style>
-                        body { font-family: Arial; text-align: center; padding: 40px; }
-                        h1 { color: #1e3c72; margin-bottom: 20px; }
-                        .info { margin: 20px 0; font-size: 16px; text-align: left; }
-                        .instruction { margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; font-size: 14px; }
-                        @media print { 
-                            body { padding: 20px; }
-                            .no-print { display: none; }
-                        }
-                    </style>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>
-                </head>
-                <body>
-                    <h1>ФАРМСТИЛ - Регистрация несоответствий</h1>
-                    <h2>QR-код для регистрации несоответствия</h2>
-                    
-                    <div class="info">
-                        <p><strong>Подразделение:</strong> ${currentQRData.department}</p>
-                        <p><strong>Место:</strong> ${currentQRData.location}</p>
-                        ${currentQRData.responsible ? `<p><strong>Ответственный за зону:</strong> ${currentQRData.responsible}</p>` : ''}
-                        <p><strong>Код:</strong> ${currentQRData.code}</p>
-                        <p><strong>Дата создания:</strong> ${new Date().toLocaleDateString('ru-RU')}</p>
-                    </div>
-                    
-                    <div class="instruction">
-                        <p><strong>📱 Как использовать:</strong></p>
-                        <ol style="text-align: left;">
-                            <li>Сканируйте QR-код камерой телефона</li>
-                            <li>Откроется форма регистрации несоответствия</li>
-                            <li>Заполните все обязательные поля</li>
-                            <li>Прикрепите фотографии (при необходимости)</li>
-                            <li>Нажмите "Отправить"</li>
-                        </ol>
-                    </div>
-                    
-                    <div id="qrcode" style="margin: 20px auto; width: 300px; height: 300px;"></div>
-                    <p style="margin-top: 20px; font-size: 14px; font-weight: bold;">Отсканируйте для регистрации несоответствия ISO 13485</p>
-                    
-                    <p class="no-print" style="color: #666; font-size: 12px; margin-top: 30px;">
-                        Сгенерировано: ${new Date().toLocaleString('ru-RU')}
-                    </p>
-                    
-                    <script>
-                        setTimeout(function() {
-                            try {
-                                new QRCode(document.getElementById('qrcode'), {
-                                    text: '${currentQRData.url}',
-                                    width: 300,
-                                    height: 300,
-                                    colorDark: "#1e3c72",
-                                    colorLight: "#ffffff"
-                                });
-                                setTimeout(function() {
-                                    window.print();
-                                    setTimeout(function() { window.close(); }, 500);
-                                }, 500);
-                            } catch(e) {
-                                document.getElementById('qrcode').innerHTML = 
-                                    '<div style="width: 300px; height: 300px; background: #1e3c72; color: white; ' +
-                                    'display: flex; align-items: center; justify-content: center; margin: 0 auto;">' +
-                                    '<div style="text-align: center;">' +
-                                    '<div style="font-size: 32px; font-weight: bold;">QR</div>' +
-                                    '<div style="font-size: 16px;">${currentQRData.code}</div>' +
-                                    '<div style="font-size: 12px; margin-top: 10px;">Регистрация несоответствия</div>' +
-                                    '</div></div>';
-                                setTimeout(function() {
-                                    window.print();
-                                    setTimeout(function() { window.close(); }, 500);
-                                }, 500);
-                            }
-                        }, 100);
-                    <\/script>
-                </body>
-                </html>
-            `;
-            
-            const printWindow = window.open('', '_blank');
-            printWindow.document.write(printContent);
-            printWindow.document.close();
-        };
-
+        
+        // Тест QR-кода
         window.testQRCode = function(code) {
             const currentUrl = window.location.origin + window.location.pathname;
             const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
             window.open(qrUrl, '_blank');
-            showNotification('Открыта страница регистрации несоответствия', 'success');
         };
-
-        window.sendEmailToSMKManager = async function(nsData) {
+        
+        // Загрузка списка ЛН
+        window.loadNSList = async function() {
             try {
-                const formData = new FormData();
-                formData.append('access_key', WEB3FORMS_ACCESS_KEY);
-                formData.append('subject', `ФАРМСТИЛ: Новое несоответствие ${nsData.nsNumber} (Firebase)`);
-                formData.append('from_name', 'Система ФАРМСТИЛ ISO 13485');
-                formData.append('reply_to', nsData.applicant || 'notifications@farmstil.ru');
-                formData.append('to', SMK_MANAGER_EMAIL);
+                const container = document.getElementById('nsListContainer');
+                if (!container) return;
                 
-                const htmlMessage = `
-                    <h2>🚨 Новое несоответствие ISO 13485 (Firebase)</h2>
-                    <p><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
-                    <p><strong>Дата:</strong> ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
-                    <p><strong>Подразделение:</strong> ${nsData.department}</p>
-                    <p><strong>Рабочее место:</strong> ${nsData.location}</p>
-                    <p><strong>Заявитель:</strong> ${nsData.applicant} ${nsData.applicantPhone ? `(${nsData.applicantPhone})` : ''}</p>
-                    <p><strong>Тип:</strong> ${getNSTypeText(nsData.nsType)}</p>
-                    <p><strong>Срочность:</strong> ${getUrgencyText(nsData.urgency)}</p>
-                    <hr>
-                    <h3>Описание:</h3>
-                    <p><strong>${nsData.nsTitle}</strong></p>
-                    <p>${nsData.description}</p>
-                    <hr>
-                    <p><strong>QR-код:</strong> ${nsData.qrCode || 'Не указан'}</p>
-                    <p><strong>Статус:</strong> ${getStatusText(nsData.status)}</p>
-                    <p><strong>Фотографий:</strong> ${nsData.photos ? nsData.photos.length : 0}</p>
-                    <p><strong>Источник данных:</strong> 🔥 Firebase Cloud</p>
-                    <br>
-                    <p>Данные сохранены в облачной базе и доступны в админ-панели</p>
-                `;
+                container.innerHTML = '<p style="text-align: center; padding: 20px;">⏳ Загружаю...</p>';
                 
-                formData.append('html_message', htmlMessage);
+                const nsList = await window.getAllNSFirestore();
                 
-                const response = await fetch('https://api.web3forms.com/submit', {
-                    method: 'POST',
-                    body: formData
+                if (nsList.length === 0) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <p>📭 Нет листов несоответствий</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                nsList.forEach(ns => {
+                    const statusClass = `status-${ns.status}`;
+                    const date = ns.created ? 
+                        new Date(ns.created).toLocaleDateString('ru-RU') : 'Дата неизвестна';
+                    
+                    html += `
+                        <div class="ln-card">
+                            <div class="ln-card-header">
+                                <div class="ln-number">
+                                    ${ns.nsNumber}
+                                    ${ns.isLocal ? '<span class="local-badge">ЛОКАЛЬНЫЙ</span>' : ''}
+                                </div>
+                                <div class="ln-status ${statusClass}">
+                                    ${getStatusText(ns.status)}
+                                </div>
+                            </div>
+                            <div style="margin: 10px 0;">
+                                <p><strong>Цех:</strong> ${ns.department}</p>
+                                <p><strong>Место:</strong> ${ns.location}</p>
+                                <p><strong>Заявитель:</strong> ${ns.applicant}</p>
+                                <p><strong>Дата:</strong> ${date}</p>
+                                <p><strong>Описание:</strong> ${ns.nsTitle}</p>
+                                <p><strong>Фотографий:</strong> ${ns.photosCount || 0}</p>
+                            </div>
+                        </div>
+                    `;
                 });
                 
-                const result = await response.json();
+                container.innerHTML = html;
                 
-                if (result.success) {
-                    console.log('✅ Email отправлен через Web3Forms');
-                    return { success: true };
-                } else {
-                    console.error('Ошибка отправки email:', result.message);
-                    return { success: false, message: result.message };
-                }
             } catch (error) {
-                console.error('Ошибка отправки email:', error);
-                return { success: false, message: error.message };
+                console.error('Ошибка загрузки списка:', error);
+                const container = document.getElementById('nsListContainer');
+                if (container) {
+                    container.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #dc3545;">
+                            <p>❌ Ошибка загрузки</p>
+                            <button class="btn btn-sm btn-primary" onclick="loadNSList()">
+                                ⟳ Попробовать снова
+                            </button>
+                        </div>
+                    `;
+                }
             }
         };
-
-        window.loadDirectories = function() {
-            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
-            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
-            
-            let responsiblesHtml = '';
-            responsibles.forEach(r => {
-                responsiblesHtml += `
-                    <div class="directory-item">
-                        <div class="directory-item-info">
-                            <strong>${r.name}</strong>
-                            <div style="font-size: 12px; color: #666;">${r.email} • ${r.role || 'Ответственный'}</div>
+        
+        // Обновление статистики
+        window.updateStats = async function() {
+            try {
+                const nsList = await window.getAllNSFirestore();
+                const statsGrid = document.getElementById('statsGrid');
+                
+                if (statsGrid) {
+                    const active = nsList.filter(n => 
+                        n.status !== 'l' && n.status !== 'j' && n.status !== 'queued'
+                    ).length;
+                    
+                    const pending = nsList.filter(n => n.status === 'queued').length;
+                    const photos = nsList.reduce((sum, n) => sum + (n.photosCount || 0), 0);
+                    
+                    statsGrid.innerHTML = `
+                        <div class="form-grid">
+                            <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
+                                <h3>📊 Статистика</h3>
+                                <p><strong>Всего ЛН:</strong> ${nsList.length}</p>
+                                <p><strong>Активных:</strong> ${active}</p>
+                                <p><strong>В очереди:</strong> ${pending}</p>
+                                <p><strong>Фотографий:</strong> ${photos}</p>
+                            </div>
                         </div>
-                        <div class="directory-item-actions">
-                            <button class="btn btn-sm btn-warning" onclick="editResponsible(${r.id})">✏️</button>
+                    `;
+                }
+            } catch (error) {
+                console.error('Ошибка статистики:', error);
+            }
+        };
+        
+        // Обновление информации об очереди
+        function updateQueueInfo() {
+            const pendingQueue = JSON.parse(localStorage.getItem('fb_pending') || '[]');
+            const queueInfo = document.getElementById('queueInfo');
+            
+            if (queueInfo && pendingQueue.length > 0) {
+                queueInfo.innerHTML = `
+                    <div class="queue-info">
+                        <p><strong>⚠️ Данные в очереди на отправку:</strong> ${pendingQueue.length}</p>
+                        <p style="font-size: 12px;">Будут отправлены автоматически при восстановлении лимитов Firebase</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // ============================================
+        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // ============================================
+        
+        // Уведомления
+        window.showNotification = function(message, type = 'success', duration = 3000) {
+            const notification = document.getElementById('notification');
+            if (!notification) return;
+            
+            notification.textContent = message;
+            notification.className = 'notification';
+            if (type === 'error') notification.classList.add('error');
+            if (type === 'warning') notification.classList.add('warning');
+            notification.style.display = 'block';
+            
+            setTimeout(() => notification.style.display = 'none', duration);
+        };
+        
+        // Переключение страниц
+        window.showPage = function(pageId) {
+            // Скрываем все страницы
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            
+            // Показываем нужную
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.add('active');
+                
+                // Активируем кнопку меню
+                const buttons = document.querySelectorAll('.menu-btn');
+                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
+                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
+                
+                // Загружаем данные если нужно
+                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'directories') loadDirectories();
+                if (pageId === 'admin') {
+                    updateStats();
+                    updateQueueInfo();
+                }
+            }
+        };
+        
+        // Проверка режима (рабочий/админ)
+        window.checkMode = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const qrcode = urlParams.get('qrcode');
+            
+            if (mode === 'worker') {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
+                
+                if (qrcode) {
+                    showWorkerFormByQR(qrcode);
+                } else {
+                    showWorkerFormManual();
+                }
+            } else {
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
+                showPage('generateQR');
+            }
+        };
+        
+        // Ручной ввод (заглушка)
+        window.showWorkerFormManual = function() {
+            document.getElementById('workerContent').innerHTML = `
+                <div style="padding: 20px;">
+                    <h2>🚨 Регистрация несоответствия (ручной ввод)</h2>
+                    <p>Эта функция в разработке. Используйте QR-код.</p>
+                </div>
+            `;
+        };
+        
+        // Поиск ЛН
+        window.searchNS = function() {
+            const term = document.getElementById('searchNS').value.toLowerCase();
+            const cards = document.querySelectorAll('.ln-card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                card.style.display = text.includes(term) ? 'block' : 'none';
+            });
+        };
+        
+        // Текстовые преобразования
+        window.getNSTypeText = function(type) {
+            const map = {
+                'product': 'Несоответствие продукции',
+                'process': 'Несоответствие процесса',
+                'equipment': 'Неисправность оборудования',
+                'documentation': 'Ошибка в документации',
+                'safety': 'Нарушение безопасности',
+                'other': 'Другое'
+            };
+            return map[type] || type;
+        };
+        
+        window.getStatusText = function(status) {
+            const map = {
+                'd': 'ОБНАРУЖЕНО',
+                'c': 'НА ПРОВЕРКЕ',
+                'a': 'НАЗНАЧЕНО',
+                'r': 'КОРРЕКТИРОВКА',
+                'cc': 'ПРОВЕРКА КД',
+                'e': 'ИСПОЛНЕНИЕ',
+                'p': 'ВЫПОЛНЕНО',
+                'l': 'ЗАКРЫТО',
+                'j': 'ВОЗВРАЩЕНО',
+                'queued': 'В ОЧЕРЕДИ'
+            };
+            return map[status] || status.toUpperCase();
+        };
+        
+        window.getUrgencyText = function(urgency) {
+            const map = {
+                'low': 'Низкая (неделя)',
+                'medium': 'Средняя (3 дня)',
+                'high': 'Высокая (24 часа)',
+                'critical': 'Критическая (немедленно)'
+            };
+            return map[urgency] || urgency;
+        };
+        
+        // ============================================
+        // СПРАВОЧНИКИ
+        // ============================================
+        
+        window.loadDirectories = function() {
+            const responsibles = JSON.parse(localStorage.getItem('farm_responsibles') || '[]');
+            const executors = JSON.parse(localStorage.getItem('farm_executors') || '[]');
+            
+            // Ответственные
+            let respHtml = '';
+            responsibles.forEach(r => {
+                respHtml += `
+                    <div class="directory-item">
+                        <div><strong>${r.name}</strong><br><small>${r.email}</small></div>
+                        <div>
                             <button class="btn btn-sm btn-danger" onclick="deleteResponsible(${r.id})">🗑️</button>
                         </div>
                     </div>
                 `;
             });
             
-            let executorsHtml = '';
+            // Исполнители
+            let execHtml = '';
             executors.forEach(e => {
-                executorsHtml += `
+                execHtml += `
                     <div class="directory-item">
-                        <div class="directory-item-info">
-                            <strong>${e.name}</strong>
-                            <div style="font-size: 12px; color: #666;">${e.email} • ${e.department || 'Исполнитель'}</div>
-                        </div>
-                        <div class="directory-item-actions">
-                            <button class="btn btn-sm btn-warning" onclick="editExecutor(${e.id})">✏️</button>
+                        <div><strong>${e.name}</strong><br><small>${e.email}</small></div>
+                        <div>
                             <button class="btn btn-sm btn-danger" onclick="deleteExecutor(${e.id})">🗑️</button>
                         </div>
                     </div>
                 `;
             });
             
-            const responsiblesList = document.getElementById('responsiblesList');
-            const executorsList = document.getElementById('executorsList');
+            const respList = document.getElementById('responsiblesList');
+            const execList = document.getElementById('executorsList');
             
-            if (responsiblesList) responsiblesList.innerHTML = responsiblesHtml || '<p>Нет ответственных</p>';
-            if (executorsList) executorsList.innerHTML = executorsHtml || '<p>Нет исполнителей</p>';
+            if (respList) respList.innerHTML = respHtml || '<p>Нет ответственных</p>';
+            if (execList) execList.innerHTML = execHtml || '<p>Нет исполнителей</p>';
         };
-
+        
         window.addResponsible = function() {
             const name = document.getElementById('responsibleName').value.trim();
             const email = document.getElementById('responsibleEmail').value.trim();
@@ -1633,17 +1602,11 @@
                 return;
             }
             
-            const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            const responsibles = JSON.parse(localStorage.getItem('farm_responsibles') || '[]');
             const newId = responsibles.length > 0 ? Math.max(...responsibles.map(r => r.id)) + 1 : 1;
             
-            responsibles.push({
-                id: newId,
-                name: name,
-                email: email,
-                role: 'Ответственный'
-            });
-            
-            localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
+            responsibles.push({ id: newId, name, email, role: 'Ответственный' });
+            localStorage.setItem('farm_responsibles', JSON.stringify(responsibles));
             
             document.getElementById('responsibleName').value = '';
             document.getElementById('responsibleEmail').value = '';
@@ -1651,7 +1614,7 @@
             loadDirectories();
             showNotification('Ответственный добавлен', 'success');
         };
-
+        
         window.addExecutor = function() {
             const name = document.getElementById('executorName').value.trim();
             const email = document.getElementById('executorEmail').value.trim();
@@ -1661,17 +1624,11 @@
                 return;
             }
             
-            const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            const executors = JSON.parse(localStorage.getItem('farm_executors') || '[]');
             const newId = executors.length > 0 ? Math.max(...executors.map(e => e.id)) + 1 : 1;
             
-            executors.push({
-                id: newId,
-                name: name,
-                email: email,
-                department: 'Исполнитель'
-            });
-            
-            localStorage.setItem('farmstil_executors', JSON.stringify(executors));
+            executors.push({ id: newId, name, email, department: 'Исполнитель' });
+            localStorage.setItem('farm_executors', JSON.stringify(executors));
             
             document.getElementById('executorName').value = '';
             document.getElementById('executorEmail').value = '';
@@ -1679,53 +1636,32 @@
             loadDirectories();
             showNotification('Исполнитель добавлен', 'success');
         };
-
+        
         window.deleteResponsible = function(id) {
-            let responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
+            let responsibles = JSON.parse(localStorage.getItem('farm_responsibles') || '[]');
             responsibles = responsibles.filter(r => r.id !== id);
-            localStorage.setItem('farmstil_responsibles', JSON.stringify(responsibles));
+            localStorage.setItem('farm_responsibles', JSON.stringify(responsibles));
             loadDirectories();
             showNotification('Ответственный удален', 'success');
         };
-
+        
         window.deleteExecutor = function(id) {
-            let executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
+            let executors = JSON.parse(localStorage.getItem('farm_executors') || '[]');
             executors = executors.filter(e => e.id !== id);
-            localStorage.setItem('farmstil_executors', JSON.stringify(executors));
+            localStorage.setItem('farm_executors', JSON.stringify(executors));
             loadDirectories();
             showNotification('Исполнитель удален', 'success');
         };
-
-        window.loadPendingCount = async function() {
-            try {
-                const nsList = await window.getAllNSFirestore();
-                const pendingCount = nsList.filter(ns => ns.status === 'checking_smk').length;
-                const pendingCountEl = document.getElementById('pendingCount');
-                if (pendingCountEl) pendingCountEl.textContent = pendingCount;
-            } catch (error) {
-                console.error('Ошибка загрузки счетчика:', error);
-            }
-        };
-
-        window.updateLastSyncTime = function() {
-            const lastSync = localStorage.getItem('farmstil_last_sync');
-            const lastSyncTimeEl = document.getElementById('lastSyncTime');
-            
-            if (lastSyncTimeEl) {
-                if (lastSync) {
-                    const date = new Date(lastSync);
-                    lastSyncTimeEl.textContent = date.toLocaleString('ru-RU');
-                } else {
-                    lastSyncTimeEl.textContent = 'Никогда';
-                }
-            }
-        };
-
+        
+        // ============================================
+        // АДМИН ФУНКЦИИ
+        // ============================================
+        
         window.openFirebaseConsole = function() {
             window.open('https://console.firebase.google.com/', '_blank');
-            showNotification('Открываю Firebase Console...', 'success');
+            showNotification('Открываю Firebase Console...', 'info');
         };
-
+        
         window.exportToCSV = async function() {
             try {
                 const nsList = await window.getAllNSFirestore();
@@ -1735,124 +1671,83 @@
                     return;
                 }
                 
-                const headers = [
-                    'Номер ЛН', 'Дата создания', 'Дата обнаружения', 'Подразделение', 
-                    'Рабочее место', 'Заявитель', 'Телефон', 'Тип несоответствия', 
-                    'Краткое описание', 'Полное описание', 'Срочность', 'Статус', 
-                    'QR код', 'Количество фото', 'Источник данных'
-                ];
+                const headers = ['Номер ЛН', 'Дата', 'Подразделение', 'Место', 'Заявитель', 'Статус', 'Фото'];
+                const rows = nsList.map(ns => [
+                    ns.nsNumber,
+                    ns.created ? new Date(ns.created).toLocaleDateString('ru-RU') : '',
+                    ns.department,
+                    ns.location,
+                    ns.applicant,
+                    getStatusText(ns.status),
+                    ns.photosCount || 0
+                ]);
                 
-                const csvRows = [];
-                csvRows.push(headers.join(';'));
-                
-                nsList.forEach(ns => {
-                    const row = [
-                        ns.nsNumber || '',
-                        ns.created ? new Date(ns.created).toLocaleString('ru-RU') : '',
-                        ns.detectionDate || '',
-                        ns.department || '',
-                        ns.location || '',
-                        ns.applicant || '',
-                        ns.applicantPhone || '',
-                        getNSTypeText(ns.nsType),
-                        ns.nsTitle || '',
-                        ns.description ? `"${ns.description.replace(/"/g, '""')}"` : '',
-                        getUrgencyText(ns.urgency),
-                        getStatusText(ns.status),
-                        ns.qrCode || '',
-                        ns.photosCount || 0,
-                        'Firebase Cloud'
-                    ];
-                    csvRows.push(row.join(';'));
-                });
-                
-                const csvContent = csvRows.join('\n');
-                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const csv = [headers.join(';'), ...rows.map(row => row.join(';'))].join('\n');
+                const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = `farmstil_firebase_export_${new Date().toISOString().split('T')[0]}.csv`;
+                link.download = `farmstil_${new Date().toISOString().split('T')[0]}.csv`;
                 link.click();
                 
-                showNotification(`Экспортировано ${nsList.length} записей из Firebase`, 'success');
+                showNotification(`Экспортировано ${nsList.length} записей`, 'success');
                 
             } catch (error) {
                 console.error('Ошибка экспорта:', error);
-                showNotification('Ошибка экспорта данных', 'error');
+                showNotification('Ошибка экспорта', 'error');
             }
         };
-
-        window.backupData = function() {
-            const data = {
-                ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
-                qrcodes: JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]'),
-                responsibles: JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]'),
-                executors: JSON.parse(localStorage.getItem('farmstil_executors') || '[]'),
-                timestamp: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `farmstil_local_backup_${new Date().toISOString().split('T')[0]}.json`;
-            link.click();
-            
-            showNotification('Локальная резервная копия создана', 'success');
-        };
-
+        
         window.clearLocalData = function() {
-            if (confirm('⚠️ Вы уверены, что хотите очистить локальные данные? Это не затронет данные в облаке Firebase.')) {
-                localStorage.clear();
-                initDirectories();
-                loadDirectories();
-                updateStats();
+            if (confirm('Очистить ВСЕ локальные данные? Это не затронет облачные данные.')) {
+                localStorage.removeItem('fb_pending');
+                localStorage.removeItem('farm_ns');
+                localStorage.removeItem('farm_qrcodes');
                 showNotification('Локальные данные очищены', 'success');
+                updateQueueInfo();
+                loadNSList();
             }
         };
-
-        window.searchNS = function() {
-            const searchTerm = document.getElementById('searchNS').value.toLowerCase();
-            const cards = document.querySelectorAll('.ln-card');
-            
-            cards.forEach(card => {
-                const text = card.textContent.toLowerCase();
-                if (text.includes(searchTerm)) {
-                    card.style.display = 'block';
-                } else {
-                    card.style.display = 'none';
-                }
-            });
+        
+        window.refreshAllData = function() {
+            updateStats();
+            loadNSList();
+            showNotification('Данные обновлены', 'success');
         };
-
-        window.showWorkerFormManual = function() {
-            document.getElementById('workerContent').innerHTML = `
-                <div style="padding: 20px;">
-                    <h2>🚨 Регистрация несоответствия (ручной ввод)</h2>
-                    <p>Эта функция в разработке. Используйте QR-код для регистрации.</p>
-                </div>
-            `;
-        };
-
+        
         window.showPendingNS = function() {
             showPage('listNS');
+            // Можно добавить фильтр по статусу 'c' (checking_smk)
         };
-
-        // Заглушки для остальных функций
+        
+        // Заглушки для будущих функций
         window.viewNSDetails = function(id) {
-            showNotification(`Просмотр ЛН ${id} (функция в разработке)`, 'info');
+            showNotification(`Просмотр ЛН ${id} (в разработке)`, 'info');
         };
-
+        
         window.editNS = function(id) {
-            showNotification(`Редактирование ЛН ${id} (функция в разработке)`, 'info');
+            showNotification(`Редактирование ЛН ${id} (в разработке)`, 'info');
         };
-
+        
         window.approveNS = function(id) {
-            showNotification(`Одобрение ЛН ${id} (функция в разработке)`, 'info');
+            showNotification(`Одобрение ЛН ${id} (в разработке)`, 'info');
         };
-
-        console.log('✅ Система ФАРМСТИЛ с Firebase полностью загружена');
+        
+        // ============================================
+        // ЗАПУСК СИСТЕМЫ
+        // ============================================
+        console.log('✅ Система ФАРМСТИЛ загружена');
+        
+        // Автоматический запуск
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                if (window.initFarmstilSystem) {
+                    window.initFarmstilSystem();
+                }
+            }, 100);
+        });
+        
     </script>
 </body>
 </html>
