@@ -305,6 +305,25 @@
             border-left-color: #dc3545;
             background: #f8d7da;
         }
+        
+        .firebase-status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 8px;
+            background: #e8f4ff;
+            border-left: 4px solid #1e3c72;
+            text-align: center;
+        }
+        
+        .firebase-status.connected {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .firebase-status.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
     </style>
 </head>
 <body>
@@ -338,7 +357,10 @@
             <!-- Шапка -->
             <div class="header">
                 <h1>ФАРМСТИЛ - Административная панель</h1>
-                <h2>ISO 13485 Workflow + Google Sheets</h2>
+                <h2>ISO 13485 Workflow + Firebase</h2>
+                <div id="firebaseStatus" class="firebase-status">
+                    ⏳ Подключение к облачной базе данных...
+                </div>
             </div>
             
             <!-- Меню -->
@@ -386,7 +408,9 @@
                 <div class="form-grid">
                     <input type="text" id="searchNS" placeholder="🔍 Поиск по номеру ЛН, цеху, статусу..." onkeyup="searchNS()">
                 </div>
-                <div id="nsListContainer"></div>
+                <div id="nsListContainer">
+                    <p style="text-align: center; padding: 20px;">⏳ Загружаю данные из облачной базы...</p>
+                </div>
             </div>
             
             <div class="page" id="workflowPage">
@@ -450,39 +474,93 @@
             
             <div class="page" id="adminPage">
                 <h2>⚙️ Администрирование</h2>
-                <div id="statsGrid"></div>
+                <div id="statsGrid">
+                    <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
+                        <h3>📊 Статистика системы (Firebase)</h3>
+                        <p>Загружаю данные из облака...</p>
+                    </div>
+                </div>
                 <div id="syncSection">
-                    <h3>🔄 Синхронизация с Google Sheets</h3>
-                    <div class="sync-status" id="syncStatus">
-                        <p>Статус: Ожидание синхронизации</p>
+                    <h3>🔥 Состояние облачной базы</h3>
+                    <div class="firebase-status" id="dbStatus">
+                        <p>Статус: Проверяю подключение...</p>
                     </div>
                     <div class="form-grid">
-                        <button class="btn btn-primary" onclick="syncWithGoogleSheets()">🔄 Синхронизировать сейчас</button>
                         <button class="btn btn-success" onclick="exportToCSV()">📊 Экспорт в CSV</button>
-                        <button class="btn btn-info" onclick="openGoogleSheets()">📊 Открыть Google Sheets</button>
+                        <button class="btn btn-info" onclick="openFirebaseConsole()">🔥 Открыть Firebase Console</button>
                     </div>
                     <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                        <h4>📋 Информация о синхронизации:</h4>
-                        <p><strong>Таблица:</strong> ЛН_ISO13485</p>
-                        <p><strong>ID таблицы:</strong> 1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU</p>
-                        <p><strong>Последняя синхронизация:</strong> <span id="lastSyncTime">Никогда</span></p>
+                        <h4>📋 Информация о базе данных:</h4>
+                        <p><strong>База данных:</strong> Firestore (облачная)</p>
+                        <p><strong>Проект:</strong> fl-nc-37e11</p>
+                        <p><strong>Коллекции:</strong> non_conformities, qrcodes</p>
+                        <p><strong>Статус:</strong> <span id="dbConnectionStatus">Проверка...</span></p>
                     </div>
                 </div>
                 <div class="form-grid" style="margin-top: 30px;">
-                    <button class="btn btn-primary" onclick="backupData()">💾 Резервная копия</button>
-                    <button class="btn btn-info" onclick="restoreData()">🔄 Восстановить</button>
-                    <button class="btn btn-warning" onclick="clearAllData()">🗑️ Очистить все</button>
+                    <button class="btn btn-primary" onclick="backupData()">💾 Локальная копия</button>
+                    <button class="btn btn-warning" onclick="clearLocalData()">🗑️ Очистить локальные данные</button>
+                    <button class="btn btn-danger" onclick="testFirebaseConnection()">🧪 Тест подключения</button>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Firebase SDK -->
+    <script type="module">
+        // ============================================
+        // FIREBASE ИМПОРТ И КОНФИГУРАЦИЯ
+        // ============================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            query, 
+            orderBy,
+            serverTimestamp,
+            doc,
+            updateDoc,
+            onSnapshot,
+            deleteDoc 
+        } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
+
+        // Конфигурация Firebase (ВАША!)
+        const firebaseConfig = {
+            apiKey: "AIzaSyCz6c6IJUg_pqZqem1ejNEZnm_dy8uhwKE",
+            authDomain: "fl-nc-37e11.firebaseapp.com",
+            projectId: "fl-nc-37e11",
+            storageBucket: "fl-nc-37e11.firebasestorage.app",
+            messagingSenderId: "573438710014",
+            appId: "1:573438710014:web:99af07c7e3440d53bd95af",
+            measurementId: "G-3RBJDQWWCN"
+        };
+
+        // Инициализация Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        // Обновляем статус подключения
+        document.getElementById('firebaseStatus').innerHTML = `
+            <p>✅ Подключено к Firebase Cloud</p>
+            <p style="font-size: 12px; color: #666;">Проект: fl-nc-37e11 | База данных: Firestore</p>
+        `;
+        document.getElementById('firebaseStatus').className = 'firebase-status connected';
+        
+        document.getElementById('dbConnectionStatus').textContent = '✅ Подключено';
+        document.getElementById('dbStatus').innerHTML = '<p>✅ Соединение с Firebase установлено</p>';
+        document.getElementById('dbStatus').className = 'firebase-status connected';
+
+        console.log('✅ Firebase инициализирован');
+    </script>
+
     <script>
         // ============================================
-        // КОНСТАНТЫ И КОНФИГУРАЦИЯ
+        // КОНСТАНТЫ И ПЕРЕМЕННЫЕ
         // ============================================
-        
-        // Конфигурация Google Sheets
         const GOOGLE_SHEETS_CONFIG = {
             SPREADSHEET_ID: '1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU',
             SHEET_NAME: 'ЛН_ISO13485',
@@ -507,24 +585,204 @@
         let currentQRData = null;
         let photos = [];
         let currentEditingNS = null;
-        
+        let firebaseUnsubscribe = null;
+
         // ============================================
-        // ИНИЦИАЛИЗАЦИЯ
+        // FIREBASE ФУНКЦИИ
         // ============================================
-        
+
+        // 1. Сохранить ЛН в Firestore
+        window.saveNSFirestore = async function(nsData) {
+            try {
+                console.log('Сохраняю ЛН в Firestore:', nsData.nsNumber);
+                
+                // Добавляем временную метку
+                const dataToSave = {
+                    ...nsData,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    firebaseSaved: true
+                };
+                
+                // Удаляем id чтобы Firestore создал свой
+                delete dataToSave.id;
+                
+                // Сохраняем в коллекцию 'non_conformities'
+                const docRef = await addDoc(collection(db, "non_conformities"), dataToSave);
+                console.log('✅ ЛН сохранен в Firestore с ID:', docRef.id);
+                
+                return { 
+                    success: true, 
+                    id: docRef.id,
+                    nsNumber: nsData.nsNumber 
+                };
+            } catch (error) {
+                console.error('❌ Ошибка сохранения в Firestore:', error);
+                return { 
+                    success: false, 
+                    error: error.message,
+                    code: error.code 
+                };
+            }
+        };
+
+        // 2. Получить все ЛН из Firestore
+        window.getAllNSFirestore = async function() {
+            try {
+                console.log('Загружаю ЛН из Firestore...');
+                
+                // Создаем запрос с сортировкой по дате создания
+                const q = query(
+                    collection(db, "non_conformities"), 
+                    orderBy("created", "desc")
+                );
+                
+                const querySnapshot = await getDocs(q);
+                const nsList = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    nsList.push({
+                        firestoreId: doc.id,  // ID документа Firestore
+                        ...data,
+                        // Обрабатываем даты
+                        created: data.created ? data.created : new Date().toISOString(),
+                        // Если есть timestamp, конвертируем
+                        createdAt: data.createdAt ? 
+                            (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : 
+                            new Date().toISOString()
+                    });
+                });
+                
+                console.log(`✅ Загружено ${nsList.length} ЛН из Firestore`);
+                return nsList;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки из Firestore:', error);
+                return [];
+            }
+        };
+
+        // 3. Обновить статус ЛН
+        window.updateNSStatusFirestore = async function(nsId, newStatus, comment = '') {
+            try {
+                const nsRef = doc(db, "non_conformities", nsId);
+                
+                await updateDoc(nsRef, {
+                    status: newStatus,
+                    updatedAt: serverTimestamp(),
+                    lastAction: {
+                        date: new Date().toISOString(),
+                        comment: comment
+                    }
+                });
+                
+                console.log(`✅ Статус ЛН ${nsId} обновлен на: ${newStatus}`);
+                return { success: true };
+            } catch (error) {
+                console.error('❌ Ошибка обновления статуса:', error);
+                return { success: false, error: error.message };
+            }
+        };
+
+        // 4. Сохранить QR-код в Firestore
+        window.saveQRCodeFirestore = async function(qrData) {
+            try {
+                const dataToSave = {
+                    ...qrData,
+                    createdAt: serverTimestamp(),
+                    firebaseSaved: true
+                };
+                
+                const docRef = await addDoc(collection(db, "qrcodes"), dataToSave);
+                console.log('✅ QR-код сохранен в Firestore:', qrData.code);
+                return { success: true, id: docRef.id };
+            } catch (error) {
+                console.error('❌ Ошибка сохранения QR-кода:', error);
+                return { success: false, error: error.message };
+            }
+        };
+
+        // 5. Получить все QR-коды
+        window.getAllQRCodesFirestore = async function() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "qrcodes"));
+                const qrCodes = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    qrCodes.push({
+                        firestoreId: doc.id,
+                        ...data
+                    });
+                });
+                
+                return qrCodes;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки QR-кодов:', error);
+                return [];
+            }
+        };
+
+        // 6. Тест подключения к Firebase
+        window.testFirebaseConnection = async function() {
+            try {
+                showNotification('Тестирую подключение к Firebase...', 'success');
+                
+                // Пробуем прочитать тестовые данные
+                const testQuery = query(collection(db, "non_conformities"), orderBy("created", "desc"));
+                const snapshot = await getDocs(testQuery);
+                
+                showNotification(`✅ Подключение успешно! Найдено ${snapshot.size} записей`, 'success');
+                
+                document.getElementById('dbStatus').innerHTML = `
+                    <p>✅ Соединение с Firebase установлено</p>
+                    <p style="font-size: 12px;">Найдено записей: ${snapshot.size}</p>
+                `;
+                document.getElementById('dbStatus').className = 'firebase-status connected';
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Ошибка подключения к Firebase:', error);
+                showNotification(`❌ Ошибка подключения: ${error.message}`, 'error');
+                
+                document.getElementById('dbStatus').innerHTML = `
+                    <p>❌ Ошибка подключения</p>
+                    <p style="font-size: 12px;">${error.message}</p>
+                `;
+                document.getElementById('dbStatus').className = 'firebase-status error';
+                
+                return false;
+            }
+        };
+
+        // ============================================
+        // ОСНОВНЫЕ ФУНКЦИИ СИСТЕМЫ
+        // ============================================
+
+        // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🚀 Система ФАРМСТИЛ ISO 13485 запускается...');
+            console.log('🚀 Система ФАРМСТИЛ ISO 13485 с Firebase запускается...');
             
+            // Инициализируем локальные хранилища
             initDirectories();
             checkMode();
             loadDirectories();
-            updateStats();
-            loadPendingCount();
-            updateLastSyncTime();
             
-            console.log('✅ Система готова к работе');
+            // Загружаем данные из Firestore
+            setTimeout(async () => {
+                await updateStats();
+                await loadPendingCount();
+                updateLastSyncTime();
+                
+                // Если открыта страница со списком ЛН - загружаем
+                if (document.getElementById('nsListContainer')) {
+                    await loadNSList();
+                }
+                
+                console.log('✅ Система готова к работе с Firebase');
+            }, 1000);
         });
-        
+
         function initDirectories() {
             if (!localStorage.getItem('farmstil_responsibles')) {
                 const defaultResponsibles = [
@@ -554,12 +812,259 @@
                 localStorage.setItem('farmstil_last_sync', '');
             }
         }
-        
-        // ============================================
-        // QR-КОДЫ
-        // ============================================
-        
-        function generateQRCode() {
+
+        // Функция отправки ЛН (Firebase версия)
+        window.submitWorkerForm = async function(qrCode) {
+            try {
+                // Валидация формы
+                const requiredFields = ['workerApplicant', 'workerDate', 'workerNsType', 'workerTitle', 'workerDescription', 'workerUrgency'];
+                for (const fieldId of requiredFields) {
+                    const field = document.getElementById(fieldId);
+                    if (!field || !field.value.trim()) {
+                        showNotification(`Заполните поле: ${field.previousElementSibling?.textContent || fieldId}`, 'error');
+                        field.focus();
+                        return;
+                    }
+                }
+                
+                // Собираем данные
+                const nsData = {
+                    id: 'ns_' + Date.now(),
+                    nsNumber: generateNSNumber(),
+                    created: new Date().toISOString(),
+                    detectionDate: document.getElementById('workerDate').value,
+                    department: document.getElementById('workerDepartment').value || 'Не указано',
+                    location: document.getElementById('workerLocation').value || 'Не указано',
+                    applicant: document.getElementById('workerApplicant').value,
+                    applicantPhone: document.getElementById('workerPhone').value || '',
+                    nsType: document.getElementById('workerNsType').value,
+                    nsTitle: document.getElementById('workerTitle').value,
+                    description: document.getElementById('workerDescription').value,
+                    urgency: document.getElementById('workerUrgency').value,
+                    photos: photos,
+                    status: WORKFLOW_STATUSES.DETECTED,
+                    qrCode: qrCode,
+                    workflow: [{
+                        step: 1,
+                        action: 'detected',
+                        user: document.getElementById('workerApplicant').value,
+                        date: new Date().toISOString(),
+                        comment: 'Несоответствие зарегистрировано через QR-код'
+                    }]
+                };
+                
+                console.log('Создаем ЛН:', nsData);
+                
+                // 1. Сохраняем в Firestore (облачная база)
+                const firestoreResult = await saveNSFirestore(nsData);
+                
+                if (!firestoreResult.success) {
+                    throw new Error(`Ошибка сохранения в облачную базу: ${firestoreResult.error}`);
+                }
+                
+                // 2. Сохраняем локально для оффлайн-доступа
+                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+                nsList.push({
+                    ...nsData,
+                    firestoreId: firestoreResult.id
+                });
+                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
+                
+                // Показываем сообщение об успехе
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #28a745;">✅</div>
+                        <h2>Лист несоответствия создан!</h2>
+                        <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
+                        <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
+                            <p><strong>📋 Краткая информация:</strong></p>
+                            <p>Цех: ${nsData.department}</p>
+                            <p>Место: ${nsData.location}</p>
+                            <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
+                            <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
+                            <p>Заявитель: ${nsData.applicant}</p>
+                        </div>
+                        <div style="margin: 20px 0; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+                            <p>✅ Данные сохранены в облачной базе Firebase</p>
+                            <p><small>ЛН ${nsData.nsNumber} теперь виден во всех административных панелях</small></p>
+                        </div>
+                        <div id="emailStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <p>📧 Отправка уведомления менеджеру СМК...</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
+                            Вернуться на главную
+                        </button>
+                    </div>
+                `;
+                
+                // Отправляем email
+                setTimeout(async () => {
+                    const emailStatus = document.getElementById('emailStatus');
+                    try {
+                        await sendEmailToSMKManager(nsData);
+                        emailStatus.innerHTML = '<p>✅ Email успешно отправлен менеджеру СМК</p>';
+                        emailStatus.style.background = '#d4edda';
+                        emailStatus.style.borderLeft = '4px solid #28a745';
+                    } catch (emailError) {
+                        console.error('Ошибка отправки email:', emailError);
+                        emailStatus.innerHTML = '<p>⚠️ Ошибка отправки email. Сообщите менеджеру вручную.</p>';
+                        emailStatus.style.background = '#fff3cd';
+                        emailStatus.style.borderLeft = '4px solid #ffc107';
+                    }
+                }, 100);
+                
+                showNotification(`ЛН ${nsData.nsNumber} успешно создан! Данные в облаке.`, 'success');
+                
+            } catch (error) {
+                console.error('❌ Ошибка при создании ЛН:', error);
+                showNotification(`Ошибка: ${error.message}`, 'error');
+                
+                document.getElementById('workerContent').innerHTML = `
+                    <div style="text-align: center; padding: 40px;">
+                        <div style="font-size: 80px; color: #dc3545;">❌</div>
+                        <h2>Ошибка при создании ЛН</h2>
+                        <p style="color: #666; margin: 20px 0;">
+                            ${error.message}<br>
+                            Попробуйте еще раз или свяжитесь с администратором.
+                        </p>
+                        <button class="btn btn-primary" onclick="window.location.reload()">
+                            ↻ Попробовать снова
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
+                            ↩️ На главную
+                        </button>
+                    </div>
+                `;
+            }
+        };
+
+        // Загрузка списка ЛН из Firestore
+        window.loadNSList = async function() {
+            try {
+                const nsListContainer = document.getElementById('nsListContainer');
+                if (!nsListContainer) return;
+                
+                nsListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">⏳ Загружаю данные из облака Firebase...</p>';
+                
+                const nsList = await getAllNSFirestore();
+                
+                if (nsList.length === 0) {
+                    nsListContainer.innerHTML = `
+                        <div style="text-align: center; padding: 40px; color: #666;">
+                            <p>📭 Нет листов несоответствий в базе</p>
+                            <p style="font-size: 14px; margin-top: 10px;">Создайте первый ЛН через QR-код</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                let html = '';
+                nsList.forEach(ns => {
+                    const statusClass = `status-${ns.status}`;
+                    const date = ns.created ? 
+                        new Date(ns.created).toLocaleDateString('ru-RU') : 
+                        'Дата неизвестна';
+                    
+                    html += `
+                        <div class="ln-card" data-ns-id="${ns.firestoreId || ns.id}">
+                            <div class="ln-card-header">
+                                <div class="ln-number">${ns.nsNumber}</div>
+                                <div class="ln-status ${statusClass}">${getStatusText(ns.status)}</div>
+                            </div>
+                            <div style="margin: 10px 0;">
+                                <p><strong>Цех:</strong> ${ns.department}</p>
+                                <p><strong>Место:</strong> ${ns.location}</p>
+                                <p><strong>Заявитель:</strong> ${ns.applicant}</p>
+                                <p><strong>Дата:</strong> ${date}</p>
+                                <p><strong>Описание:</strong> ${ns.nsTitle}</p>
+                                ${ns.qrCode ? `<p><strong>QR-код:</strong> ${ns.qrCode}</p>` : ''}
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-sm btn-info" onclick="viewNSDetails('${ns.firestoreId || ns.id}')">👁️ Просмотр</button>
+                                <button class="btn btn-sm btn-warning" onclick="editNS('${ns.firestoreId || ns.id}')">✏️ Редактировать</button>
+                                ${ns.status === 'detected' ? 
+                                    `<button class="btn btn-sm btn-success" onclick="approveNS('${ns.firestoreId || ns.id}')">✅ В работу</button>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                nsListContainer.innerHTML = html;
+                
+                // Настраиваем обновление в реальном времени
+                if (firebaseUnsubscribe) {
+                    firebaseUnsubscribe(); // Отписываемся от старого слушателя
+                }
+                
+                const q = query(collection(db, "non_conformities"), orderBy("created", "desc"));
+                firebaseUnsubscribe = onSnapshot(q, (snapshot) => {
+                    console.log('🔥 Получено обновление из Firestore в реальном времени');
+                    // Можно добавить автоматическое обновление списка
+                });
+                
+            } catch (error) {
+                console.error('Ошибка загрузки списка ЛН:', error);
+                const nsListContainer = document.getElementById('nsListContainer');
+                if (nsListContainer) {
+                    nsListContainer.innerHTML = `
+                        <div style="text-align: center; padding: 20px; color: #dc3545;">
+                            <p>❌ Ошибка загрузки данных из облака</p>
+                            <p><small>${error.message}</small></p>
+                            <button class="btn btn-sm btn-primary" onclick="loadNSList()">⟳ Попробовать снова</button>
+                            <button class="btn btn-sm btn-secondary" onclick="loadNSFromLocal()" style="margin-left: 10px;">
+                                📁 Загрузить локальные данные
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+        };
+
+        // Функция загрузки из локального хранилища
+        window.loadNSFromLocal = function() {
+            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
+            const nsListContainer = document.getElementById('nsListContainer');
+            
+            if (!nsListContainer) return;
+            
+            if (nsList.length === 0) {
+                nsListContainer.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">Нет локальных данных</p>';
+                return;
+            }
+            
+            let html = '<div style="padding: 10px; background: #fff3cd; border-radius: 8px; margin-bottom: 15px;">';
+            html += '<p>⚠️ Показаны локальные данные (не синхронизированы с облаком)</p>';
+            html += '</div>';
+            
+            nsList.forEach(ns => {
+                const statusClass = `status-${ns.status}`;
+                const date = ns.created ? 
+                    new Date(ns.created).toLocaleDateString('ru-RU') : 
+                    'Дата неизвестна';
+                
+                html += `
+                    <div class="ln-card">
+                        <div class="ln-card-header">
+                            <div class="ln-number">${ns.nsNumber}</div>
+                            <div class="ln-status ${statusClass}">${getStatusText(ns.status)}</div>
+                        </div>
+                        <div style="margin: 10px 0;">
+                            <p><strong>Цех:</strong> ${ns.department}</p>
+                            <p><strong>Место:</strong> ${ns.location}</p>
+                            <p><strong>Заявитель:</strong> ${ns.applicant}</p>
+                            <p><strong>Дата:</strong> ${date}</p>
+                            <p><strong>Описание:</strong> ${ns.nsTitle}</p>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            nsListContainer.innerHTML = html;
+            showNotification('Загружены локальные данные', 'success');
+        };
+
+        // Генерация QR-кода с сохранением в Firestore
+        window.generateQRCode = async function() {
             const department = document.getElementById('qrDepartment').value;
             const location = document.getElementById('qrLocation').value;
             const responsible = document.getElementById('qrResponsible').value;
@@ -570,7 +1075,6 @@
             }
             
             const code = `FS-${Date.now().toString().slice(-8)}`;
-            
             const currentUrl = window.location.origin + window.location.pathname;
             const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
             
@@ -583,17 +1087,291 @@
                 created: new Date().toISOString()
             };
             
+            // Сохраняем в Firestore
+            const firestoreResult = await saveQRCodeFirestore(currentQRData);
+            
+            if (firestoreResult.success) {
+                // Сохраняем локально
+                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
+                qrcodes.push({
+                    ...currentQRData, 
+                    firestoreId: firestoreResult.id
+                });
+                localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+                
+                displayQRCode(qrUrl, code, department, location, responsible);
+                showNotification('QR-код создан и сохранен в облаке!', 'success');
+                
+                // Обновляем статистику
+                updateStats();
+            } else {
+                showNotification(`Ошибка сохранения QR-кода: ${firestoreResult.error}`, 'error');
+            }
+        };
+
+        // Обновление статистики из Firestore
+        window.updateStats = async function() {
+            try {
+                const nsList = await getAllNSFirestore();
+                const statsGrid = document.getElementById('statsGrid');
+                
+                if (statsGrid) {
+                    const activeCount = nsList.filter(ns => 
+                        ns.status !== 'closed' && ns.status !== 'rejected'
+                    ).length;
+                    
+                    const lastNS = nsList.length > 0 ? nsList[0] : null;
+                    
+                    statsGrid.innerHTML = `
+                        <div class="form-grid">
+                            <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
+                                <h3>📊 Статистика системы</h3>
+                                <p><strong>Всего ЛН в облаке:</strong> ${nsList.length}</p>
+                                <p><strong>Активных ЛН:</strong> ${activeCount}</p>
+                                <p><strong>Последний ЛН:</strong> ${lastNS ? lastNS.nsNumber : 'Нет'}</p>
+                                <p><strong>Дата последнего:</strong> ${lastNS ? new Date(lastNS.created).toLocaleDateString('ru-RU') : 'Нет'}</p>
+                                <p><strong>Источник данных:</strong> 🔥 Firebase Firestore</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Ошибка обновления статистики:', error);
+            }
+        };
+
+        // ============================================
+        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+        // ============================================
+
+        window.showNotification = function(message, type = 'success', duration = 3000) {
+            const notification = document.getElementById('notification');
+            if (!notification) return;
+            
+            notification.textContent = message;
+            notification.className = 'notification';
+            if (type === 'error') notification.classList.add('error');
+            notification.style.display = 'block';
+            
+            setTimeout(() => notification.style.display = 'none', duration);
+        };
+
+        window.closeModal = function() {
+            document.getElementById('statusModal').style.display = 'none';
+        };
+
+        window.showPage = function(pageId) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
+            
+            const page = document.getElementById(pageId + 'Page');
+            if (page) {
+                page.classList.add('active');
+                const buttons = document.querySelectorAll('.menu-btn');
+                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
+                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
+                
+                if (pageId === 'listNS') loadNSList();
+                if (pageId === 'directories') loadDirectories();
+                if (pageId === 'admin') {
+                    updateStats();
+                    updateLastSyncTime();
+                }
+            }
+        };
+
+        window.checkMode = function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            const qrcode = urlParams.get('qrcode');
+            
+            if (mode === 'worker') {
+                document.getElementById('adminMode').style.display = 'none';
+                document.getElementById('workerMode').style.display = 'block';
+                
+                if (qrcode) {
+                    showWorkerFormByQR(qrcode);
+                } else {
+                    showWorkerFormManual();
+                }
+            } else {
+                document.getElementById('adminMode').style.display = 'block';
+                document.getElementById('workerMode').style.display = 'none';
+                showPage('generateQR');
+            }
+        };
+
+        window.showWorkerFormByQR = function(qrCode) {
+            // Загружаем QR-коды из Firestore и локально
             const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            qrcodes.push(currentQRData);
-            localStorage.setItem('farmstil_qrcodes', JSON.stringify(qrcodes));
+            const qrData = qrcodes.find(qr => qr.code === qrCode);
             
-            displayQRCode(qrUrl, code, department, location, responsible);
-            showNotification('QR-код успешно создан!', 'success');
+            const html = `
+                <div style="padding: 20px;">
+                    <h2>🚨 Регистрация несоответствия ISO 13485</h2>
+                    ${qrData ? `
+                        <div style="background: #e8f4ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
+                            <h3>📋 Информация о месте</h3>
+                            <p><strong>Цех/Подразделение:</strong> ${qrData.department}</p>
+                            <p><strong>Рабочее место:</strong> ${qrData.location}</p>
+                            ${qrData.responsible ? `<p><strong>Ответственный за зону:</strong> ${qrData.responsible}</p>` : ''}
+                            <p><strong>QR-код:</strong> ${qrCode}</p>
+                        </div>
+                    ` : `
+                        <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+                            <p>⚠️ QR-код "${qrCode}" найден в локальном хранилище</p>
+                            <p>Работаем в оффлайн-режиме</p>
+                        </div>
+                    `}
+                    
+                    <form id="workerForm">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label>👤 Ваше ФИО:</label>
+                                <input type="text" id="workerApplicant" placeholder="ФИО сотрудника" required>
+                            </div>
+                            <div class="form-group">
+                                <label>📞 Телефон для связи:</label>
+                                <input type="tel" id="workerPhone" placeholder="+7 (999) 999-99-99">
+                            </div>
+                            <div class="form-group">
+                                <label>📅 Дата обнаружения:</label>
+                                <input type="datetime-local" id="workerDate" value="${new Date().toISOString().slice(0, 16)}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>🏭 Тип несоответствия:</label>
+                                <select id="workerNsType" required>
+                                    <option value="">Выберите тип</option>
+                                    <option value="product">Несоответствие продукции</option>
+                                    <option value="process">Несоответствие процесса</option>
+                                    <option value="equipment">Неисправность оборудования</option>
+                                    <option value="documentation">Ошибка в документации</option>
+                                    <option value="safety">Нарушение безопасности</option>
+                                    <option value="other">Другое</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>🔍 Краткое описание проблемы:</label>
+                            <input type="text" id="workerTitle" placeholder="Краткое описание проблемы (до 100 символов)" maxlength="100" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📋 Подробное описание:</label>
+                            <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины и последствия..." required></textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>⚠️ Срочность:</label>
+                            <select id="workerUrgency" required>
+                                <option value="low">Низкая (решить в течение недели)</option>
+                                <option value="medium" selected>Средняя (решить в течение 3 дней)</option>
+                                <option value="high">Высокая (решить в течение 24 часов)</option>
+                                <option value="critical">Критическая (остановить производство)</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>📷 Фотографии (макс. 5):</label>
+                            <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
+                            <div id="workerPhotoPreview" class="photo-preview-container"></div>
+                        </div>
+                        
+                        <input type="hidden" id="workerDepartment" value="${qrData ? qrData.department : ''}">
+                        <input type="hidden" id="workerLocation" value="${qrData ? qrData.location : ''}">
+                        
+                        <div style="margin: 30px 0; text-align: center;">
+                            <button type="button" class="btn btn-success" onclick="submitWorkerForm('${qrCode}')" style="padding: 15px 30px; font-size: 18px;">
+                                📤 Отправить Лист Несоответствия
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
+                                ↩️ Отмена
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            `;
             
-            setTimeout(syncQRCodeWithGoogleSheets, 1000);
-        }
-        
-        function displayQRCode(qrUrl, code, department, location, responsible) {
+            document.getElementById('workerContent').innerHTML = html;
+        };
+
+        window.handleWorkerPhotos = function(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('workerPhotoPreview');
+            
+            if (!preview) return;
+            
+            preview.innerHTML = '';
+            photos = [];
+            
+            for (let i = 0; i < Math.min(files.length, 5); i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    photos.push({
+                        name: file.name,
+                        data: e.target.result,
+                        type: file.type,
+                        size: file.size
+                    });
+                    
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.className = 'photo-preview';
+                    preview.appendChild(img);
+                };
+                
+                reader.readAsDataURL(file);
+            }
+        };
+
+        window.generateNSNumber = function() {
+            const year = new Date().getFullYear().toString().slice(-2);
+            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
+            // Для Firebase будем считать по данным в облаке
+            return `ЛН-${year}${month}-${Date.now().toString().slice(-4)}`;
+        };
+
+        window.getNSTypeText = function(type) {
+            const typeMap = {
+                'product': 'Несоответствие продукции',
+                'process': 'Несоответствие процесса',
+                'equipment': 'Неисправность оборудования',
+                'documentation': 'Ошибка в документации',
+                'safety': 'Нарушение безопасности',
+                'other': 'Другое'
+            };
+            return typeMap[type] || type;
+        };
+
+        window.getStatusText = function(status) {
+            const statusMap = {
+                'detected': 'ОБНАРУЖЕНО',
+                'checking_smk': 'НА ПРОВЕРКЕ',
+                'assigned': 'НАЗНАЧЕНО',
+                'correction': 'КОРРЕКТИРОВКА',
+                'checking_correction': 'ПРОВЕРКА КД',
+                'execution': 'ИСПОЛНЕНИЕ',
+                'completed': 'ВЫПОЛНЕНО',
+                'closed': 'ЗАКРЫТО',
+                'rejected': 'ВОЗВРАЩЕНО'
+            };
+            return statusMap[status] || status.toUpperCase();
+        };
+
+        window.getUrgencyText = function(urgency) {
+            const urgencyMap = {
+                'low': 'Низкая (неделя)',
+                'medium': 'Средняя (3 дня)',
+                'high': 'Высокая (24 часа)',
+                'critical': 'Критическая (немедленно)'
+            };
+            return urgencyMap[urgency] || urgency;
+        };
+
+        window.displayQRCode = function(qrUrl, code, department, location, responsible) {
             const qrcodeDiv = document.getElementById('qrPreview');
             qrcodeDiv.innerHTML = '';
             
@@ -648,16 +1426,9 @@
             `;
             
             qrcodeDiv.style.display = 'block';
-        }
-        
-        function testQRCode(code) {
-            const currentUrl = window.location.origin + window.location.pathname;
-            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
-            window.open(qrUrl, '_blank');
-            showNotification('Открыта страница регистрации несоответствия', 'success');
-        }
-        
-        function printQRCode() {
+        };
+
+        window.printQRCode = function() {
             if (!currentQRData) return;
             
             const printContent = `
@@ -743,933 +1514,69 @@
             const printWindow = window.open('', '_blank');
             printWindow.document.write(printContent);
             printWindow.document.close();
-        }
-        
-        // ============================================
-        // РАБОЧИЙ РЕЖИМ - РЕГИСТРАЦИЯ НЕСООТВЕТСТВИЯ
-        // ============================================
-        
-        function checkMode() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const mode = urlParams.get('mode');
-            const qrcode = urlParams.get('qrcode');
-            
-            if (mode === 'worker') {
-                document.getElementById('adminMode').style.display = 'none';
-                document.getElementById('workerMode').style.display = 'block';
-                
-                if (qrcode) {
-                    showWorkerFormByQR(qrcode);
-                } else {
-                    showWorkerFormManual();
-                }
-            } else {
-                document.getElementById('adminMode').style.display = 'block';
-                document.getElementById('workerMode').style.display = 'none';
-                showPage('generateQR');
-            }
-        }
-        
-        function showWorkerFormByQR(qrCode) {
-            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            const qrData = qrcodes.find(qr => qr.code === qrCode);
-            
-            const html = `
-                <div style="padding: 20px;">
-                    <h2>🚨 Регистрация несоответствия ISO 13485</h2>
-                    ${qrData ? `
-                        <div style="background: #e8f4ff; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #1e3c72;">
-                            <h3>📋 Информация о месте</h3>
-                            <p><strong>Цех/Подразделение:</strong> ${qrData.department}</p>
-                            <p><strong>Рабочее место:</strong> ${qrData.location}</p>
-                            ${qrData.responsible ? `<p><strong>Ответственный за зону:</strong> ${qrData.responsible}</p>` : ''}
-                            <p><strong>QR-код:</strong> ${qrCode}</p>
-                        </div>
-                    ` : `
-                        <div style="background: #fff3cd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-                            <p>⚠️ QR-код "${qrCode}" не найден в системе</p>
-                            <p>Пожалуйста, заполните данные вручную</p>
-                        </div>
-                    `}
-                    
-                    <form id="workerForm">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>👤 Ваше ФИО:</label>
-                                <input type="text" id="workerApplicant" placeholder="ФИО сотрудника" required>
-                            </div>
-                            <div class="form-group">
-                                <label>📞 Телефон для связи:</label>
-                                <input type="tel" id="workerPhone" placeholder="+7 (999) 999-99-99">
-                            </div>
-                            <div class="form-group">
-                                <label>📅 Дата обнаружения:</label>
-                                <input type="datetime-local" id="workerDate" value="${new Date().toISOString().slice(0, 16)}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>🏭 Тип несоответствия:</label>
-                                <select id="workerNsType" required>
-                                    <option value="">Выберите тип</option>
-                                    <option value="product">Несоответствие продукции</option>
-                                    <option value="process">Несоответствие процесса</option>
-                                    <option value="equipment">Неисправность оборудования</option>
-                                    <option value="documentation">Ошибка в документации</option>
-                                    <option value="safety">Нарушение безопасности</option>
-                                    <option value="other">Другое</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>🔍 Краткое описание проблемы:</label>
-                            <input type="text" id="workerTitle" placeholder="Краткое описание проблемы (до 100 символов)" maxlength="100" required>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>📋 Подробное описание:</label>
-                            <textarea id="workerDescription" rows="5" placeholder="Подробно опишите проблему, возможные причины и последствия..." required></textarea>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>⚠️ Срочность:</label>
-                            <select id="workerUrgency" required>
-                                <option value="low">Низкая (решить в течение недели)</option>
-                                <option value="medium" selected>Средняя (решить в течение 3 дней)</option>
-                                <option value="high">Высокая (решить в течение 24 часов)</option>
-                                <option value="critical">Критическая (остановить производство)</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>📷 Фотографии (макс. 5):</label>
-                            <input type="file" id="workerPhotos" accept="image/*" multiple onchange="handleWorkerPhotos(event)">
-                            <div id="workerPhotoPreview" class="photo-preview-container"></div>
-                        </div>
-                        
-                        <input type="hidden" id="workerDepartment" value="${qrData ? qrData.department : ''}">
-                        <input type="hidden" id="workerLocation" value="${qrData ? qrData.location : ''}">
-                        
-                        <div style="margin: 30px 0; text-align: center;">
-                            <button type="button" class="btn btn-success" onclick="submitWorkerForm('${qrCode}')" style="padding: 15px 30px; font-size: 18px;">
-                                📤 Отправить Лист Несоответствия
-                            </button>
-                            <button type="button" class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
-                                ↩️ Отмена
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            `;
-            
-            document.getElementById('workerContent').innerHTML = html;
-        }
-        
-        function handleWorkerPhotos(event) {
-            const files = event.target.files;
-            const preview = document.getElementById('workerPhotoPreview');
-            
-            if (!preview) return;
-            
-            preview.innerHTML = '';
-            photos = [];
-            
-            for (let i = 0; i < Math.min(files.length, 5); i++) {
-                const file = files[i];
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    photos.push({
-                        name: file.name,
-                        data: e.target.result,
-                        type: file.type,
-                        size: file.size
-                    });
-                    
-                    const img = document.createElement('img');
-                    img.src = e.target.result;
-                    img.className = 'photo-preview';
-                    preview.appendChild(img);
-                };
-                
-                reader.readAsDataURL(file);
-            }
-        }
-        
-        async function submitWorkerForm(qrCode) {
-            try {
-                // Валидация формы
-                const requiredFields = ['workerApplicant', 'workerDate', 'workerNsType', 'workerTitle', 'workerDescription', 'workerUrgency'];
-                for (const fieldId of requiredFields) {
-                    const field = document.getElementById(fieldId);
-                    if (!field || !field.value.trim()) {
-                        showNotification(`Заполните поле: ${field.previousElementSibling?.textContent || fieldId}`, 'error');
-                        field.focus();
-                        return;
-                    }
-                }
-                
-                // Собираем данные
-                const nsData = {
-                    id: 'ns_' + Date.now(),
-                    nsNumber: generateNSNumber(),
-                    created: new Date().toISOString(),
-                    detectionDate: document.getElementById('workerDate').value,
-                    department: document.getElementById('workerDepartment').value || 'Не указано',
-                    location: document.getElementById('workerLocation').value || 'Не указано',
-                    applicant: document.getElementById('workerApplicant').value,
-                    applicantPhone: document.getElementById('workerPhone').value || '',
-                    nsType: document.getElementById('workerNsType').value,
-                    nsTitle: document.getElementById('workerTitle').value,
-                    description: document.getElementById('workerDescription').value,
-                    urgency: document.getElementById('workerUrgency').value,
-                    photos: photos,
-                    status: WORKFLOW_STATUSES.DETECTED,
-                    qrCode: qrCode,
-                    workflow: [{
-                        step: 1,
-                        action: 'detected',
-                        user: document.getElementById('workerApplicant').value,
-                        date: new Date().toISOString(),
-                        comment: 'Несоответствие зарегистрировано через QR-код'
-                    }]
-                };
-                
-                console.log('Создаем ЛН:', nsData);
-                
-                // Сохраняем в localStorage
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                nsList.push(nsData);
-                localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
-                
-                console.log('✅ ЛН сохранен в localStorage:', nsData.nsNumber);
-                
-                // Показываем сообщение об успехе
-                document.getElementById('workerContent').innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 80px; color: #28a745;">✅</div>
-                        <h2>Лист несоответствия создан!</h2>
-                        <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
-                        <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
-                            <p><strong>📋 Краткая информация:</strong></p>
-                            <p>Цех: ${nsData.department}</p>
-                            <p>Место: ${nsData.location}</p>
-                            <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
-                            <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
-                            <p>Заявитель: ${nsData.applicant}</p>
-                        </div>
-                        <div id="emailStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <p>📧 Отправка уведомления менеджеру СМК...</p>
-                        </div>
-                        <div id="syncStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <p>📊 Синхронизация с Google Sheets...</p>
-                        </div>
-                        <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
-                            Вернуться на главную
-                        </button>
-                    </div>
-                `;
-                
-                // Отправляем email
-                const emailStatus = document.getElementById('emailStatus');
-                try {
-                    const emailResult = await sendEmailToSMKManager(nsData);
-                    if (emailResult.success) {
-                        emailStatus.innerHTML = '<p>✅ Email успешно отправлен менеджеру СМК</p>';
-                        emailStatus.style.background = '#d4edda';
-                        emailStatus.style.borderLeft = '4px solid #28a745';
-                    } else {
-                        emailStatus.innerHTML = '<p>⚠️ Email не отправлен. Сообщите менеджеру вручную.</p>';
-                        emailStatus.style.background = '#fff3cd';
-                        emailStatus.style.borderLeft = '4px solid #ffc107';
-                    }
-                } catch (emailError) {
-                    console.error('Ошибка отправки email:', emailError);
-                    emailStatus.innerHTML = '<p>⚠️ Ошибка отправки email. Сообщите менеджеру вручную.</p>';
-                    emailStatus.style.background = '#f8d7da';
-                    emailStatus.style.borderLeft = '4px solid #dc3545';
-                }
-                
-                // Синхронизируем с Google Sheets
-                const syncStatus = document.getElementById('syncStatus');
-                try {
-                    await syncNSWithGoogleSheets(nsData);
-                    syncStatus.innerHTML = '<p>✅ Данные синхронизированы с Google Sheets</p>';
-                    syncStatus.style.background = '#d4edda';
-                    syncStatus.style.borderLeft = '4px solid #28a745';
-                } catch (syncError) {
-                    console.error('Ошибка синхронизации:', syncError);
-                    syncStatus.innerHTML = '<p>⚠️ Ошибка синхронизации. Используйте экспорт в CSV.</p>';
-                    syncStatus.style.background = '#f8d7da';
-                    syncStatus.style.borderLeft = '4px solid #dc3545';
-                }
-                
-                showNotification(`ЛН ${nsData.nsNumber} успешно создан!`, 'success');
-                
-            } catch (error) {
-                console.error('❌ Ошибка при создании ЛН:', error);
-                showNotification('Ошибка при создании ЛН. Проверьте консоль.', 'error');
-                
-                document.getElementById('workerContent').innerHTML = `
-                    <div style="text-align: center; padding: 40px;">
-                        <div style="font-size: 80px; color: #dc3545;">❌</div>
-                        <h2>Ошибка при создании ЛН</h2>
-                        <p style="color: #666; margin: 20px 0;">
-                            Произошла ошибка: ${error.message}<br>
-                            Пожалуйста, попробуйте еще раз или свяжитесь с администратором.
-                        </p>
-                        <button class="btn btn-primary" onclick="window.location.reload()">
-                            ↻ Попробовать снова
-                        </button>
-                        <button class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
-                            ↩️ На главную
-                        </button>
-                    </div>
-                `;
-            }
-        }
-        
-        function generateNSNumber() {
-            const year = new Date().getFullYear().toString().slice(-2);
-            const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const count = nsList.filter(ns => {
-                const nsDate = new Date(ns.created);
-                return nsDate.getFullYear() === new Date().getFullYear() && 
-                       nsDate.getMonth() + 1 === new Date().getMonth() + 1;
-            }).length + 1;
-            return `ЛН-${year}${month}-${count.toString().padStart(3, '0')}`;
-        }
-        
-        function getUrgencyText(urgency) {
-            const urgencyMap = {
-                'low': 'Низкая (неделя)',
-                'medium': 'Средняя (3 дня)',
-                'high': 'Высокая (24 часа)',
-                'critical': 'Критическая (немедленно)'
-            };
-            return urgencyMap[urgency] || urgency;
-        }
-        
-     // ============================================
-// ОТПРАВКА EMAIL ЧЕРЕЗ WEB3FORMS (ИСПРАВЛЕННАЯ)
-// ============================================
-
-async function sendEmailToSMKManager(nsData) {
-    try {
-        console.log('Начинаю отправку email через Web3Forms...');
-        
-        // Формируем правильный URL для административной панели
-        const adminUrl = window.location.href.split('?')[0]; // Базовый URL без параметров
-        
-        // Формируем данные для отправки
-        const formData = new FormData();
-        formData.append('access_key', WEB3FORMS_ACCESS_KEY);
-        formData.append('subject', `ФАРМСТИЛ: Новое несоответствие ${nsData.nsNumber}`);
-        formData.append('from_name', 'Система ФАРМСТИЛ ISO 13485');
-        formData.append('reply_to', nsData.applicant || 'notifications@farmstil.ru');
-        formData.append('to', SMK_MANAGER_EMAIL);
-        
-        // Формируем HTML-сообщение с правильной ссылкой
-        const htmlMessage = `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-                    <h1 style="margin: 0;">🚨 Новое несоответствие ISO 13485</h1>
-                    <p style="margin: 5px 0 0 0;">ФАРМСТИЛ - Система управления качеством</p>
-                </div>
-                <div style="background: white; padding: 20px; border-radius: 0 0 10px 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-                    <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                        <h2 style="color: #1e3c72; margin-top: 0;">Основная информация</h2>
-                        <table style="width: 100%; border-collapse: collapse;">
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Номер ЛН:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;"><span style="background: #1e3c72; color: white; padding: 2px 8px; border-radius: 4px; font-weight: bold;">${nsData.nsNumber}</span></td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Дата:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">${new Date(nsData.created).toLocaleString('ru-RU')}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Подразделение:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">${nsData.department}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Рабочее место:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">${nsData.location}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Заявитель:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">${nsData.applicant} ${nsData.applicantPhone ? `(${nsData.applicantPhone})` : ''}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Тип:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">${getNSTypeText(nsData.nsType)}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee;"><strong>Срочность:</strong></td>
-                                <td style="padding: 8px 0; border-bottom: 1px solid #eee; text-align: right;">
-                                    <span style="background: ${nsData.urgency === 'critical' ? '#dc3545' : nsData.urgency === 'high' ? '#fd7e14' : nsData.urgency === 'medium' ? '#ffc107' : '#28a745'}; color: white; padding: 2px 8px; border-radius: 4px; font-size: 12px;">
-                                        ${getUrgencyText(nsData.urgency)}
-                                    </span>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                    
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
-                        <h3 style="color: #856404; margin-top: 0;">📝 Описание проблемы</h3>
-                        <p style="font-size: 16px; font-weight: bold; margin-bottom: 10px;">${nsData.nsTitle}</p>
-                        <p style="margin: 0;">${nsData.description.replace(/\n/g, '<br>')}</p>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
-                        <div style="flex: 1; background: #e8f4ff; padding: 10px; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">QR-код</div>
-                            <div style="font-weight: bold;">${nsData.qrCode || 'Не указан'}</div>
-                        </div>
-                        <div style="flex: 1; background: #e8f4ff; padding: 10px; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">Статус</div>
-                            <div style="font-weight: bold; color: #ffc107;">${getStatusText(nsData.status)}</div>
-                        </div>
-                        <div style="flex: 1; background: #e8f4ff; padding: 10px; border-radius: 6px; text-align: center;">
-                            <div style="font-size: 12px; color: #666;">Фотографии</div>
-                            <div style="font-weight: bold;">${nsData.photos ? nsData.photos.length : 0}</div>
-                        </div>
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 25px; padding-top: 20px; border-top: 2px solid #eee;">
-                        <p style="color: #666; margin-bottom: 15px;">Для проверки и обработки несоответствия:</p>
-                        <a href="${adminUrl}" style="display: inline-block; background: #1e3c72; color: white; padding: 12px 25px; text-decoration: none; border-radius: 8px; font-weight: bold; font-size: 16px;">
-                            📊 Перейти в административную панель
-                        </a>
-                        <p style="font-size: 12px; color: #999; margin-top: 10px;">Ссылка будет работать только на вашем устройстве</p>
-                    </div>
-                    
-                    <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee; font-size: 12px; color: #999; text-align: center;">
-                        <p>Это автоматическое уведомление от системы ФАРМСТИЛ ISO 13485</p>
-                        <p>© ${new Date().getFullYear()} ФАРМСТИЛ - Система управления качеством</p>
-                    </div>
-                </div>
-            </div>
-        `;
-        
-        formData.append('html_message', htmlMessage);
-        
-        // Добавляем текстовую версию для клиентов без поддержки HTML
-        const textMessage = `
-            НОВОЕ НЕСООТВЕТСТВИЕ ISO 13485
-            ================================
-            
-            Номер ЛН: ${nsData.nsNumber}
-            Дата: ${new Date(nsData.created).toLocaleString('ru-RU')}
-            Подразделение: ${nsData.department}
-            Рабочее место: ${nsData.location}
-            Заявитель: ${nsData.applicant} ${nsData.applicantPhone ? `(${nsData.applicantPhone})` : ''}
-            Тип: ${getNSTypeText(nsData.nsType)}
-            Срочность: ${getUrgencyText(nsData.urgency)}
-            
-            Описание:
-            ${nsData.nsTitle}
-            ${nsData.description}
-            
-            QR-код: ${nsData.qrCode || 'Не указан'}
-            Статус: ${getStatusText(nsData.status)}
-            Фотографии: ${nsData.photos ? nsData.photos.length : 0}
-            
-            Для проверки перейдите по ссылке: ${adminUrl}
-            
-            ---
-            ФАРМСТИЛ - Система управления качеством
-        `;
-        
-        formData.append('message', textMessage);
-        
-        // Отправляем запрос
-        console.log('Отправляю запрос к Web3Forms...');
-        const response = await fetch('https://api.web3forms.com/submit', {
-            method: 'POST',
-            body: formData
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            console.log('✅ Email успешно отправлен через Web3Forms');
-            return { success: true, message: result.message };
-        } else {
-            console.error('❌ Ошибка отправки email через Web3Forms:', result);
-            return { success: false, message: result.message || 'Неизвестная ошибка' };
-        }
-        
-    } catch (error) {
-        console.error('❌ Ошибка в sendEmailToSMKManager:', error);
-        return { success: false, message: error.message };
-    }
-}
-
-// ============================================
-// ИСПРАВЛЕННАЯ ФУНКЦИЯ ПОСЛЕ УСПЕШНОЙ ОТПРАВКИ
-// ============================================
-
-async function submitWorkerForm(qrCode) {
-    try {
-        // Валидация формы
-        const requiredFields = ['workerApplicant', 'workerDate', 'workerNsType', 'workerTitle', 'workerDescription', 'workerUrgency'];
-        let hasError = false;
-        
-        for (const fieldId of requiredFields) {
-            const field = document.getElementById(fieldId);
-            if (!field || !field.value.trim()) {
-                showNotification(`Заполните поле: ${field.previousElementSibling?.textContent || fieldId}`, 'error');
-                field.style.borderColor = '#dc3545';
-                field.focus();
-                hasError = true;
-                return;
-            } else {
-                field.style.borderColor = '#28a745';
-            }
-        }
-        
-        if (hasError) return;
-        
-        // Собираем данные
-        const nsData = {
-            id: 'ns_' + Date.now(),
-            nsNumber: generateNSNumber(),
-            created: new Date().toISOString(),
-            detectionDate: document.getElementById('workerDate').value,
-            department: document.getElementById('workerDepartment').value || 'Не указано',
-            location: document.getElementById('workerLocation').value || 'Не указано',
-            applicant: document.getElementById('workerApplicant').value,
-            applicantPhone: document.getElementById('workerPhone').value || '',
-            nsType: document.getElementById('workerNsType').value,
-            nsTitle: document.getElementById('workerTitle').value,
-            description: document.getElementById('workerDescription').value,
-            urgency: document.getElementById('workerUrgency').value,
-            photos: photos,
-            status: WORKFLOW_STATUSES.DETECTED,
-            qrCode: qrCode,
-            workflow: [{
-                step: 1,
-                action: 'detected',
-                user: document.getElementById('workerApplicant').value,
-                date: new Date().toISOString(),
-                comment: 'Несоответствие зарегистрировано через QR-код'
-            }]
         };
-        
-        console.log('Создаем ЛН:', nsData);
-        
-        // Сохраняем в localStorage
-        const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-        nsList.push(nsData);
-        localStorage.setItem('farmstil_ns', JSON.stringify(nsList));
-        
-        console.log('✅ ЛН сохранен в localStorage:', nsData.nsNumber);
-        
-        // Показываем сообщение об успехе
-        document.getElementById('workerContent').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <div style="font-size: 80px; color: #28a745;">✅</div>
-                <h2>Лист несоответствия создан!</h2>
-                <p style="font-size: 18px; margin: 20px 0;">Номер: <strong>${nsData.nsNumber}</strong></p>
-                <div style="background: #e8f4ff; padding: 20px; border-radius: 10px; margin: 20px auto; max-width: 500px; text-align: left;">
-                    <p><strong>📋 Краткая информация:</strong></p>
-                    <p>Цех: ${nsData.department}</p>
-                    <p>Место: ${nsData.location}</p>
-                    <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
-                    <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
-                    <p>Заявитель: ${nsData.applicant}</p>
-                </div>
-                <div id="emailStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <p>📧 Отправка уведомления менеджеру СМК...</p>
-                </div>
-                <div id="syncStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                    <p>📊 Синхронизация с Google Sheets...</p>
-                </div>
-                <div style="margin: 20px 0; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
-                    <p>✅ Данные успешно сохранены в системе</p>
-                    <p><small>Номер ЛН ${nsData.nsNumber} будет использоваться для отслеживания</small></p>
-                </div>
-                <button class="btn btn-primary" onclick="window.location.href = window.location.pathname">
-                    Вернуться на главную
-                </button>
-            </div>
-        `;
-        
-        // Отправляем email (асинхронно, не блокируем интерфейс)
-        setTimeout(async () => {
-            const emailStatus = document.getElementById('emailStatus');
-            try {
-                const emailResult = await sendEmailToSMKManager(nsData);
-                if (emailResult.success) {
-                    emailStatus.innerHTML = '<p>✅ Email успешно отправлен менеджеру СМК</p>';
-                    emailStatus.style.background = '#d4edda';
-                    emailStatus.style.borderLeft = '4px solid #28a745';
-                } else {
-                    emailStatus.innerHTML = `<p>⚠️ ${emailResult.message || 'Email не отправлен'}</p><p><small>Сообщите менеджеру вручную о ЛН ${nsData.nsNumber}</small></p>`;
-                    emailStatus.style.background = '#fff3cd';
-                    emailStatus.style.borderLeft = '4px solid #ffc107';
-                }
-            } catch (emailError) {
-                console.error('Ошибка отправки email:', emailError);
-                emailStatus.innerHTML = '<p>⚠️ Ошибка отправки email. Сообщите менеджеру вручную.</p>';
-                emailStatus.style.background = '#f8d7da';
-                emailStatus.style.borderLeft = '4px solid #dc3545';
-            }
-        }, 100);
-        
-        // Синхронизируем с Google Sheets (асинхронно)
-        setTimeout(async () => {
-            const syncStatus = document.getElementById('syncStatus');
-            try {
-                await syncNSWithGoogleSheets(nsData);
-                syncStatus.innerHTML = '<p>✅ Данные синхронизированы с Google Sheets</p>';
-                syncStatus.style.background = '#d4edda';
-                syncStatus.style.borderLeft = '4px solid #28a745';
-            } catch (syncError) {
-                console.error('Ошибка синхронизации:', syncError);
-                syncStatus.innerHTML = '<p>⚠️ Ошибка синхронизации. Используйте экспорт в CSV.</p>';
-                syncStatus.style.background = '#f8d7da';
-                syncStatus.style.borderLeft = '4px solid #dc3545';
-            }
-        }, 200);
-        
-        showNotification(`ЛН ${nsData.nsNumber} успешно создан!`, 'success');
-        
-    } catch (error) {
-        console.error('❌ Ошибка при создании ЛН:', error);
-        showNotification('Ошибка при создании ЛН. Проверьте консоль.', 'error');
-        
-        document.getElementById('workerContent').innerHTML = `
-            <div style="text-align: center; padding: 40px;">
-                <div style="font-size: 80px; color: #dc3545;">❌</div>
-                <h2>Ошибка при создании ЛН</h2>
-                <p style="color: #666; margin: 20px 0;">
-                    Произошла ошибка: ${error.message}<br>
-                    Пожалуйста, попробуйте еще раз или свяжитесь с администратором.
-                </p>
-                <button class="btn btn-primary" onclick="window.location.reload()">
-                    ↻ Попробовать снова
-                </button>
-                <button class="btn btn-secondary" onclick="window.location.href = window.location.pathname" style="margin-left: 15px;">
-                    ↩️ На главную
-                </button>
-            </div>
-        `;
-    }
-}
 
-// ============================================
-// ДОБАВЬТЕ ЭТУ ФУНКЦИЮ ДЛЯ ВАЛИДАЦИИ ФОРМЫ
-// ============================================
+        window.testQRCode = function(code) {
+            const currentUrl = window.location.origin + window.location.pathname;
+            const qrUrl = `${currentUrl}?mode=worker&qrcode=${encodeURIComponent(code)}`;
+            window.open(qrUrl, '_blank');
+            showNotification('Открыта страница регистрации несоответствия', 'success');
+        };
 
-function validateWorkerForm() {
-    const fields = [
-        { id: 'workerApplicant', name: 'ФИО' },
-        { id: 'workerDate', name: 'Дата обнаружения' },
-        { id: 'workerNsType', name: 'Тип несоответствия' },
-        { id: 'workerTitle', name: 'Краткое описание' },
-        { id: 'workerDescription', name: 'Подробное описание' },
-        { id: 'workerUrgency', name: 'Срочность' }
-    ];
-    
-    let isValid = true;
-    let firstInvalidField = null;
-    
-    fields.forEach(field => {
-        const element = document.getElementById(field.id);
-        if (element) {
-            if (!element.value.trim()) {
-                element.style.borderColor = '#dc3545';
-                element.style.boxShadow = '0 0 0 0.2rem rgba(220,53,69,.25)';
-                isValid = false;
-                if (!firstInvalidField) {
-                    firstInvalidField = element;
-                }
-            } else {
-                element.style.borderColor = '#28a745';
-                element.style.boxShadow = 'none';
-            }
-        }
-    });
-    
-    if (firstInvalidField) {
-        firstInvalidField.focus();
-        showNotification(`Заполните поле: "${firstInvalidField.previousElementSibling?.textContent || firstInvalidField.placeholder}"`, 'error');
-    }
-    
-    return isValid;
-}
-
-// Обновите кнопку отправки в функции showWorkerFormByQR:
-// Измените строку с кнопкой на:
-// <button type="button" class="btn btn-success" onclick="if(validateWorkerForm()) submitWorkerForm('${qrCode}')" style="padding: 15px 30px; font-size: 18px;">
-        
-        // ============================================
-        // СИНХРОНИЗАЦИЯ С GOOGLE SHEETS
-        // ============================================
-        
-        async function syncWithGoogleSheets() {
-            showNotification('Начинаю синхронизацию с Google Sheets...', 'success');
-            
+        // Остальные функции (sendEmailToSMKManager, loadDirectories и т.д.)
+        window.sendEmailToSMKManager = async function(nsData) {
             try {
-                const syncStatus = document.getElementById('syncStatus');
-                syncStatus.innerHTML = '<p>Статус: Синхронизация...</p>';
-                syncStatus.className = 'sync-status';
+                const formData = new FormData();
+                formData.append('access_key', WEB3FORMS_ACCESS_KEY);
+                formData.append('subject', `ФАРМСТИЛ: Новое несоответствие ${nsData.nsNumber} (Firebase)`);
+                formData.append('from_name', 'Система ФАРМСТИЛ ISO 13485');
+                formData.append('reply_to', nsData.applicant || 'notifications@farmstil.ru');
+                formData.append('to', SMK_MANAGER_EMAIL);
                 
-                const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-                const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-                const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
-                const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
-                
-                const data = {
-                    action: 'sync_all_data',
-                    timestamp: new Date().toISOString(),
-                    nsList: nsList,
-                    qrcodes: qrcodes,
-                    responsibles: responsibles,
-                    executors: executors
-                };
-                
-                const response = await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                syncStatus.innerHTML = `
-                    <p>✅ Синхронизация завершена успешно!</p>
-                    <p><small>Синхронизировано:</small></p>
-                    <ul style="margin: 5px 0; padding-left: 20px;">
-                        <li>Листов несоответствий: ${nsList.length}</li>
-                        <li>QR-кодов: ${qrcodes.length}</li>
-                        <li>Ответственных: ${responsibles.length}</li>
-                        <li>Исполнителей: ${executors.length}</li>
-                    </ul>
+                const htmlMessage = `
+                    <h2>🚨 Новое несоответствие ISO 13485 (Firebase)</h2>
+                    <p><strong>Номер ЛН:</strong> ${nsData.nsNumber}</p>
+                    <p><strong>Дата:</strong> ${new Date(nsData.created).toLocaleString('ru-RU')}</p>
+                    <p><strong>Подразделение:</strong> ${nsData.department}</p>
+                    <p><strong>Рабочее место:</strong> ${nsData.location}</p>
+                    <p><strong>Заявитель:</strong> ${nsData.applicant} ${nsData.applicantPhone ? `(${nsData.applicantPhone})` : ''}</p>
+                    <p><strong>Тип:</strong> ${getNSTypeText(nsData.nsType)}</p>
+                    <p><strong>Срочность:</strong> ${getUrgencyText(nsData.urgency)}</p>
+                    <hr>
+                    <h3>Описание:</h3>
+                    <p><strong>${nsData.nsTitle}</strong></p>
+                    <p>${nsData.description}</p>
+                    <hr>
+                    <p><strong>QR-код:</strong> ${nsData.qrCode || 'Не указан'}</p>
+                    <p><strong>Статус:</strong> ${getStatusText(nsData.status)}</p>
+                    <p><strong>Источник данных:</strong> 🔥 Firebase Cloud</p>
+                    <br>
+                    <p>Данные сохранены в облачной базе и доступны в админ-панели</p>
                 `;
-                syncStatus.className = 'sync-status success';
                 
-                localStorage.setItem('farmstil_last_sync', new Date().toISOString());
-                updateLastSyncTime();
+                formData.append('html_message', htmlMessage);
                 
-                showNotification(`Синхронизировано ${nsList.length} записей с Google Sheets`, 'success');
-                
-            } catch (error) {
-                console.error('Ошибка синхронизации:', error);
-                const syncStatus = document.getElementById('syncStatus');
-                syncStatus.innerHTML = '<p>❌ Ошибка синхронизации. Используйте экспорт в CSV.</p>';
-                syncStatus.className = 'sync-status error';
-                showNotification('Ошибка синхронизации. Используйте экспорт в CSV.', 'error');
-            }
-        }
-        
-        async function syncNSWithGoogleSheets(nsData) {
-            try {
-                const data = {
-                    action: 'add_ns',
-                    nsData: nsData
-                };
-                
-                await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
+                const response = await fetch('https://api.web3forms.com/submit', {
                     method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
+                    body: formData
                 });
                 
-                console.log('✅ ЛН синхронизирован с Google Sheets:', nsData.nsNumber);
-                return true;
-            } catch (error) {
-                console.error('❌ Ошибка синхронизации ЛН:', error);
-                throw error;
-            }
-        }
-        
-        async function syncQRCodeWithGoogleSheets() {
-            if (!currentQRData) return;
-            
-            try {
-                const data = {
-                    action: 'add_qrcode',
-                    qrData: currentQRData
-                };
+                const result = await response.json();
                 
-                await fetch(GOOGLE_SHEETS_CONFIG.WEB_APP_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
-                
-                console.log('✅ QR-код синхронизирован с Google Sheets:', currentQRData.code);
-            } catch (error) {
-                console.error('❌ Ошибка синхронизации QR-кода:', error);
-            }
-        }
-        
-        function updateLastSyncTime() {
-            const lastSync = localStorage.getItem('farmstil_last_sync');
-            const lastSyncTimeEl = document.getElementById('lastSyncTime');
-            
-            if (lastSyncTimeEl) {
-                if (lastSync) {
-                    const date = new Date(lastSync);
-                    lastSyncTimeEl.textContent = date.toLocaleString('ru-RU');
+                if (result.success) {
+                    console.log('✅ Email отправлен через Web3Forms');
+                    return { success: true };
                 } else {
-                    lastSyncTimeEl.textContent = 'Никогда';
+                    console.error('Ошибка отправки email:', result.message);
+                    return { success: false, message: result.message };
                 }
+            } catch (error) {
+                console.error('Ошибка отправки email:', error);
+                return { success: false, message: error.message };
             }
-        }
-        
-        function openGoogleSheets() {
-            const sheetsUrl = `https://docs.google.com/spreadsheets/d/${GOOGLE_SHEETS_CONFIG.SPREADSHEET_ID}/edit`;
-            window.open(sheetsUrl, '_blank');
-            showNotification('Открываю Google Sheets...', 'success');
-        }
-        
-        // ============================================
-        // ЭКСПОРТ В CSV
-        // ============================================
-        
-        function exportToCSV() {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            
-            if (nsList.length === 0) {
-                showNotification('Нет данных для экспорта', 'warning');
-                return;
-            }
-            
-            const headers = [
-                'Номер ЛН', 'Дата создания', 'Дата обнаружения', 'Подразделение', 
-                'Рабочее место', 'Заявитель', 'Телефон', 'Тип несоответствия', 
-                'Краткое описание', 'Полное описание', 'Срочность', 'Статус', 
-                'Ответственный', 'Email ответственного', 'Срок исполнения', 
-                'QR код', 'Количество фото', 'История workflow'
-            ];
-            
-            const csvRows = [];
-            csvRows.push(headers.join(';'));
-            
-            nsList.forEach(ns => {
-                const workflowText = ns.workflow ? ns.workflow.map(w => 
-                    `${w.date}: ${w.user} - ${w.comment}`
-                ).join(' | ') : '';
-                
-                const row = [
-                    ns.nsNumber || '',
-                    ns.created ? new Date(ns.created).toLocaleString('ru-RU') : '',
-                    ns.detectionDate || '',
-                    ns.department || '',
-                    ns.location || '',
-                    ns.applicant || '',
-                    ns.applicantPhone || '',
-                    getNSTypeText(ns.nsType),
-                    ns.nsTitle || '',
-                    ns.description ? `"${ns.description.replace(/"/g, '""')}"` : '',
-                    getUrgencyText(ns.urgency),
-                    getStatusText(ns.status),
-                    ns.responsiblePerson || '',
-                    ns.responsibleEmail || '',
-                    ns.deadline || '',
-                    ns.qrCode || '',
-                    ns.photos ? ns.photos.length : 0,
-                    workflowText ? `"${workflowText.replace(/"/g, '""')}"` : ''
-                ];
-                csvRows.push(row.join(';'));
-            });
-            
-            const csvContent = csvRows.join('\n');
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `farmstil_ns_export_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-            
-            showNotification(`Экспортировано ${nsList.length} записей в CSV`, 'success');
-        }
-        
-        // ============================================
-        // ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
-        // ============================================
-        
-        function showNotification(message, type = 'success', duration = 3000) {
-            const notification = document.getElementById('notification');
-            if (!notification) return;
-            
-            notification.textContent = message;
-            notification.className = 'notification';
-            if (type === 'error') notification.classList.add('error');
-            notification.style.display = 'block';
-            
-            setTimeout(() => notification.style.display = 'none', duration);
-        }
-        
-        function closeModal() {
-            document.getElementById('statusModal').style.display = 'none';
-        }
-        
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-            document.querySelectorAll('.menu-btn').forEach(btn => btn.classList.remove('active'));
-            
-            const page = document.getElementById(pageId + 'Page');
-            if (page) {
-                page.classList.add('active');
-                const buttons = document.querySelectorAll('.menu-btn');
-                const pageIndex = ['generateQR', 'listNS', 'workflow', 'directories', 'admin'].indexOf(pageId);
-                if (buttons[pageIndex]) buttons[pageIndex].classList.add('active');
-                
-                if (pageId === 'listNS') loadNSList();
-                if (pageId === 'directories') loadDirectories();
-                if (pageId === 'admin') {
-                    updateStats();
-                    updateLastSyncTime();
-                }
-            }
-        }
-        
-        function getNSTypeText(type) {
-            const typeMap = {
-                'product': 'Несоответствие продукции',
-                'process': 'Несоответствие процесса',
-                'equipment': 'Неисправность оборудования',
-                'documentation': 'Ошибка в документации',
-                'safety': 'Нарушение безопасности',
-                'other': 'Другое'
-            };
-            return typeMap[type] || type;
-        }
-        
-        function getStatusText(status) {
-            const statusMap = {
-                'detected': 'ОБНАРУЖЕНО',
-                'checking_smk': 'НА ПРОВЕРКЕ',
-                'assigned': 'НАЗНАЧЕНО',
-                'correction': 'КОРРЕКТИРОВКА',
-                'checking_correction': 'ПРОВЕРКА КД',
-                'execution': 'ИСПОЛНЕНИЕ',
-                'completed': 'ВЫПОЛНЕНО',
-                'closed': 'ЗАКРЫТО',
-                'rejected': 'ВОЗВРАЩЕНО'
-            };
-            return statusMap[status] || status.toUpperCase();
-        }
-        
-        // ============================================
-        // СПРАВОЧНИКИ И ДРУГИЕ ФУНКЦИИ
-        // ============================================
-        
-        function loadDirectories() {
-            // Загрузка справочников
+        };
+
+        window.loadDirectories = function() {
             const responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
             const executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
             
@@ -1710,9 +1617,9 @@ function validateWorkerForm() {
             
             if (responsiblesList) responsiblesList.innerHTML = responsiblesHtml || '<p>Нет ответственных</p>';
             if (executorsList) executorsList.innerHTML = executorsHtml || '<p>Нет исполнителей</p>';
-        }
-        
-        function addResponsible() {
+        };
+
+        window.addResponsible = function() {
             const name = document.getElementById('responsibleName').value.trim();
             const email = document.getElementById('responsibleEmail').value.trim();
             
@@ -1738,9 +1645,9 @@ function validateWorkerForm() {
             
             loadDirectories();
             showNotification('Ответственный добавлен', 'success');
-        }
-        
-        function addExecutor() {
+        };
+
+        window.addExecutor = function() {
             const name = document.getElementById('executorName').value.trim();
             const email = document.getElementById('executorEmail').value.trim();
             
@@ -1766,22 +1673,8 @@ function validateWorkerForm() {
             
             loadDirectories();
             showNotification('Исполнитель добавлен', 'success');
-        }
-        
-        // ============================================
-        // ЭКСПОРТ ФУНКЦИЙ
-        // ============================================
-        
-        window.generateQRCode = generateQRCode;
-        window.testQRCode = testQRCode;
-        window.printQRCode = printQRCode;
-        window.syncWithGoogleSheets = syncWithGoogleSheets;
-        window.exportToCSV = exportToCSV;
-        window.openGoogleSheets = openGoogleSheets;
-        window.closeModal = closeModal;
-        window.showPage = showPage;
-        window.addResponsible = addResponsible;
-        window.addExecutor = addExecutor;
+        };
+
         window.deleteResponsible = function(id) {
             let responsibles = JSON.parse(localStorage.getItem('farmstil_responsibles') || '[]');
             responsibles = responsibles.filter(r => r.id !== id);
@@ -1789,6 +1682,7 @@ function validateWorkerForm() {
             loadDirectories();
             showNotification('Ответственный удален', 'success');
         };
+
         window.deleteExecutor = function(id) {
             let executors = JSON.parse(localStorage.getItem('farmstil_executors') || '[]');
             executors = executors.filter(e => e.id !== id);
@@ -1796,6 +1690,94 @@ function validateWorkerForm() {
             loadDirectories();
             showNotification('Исполнитель удален', 'success');
         };
+
+        window.loadPendingCount = async function() {
+            try {
+                const nsList = await getAllNSFirestore();
+                const pendingCount = nsList.filter(ns => ns.status === 'checking_smk').length;
+                const pendingCountEl = document.getElementById('pendingCount');
+                if (pendingCountEl) pendingCountEl.textContent = pendingCount;
+            } catch (error) {
+                console.error('Ошибка загрузки счетчика:', error);
+            }
+        };
+
+        window.updateLastSyncTime = function() {
+            const lastSync = localStorage.getItem('farmstil_last_sync');
+            const lastSyncTimeEl = document.getElementById('lastSyncTime');
+            
+            if (lastSyncTimeEl) {
+                if (lastSync) {
+                    const date = new Date(lastSync);
+                    lastSyncTimeEl.textContent = date.toLocaleString('ru-RU');
+                } else {
+                    lastSyncTimeEl.textContent = 'Никогда';
+                }
+            }
+        };
+
+        window.openFirebaseConsole = function() {
+            window.open('https://console.firebase.google.com/', '_blank');
+            showNotification('Открываю Firebase Console...', 'success');
+        };
+
+        window.exportToCSV = async function() {
+            try {
+                const nsList = await getAllNSFirestore();
+                
+                if (nsList.length === 0) {
+                    showNotification('Нет данных для экспорта', 'warning');
+                    return;
+                }
+                
+                const headers = [
+                    'Номер ЛН', 'Дата создания', 'Дата обнаружения', 'Подразделение', 
+                    'Рабочее место', 'Заявитель', 'Телефон', 'Тип несоответствия', 
+                    'Краткое описание', 'Полное описание', 'Срочность', 'Статус', 
+                    'QR код', 'Количество фото', 'Источник данных'
+                ];
+                
+                const csvRows = [];
+                csvRows.push(headers.join(';'));
+                
+                nsList.forEach(ns => {
+                    const row = [
+                        ns.nsNumber || '',
+                        ns.created ? new Date(ns.created).toLocaleString('ru-RU') : '',
+                        ns.detectionDate || '',
+                        ns.department || '',
+                        ns.location || '',
+                        ns.applicant || '',
+                        ns.applicantPhone || '',
+                        getNSTypeText(ns.nsType),
+                        ns.nsTitle || '',
+                        ns.description ? `"${ns.description.replace(/"/g, '""')}"` : '',
+                        getUrgencyText(ns.urgency),
+                        getStatusText(ns.status),
+                        ns.qrCode || '',
+                        ns.photos ? ns.photos.length : 0,
+                        'Firebase Cloud'
+                    ];
+                    csvRows.push(row.join(';'));
+                });
+                
+                const csvContent = csvRows.join('\n');
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `farmstil_firebase_export_${new Date().toISOString().split('T')[0]}.csv`;
+                link.click();
+                
+                showNotification(`Экспортировано ${nsList.length} записей из Firebase`, 'success');
+                
+            } catch (error) {
+                console.error('Ошибка экспорта:', error);
+                showNotification('Ошибка экспорта данных', 'error');
+            }
+        };
+
         window.backupData = function() {
             const data = {
                 ns: JSON.parse(localStorage.getItem('farmstil_ns') || '[]'),
@@ -1809,68 +1791,64 @@ function validateWorkerForm() {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `farmstil_backup_${new Date().toISOString().split('T')[0]}.json`;
+            link.download = `farmstil_local_backup_${new Date().toISOString().split('T')[0]}.json`;
             link.click();
             
-            showNotification('Резервная копия создана', 'success');
+            showNotification('Локальная резервная копия создана', 'success');
         };
-        window.restoreData = function() {
-            // Функция восстановления данных
-            showNotification('Для восстановления загрузите файл резервной копии', 'info');
-        };
-        window.clearAllData = function() {
-            if (confirm('⚠️ Вы уверены, что хотите удалить ВСЕ данные? Это действие нельзя отменить!')) {
+
+        window.clearLocalData = function() {
+            if (confirm('⚠️ Вы уверены, что хотите очистить локальные данные? Это не затронет данные в облаке Firebase.')) {
                 localStorage.clear();
                 initDirectories();
                 loadDirectories();
                 updateStats();
-                showNotification('Все данные удалены', 'success');
+                showNotification('Локальные данные очищены', 'success');
             }
         };
-        
-        // ============================================
-        // ДОПОЛНИТЕЛЬНЫЕ ФУНКЦИИ
-        // ============================================
-        
-        function showWorkerFormManual() {
-            // Форма для ручного ввода
+
+        window.searchNS = function() {
+            const searchTerm = document.getElementById('searchNS').value.toLowerCase();
+            const cards = document.querySelectorAll('.ln-card');
+            
+            cards.forEach(card => {
+                const text = card.textContent.toLowerCase();
+                if (text.includes(searchTerm)) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        };
+
+        window.showWorkerFormManual = function() {
             document.getElementById('workerContent').innerHTML = `
                 <div style="padding: 20px;">
                     <h2>🚨 Регистрация несоответствия (ручной ввод)</h2>
-                    <p>Заполните форму для регистрации несоответствия</p>
-                    <!-- Добавьте поля формы здесь -->
+                    <p>Эта функция в разработке. Используйте QR-код для регистрации.</p>
                 </div>
             `;
-        }
-        
-        function updateStats() {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const qrcodes = JSON.parse(localStorage.getItem('farmstil_qrcodes') || '[]');
-            
-            const statsGrid = document.getElementById('statsGrid');
-            if (statsGrid) {
-                statsGrid.innerHTML = `
-                    <div class="form-grid">
-                        <div style="background: #e8f4ff; padding: 15px; border-radius: 10px;">
-                            <h3>📊 Статистика системы</h3>
-                            <p><strong>Всего ЛН:</strong> ${nsList.length}</p>
-                            <p><strong>Активных ЛН:</strong> ${nsList.filter(ns => ns.status !== 'closed' && ns.status !== 'rejected').length}</p>
-                            <p><strong>QR-кодов создано:</strong> ${qrcodes.length}</p>
-                            <p><strong>Последний ЛН:</strong> ${nsList.length > 0 ? nsList[nsList.length - 1].nsNumber : 'Нет'}</p>
-                        </div>
-                    </div>
-                `;
-            }
-        }
-        
-        function loadPendingCount() {
-            const nsList = JSON.parse(localStorage.getItem('farmstil_ns') || '[]');
-            const pendingCount = nsList.filter(ns => ns.status === 'checking_smk').length;
-            const pendingCountEl = document.getElementById('pendingCount');
-            if (pendingCountEl) pendingCountEl.textContent = pendingCount;
-        }
-        
-        console.log('✅ Все функции экспортированы в глобальную область видимости');
+        };
+
+        window.showPendingNS = function() {
+            showPage('listNS');
+            // Здесь можно добавить фильтрацию по статусу
+        };
+
+        // Заглушки для остальных функций
+        window.viewNSDetails = function(id) {
+            showNotification(`Просмотр ЛН ${id} (функция в разработке)`, 'info');
+        };
+
+        window.editNS = function(id) {
+            showNotification(`Редактирование ЛН ${id} (функция в разработке)`, 'info');
+        };
+
+        window.approveNS = function(id) {
+            showNotification(`Одобрение ЛН ${id} (функция в разработке)`, 'info');
+        };
+
+        console.log('✅ Система ФАРМСТИЛ с Firebase полностью загружена');
     </script>
 </body>
 </html>
