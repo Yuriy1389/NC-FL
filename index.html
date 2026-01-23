@@ -24,8 +24,7 @@
             serverTimestamp,
             doc,
             updateDoc,
-            onSnapshot,
-            deleteDoc 
+            onSnapshot
         } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
         // Конфигурация Firebase
@@ -47,27 +46,43 @@
         window.firebaseApp = app;
         window.firebaseDB = db;
         window.firebaseServerTimestamp = serverTimestamp;
-        window.firebaseCollections = {
-            non_conformities: "non_conformities",
-            qrcodes: "qrcodes"
-        };
-
+        
         // Firestore функции для глобального использования
         window.saveNSFirestore = async function(nsData) {
             try {
                 console.log('Сохраняю ЛН в Firestore:', nsData.nsNumber);
                 
-                const dataToSave = {
-                    ...nsData,
+                // Создаем упрощенную версию фотографий для Firestore
+                const simplifiedPhotos = nsData.photos ? nsData.photos.map(photo => ({
+                    name: photo.name || 'photo.jpg',
+                    size: photo.size || 0,
+                    type: photo.type || 'image/jpeg',
+                    uploaded: true
+                })) : [];
+                
+                const firestoreData = {
+                    nsNumber: nsData.nsNumber || '',
+                    created: nsData.created || new Date().toISOString(),
+                    detectionDate: nsData.detectionDate || '',
+                    department: nsData.department || 'Не указано',
+                    location: nsData.location || 'Не указано',
+                    applicant: nsData.applicant || '',
+                    applicantPhone: nsData.applicantPhone || '',
+                    nsType: nsData.nsType || '',
+                    nsTitle: nsData.nsTitle || '',
+                    description: nsData.description || '',
+                    urgency: nsData.urgency || 'medium',
+                    photos: simplifiedPhotos,
+                    photosCount: simplifiedPhotos.length,
+                    status: nsData.status || 'detected',
+                    qrCode: nsData.qrCode || '',
+                    workflow: nsData.workflow || [],
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
-                    firebaseSaved: true,
-                    created: new Date().toISOString()
+                    firebaseSaved: true
                 };
                 
-                delete dataToSave.id;
-                
-                const docRef = await addDoc(collection(db, "non_conformities"), dataToSave);
+                const docRef = await addDoc(collection(db, "non_conformities"), firestoreData);
                 console.log('✅ ЛН сохранен в Firestore с ID:', docRef.id);
                 
                 return { 
@@ -810,7 +825,7 @@
             }
         }
 
-        // Функция отправки ЛН (Firebase версия)
+        // Функция отправки ЛН (Firebase версия) - ИСПРАВЛЕННАЯ
         window.submitWorkerForm = async function(qrCode) {
             try {
                 // Валидация формы
@@ -838,7 +853,7 @@
                     nsTitle: document.getElementById('workerTitle').value,
                     description: document.getElementById('workerDescription').value,
                     urgency: document.getElementById('workerUrgency').value,
-                    photos: photos,
+                    photos: photos, // Сохраняем фотографии
                     status: WORKFLOW_STATUSES.DETECTED,
                     qrCode: qrCode,
                     workflow: [{
@@ -880,10 +895,12 @@
                             <p>Тип: ${getNSTypeText(nsData.nsType)}</p>
                             <p>Срочность: ${getUrgencyText(nsData.urgency)}</p>
                             <p>Заявитель: ${nsData.applicant}</p>
+                            <p>Фотографий: ${photos.length}</p>
                         </div>
                         <div style="margin: 20px 0; padding: 15px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
                             <p>✅ Данные сохранены в облачной базе Firebase</p>
                             <p><small>ЛН ${nsData.nsNumber} теперь виден во всех административных панелях</small></p>
+                            <p><small>Фотографии сохранены вместе с ЛН</small></p>
                         </div>
                         <div id="emailStatus" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
                             <p>📧 Отправка уведомления менеджеру СМК...</p>
@@ -974,6 +991,7 @@
                                 <p><strong>Заявитель:</strong> ${ns.applicant}</p>
                                 <p><strong>Дата:</strong> ${date}</p>
                                 <p><strong>Описание:</strong> ${ns.nsTitle}</p>
+                                <p><strong>Фотографий:</strong> ${ns.photosCount || 0}</p>
                                 ${ns.qrCode ? `<p><strong>QR-код:</strong> ${ns.qrCode}</p>` : ''}
                             </div>
                             <div class="action-buttons">
@@ -1040,6 +1058,7 @@
                             <p><strong>Заявитель:</strong> ${ns.applicant}</p>
                             <p><strong>Дата:</strong> ${date}</p>
                             <p><strong>Описание:</strong> ${ns.nsTitle}</p>
+                            <p><strong>Фотографий:</strong> ${ns.photos ? ns.photos.length : 0}</p>
                         </div>
                     </div>
                 `;
@@ -1116,6 +1135,7 @@
                                 <p><strong>Активных ЛН:</strong> ${activeCount}</p>
                                 <p><strong>Последний ЛН:</strong> ${lastNS ? lastNS.nsNumber : 'Нет'}</p>
                                 <p><strong>Дата последнего:</strong> ${lastNS ? new Date(lastNS.created).toLocaleDateString('ru-RU') : 'Нет'}</p>
+                                <p><strong>Фотографий всего:</strong> ${nsList.reduce((sum, ns) => sum + (ns.photosCount || 0), 0)}</p>
                                 <p><strong>Источник данных:</strong> 🔥 Firebase Firestore</p>
                             </div>
                         </div>
@@ -1298,7 +1318,7 @@
                 reader.onload = function(e) {
                     photos.push({
                         name: file.name,
-                        data: e.target.result,
+                        data: e.target.result, // base64 данные
                         type: file.type,
                         size: file.size
                     });
@@ -1533,6 +1553,7 @@
                     <hr>
                     <p><strong>QR-код:</strong> ${nsData.qrCode || 'Не указан'}</p>
                     <p><strong>Статус:</strong> ${getStatusText(nsData.status)}</p>
+                    <p><strong>Фотографий:</strong> ${nsData.photos ? nsData.photos.length : 0}</p>
                     <p><strong>Источник данных:</strong> 🔥 Firebase Cloud</p>
                     <br>
                     <p>Данные сохранены в облачной базе и доступны в админ-панели</p>
@@ -1739,7 +1760,7 @@
                         getUrgencyText(ns.urgency),
                         getStatusText(ns.status),
                         ns.qrCode || '',
-                        ns.photos ? ns.photos.length : 0,
+                        ns.photosCount || 0,
                         'Firebase Cloud'
                     ];
                     csvRows.push(row.join(';'));
