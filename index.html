@@ -8,6 +8,226 @@
     <!-- Библиотеки -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
+    <!-- Firebase SDK -->
+    <script type="module">
+        // ============================================
+        // FIREBASE ИМПОРТ И КОНФИГУРАЦИЯ (МОДУЛЬ)
+        // ============================================
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            getDocs, 
+            query, 
+            orderBy,
+            serverTimestamp,
+            doc,
+            updateDoc,
+            onSnapshot,
+            deleteDoc 
+        } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+        // Конфигурация Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCz6c6IJUg_pqZqem1ejNEZnm_dy8uhwKE",
+            authDomain: "fl-nc-37e11.firebaseapp.com",
+            projectId: "fl-nc-37e11",
+            storageBucket: "fl-nc-37e11.firebasestorage.app",
+            messagingSenderId: "573438710014",
+            appId: "1:573438710014:web:99af07c7e3440d53bd95af",
+            measurementId: "G-3RBJDQWWCN"
+        };
+
+        // Инициализация Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Экспортируем Firebase функции в глобальную область видимости
+        window.firebaseApp = app;
+        window.firebaseDB = db;
+        window.firebaseServerTimestamp = serverTimestamp;
+        window.firebaseCollections = {
+            non_conformities: "non_conformities",
+            qrcodes: "qrcodes"
+        };
+
+        // Firestore функции для глобального использования
+        window.saveNSFirestore = async function(nsData) {
+            try {
+                console.log('Сохраняю ЛН в Firestore:', nsData.nsNumber);
+                
+                const dataToSave = {
+                    ...nsData,
+                    createdAt: serverTimestamp(),
+                    updatedAt: serverTimestamp(),
+                    firebaseSaved: true,
+                    created: new Date().toISOString()
+                };
+                
+                delete dataToSave.id;
+                
+                const docRef = await addDoc(collection(db, "non_conformities"), dataToSave);
+                console.log('✅ ЛН сохранен в Firestore с ID:', docRef.id);
+                
+                return { 
+                    success: true, 
+                    id: docRef.id,
+                    nsNumber: nsData.nsNumber 
+                };
+            } catch (error) {
+                console.error('❌ Ошибка сохранения в Firestore:', error);
+                return { 
+                    success: false, 
+                    error: error.message,
+                    code: error.code 
+                };
+            }
+        };
+
+        window.getAllNSFirestore = async function() {
+            try {
+                console.log('Загружаю ЛН из Firestore...');
+                
+                const q = query(
+                    collection(db, "non_conformities"), 
+                    orderBy("created", "desc")
+                );
+                
+                const querySnapshot = await getDocs(q);
+                const nsList = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    nsList.push({
+                        firestoreId: doc.id,
+                        ...data,
+                        created: data.created ? data.created : new Date().toISOString(),
+                        createdAt: data.createdAt ? 
+                            (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : 
+                            new Date().toISOString()
+                    });
+                });
+                
+                console.log(`✅ Загружено ${nsList.length} ЛН из Firestore`);
+                return nsList;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки из Firestore:', error);
+                return [];
+            }
+        };
+
+        window.updateNSStatusFirestore = async function(nsId, newStatus, comment = '') {
+            try {
+                const nsRef = doc(db, "non_conformities", nsId);
+                
+                await updateDoc(nsRef, {
+                    status: newStatus,
+                    updatedAt: serverTimestamp(),
+                    lastAction: {
+                        date: new Date().toISOString(),
+                        comment: comment
+                    }
+                });
+                
+                console.log(`✅ Статус ЛН ${nsId} обновлен на: ${newStatus}`);
+                return { success: true };
+            } catch (error) {
+                console.error('❌ Ошибка обновления статуса:', error);
+                return { success: false, error: error.message };
+            }
+        };
+
+        window.saveQRCodeFirestore = async function(qrData) {
+            try {
+                const dataToSave = {
+                    ...qrData,
+                    createdAt: serverTimestamp(),
+                    firebaseSaved: true
+                };
+                
+                const docRef = await addDoc(collection(db, "qrcodes"), dataToSave);
+                console.log('✅ QR-код сохранен в Firestore:', qrData.code);
+                return { success: true, id: docRef.id };
+            } catch (error) {
+                console.error('❌ Ошибка сохранения QR-кода:', error);
+                return { success: false, error: error.message };
+            }
+        };
+
+        window.getAllQRCodesFirestore = async function() {
+            try {
+                const querySnapshot = await getDocs(collection(db, "qrcodes"));
+                const qrCodes = [];
+                
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    qrCodes.push({
+                        firestoreId: doc.id,
+                        ...data
+                    });
+                });
+                
+                return qrCodes;
+            } catch (error) {
+                console.error('❌ Ошибка загрузки QR-кодов:', error);
+                return [];
+            }
+        };
+
+        window.testFirebaseConnection = async function() {
+            try {
+                showNotification('Тестирую подключение к Firebase...', 'success');
+                
+                const testQuery = query(collection(db, "non_conformities"), orderBy("created", "desc"));
+                const snapshot = await getDocs(testQuery);
+                
+                showNotification(`✅ Подключение успешно! Найдено ${snapshot.size} записей`, 'success');
+                
+                document.getElementById('dbStatus').innerHTML = `
+                    <p>✅ Соединение с Firebase установлено</p>
+                    <p style="font-size: 12px;">Найдено записей: ${snapshot.size}</p>
+                `;
+                document.getElementById('dbStatus').className = 'firebase-status connected';
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Ошибка подключения к Firebase:', error);
+                showNotification(`❌ Ошибка подключения: ${error.message}`, 'error');
+                
+                document.getElementById('dbStatus').innerHTML = `
+                    <p>❌ Ошибка подключения</p>
+                    <p style="font-size: 12px;">${error.message}</p>
+                `;
+                document.getElementById('dbStatus').className = 'firebase-status error';
+                
+                return false;
+            }
+        };
+
+        // Обновляем статус подключения
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                document.getElementById('firebaseStatus').innerHTML = `
+                    <p>✅ Подключено к Firebase Cloud</p>
+                    <p style="font-size: 12px; color: #666;">Проект: fl-nc-37e11 | База данных: Firestore</p>
+                `;
+                document.getElementById('firebaseStatus').className = 'firebase-status connected';
+                
+                document.getElementById('dbConnectionStatus').textContent = '✅ Подключено';
+                document.getElementById('dbStatus').innerHTML = '<p>✅ Соединение с Firebase установлено</p>';
+                document.getElementById('dbStatus').className = 'firebase-status connected';
+                
+                console.log('✅ Firebase инициализирован');
+                
+                // Запускаем инициализацию системы
+                if (window.initSystem) {
+                    window.initSystem();
+                }
+            }, 500);
+        });
+    </script>
+
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -506,60 +726,9 @@
         </div>
     </div>
 
-    <!-- Firebase SDK -->
-    <script type="module">
-        // ============================================
-        // FIREBASE ИМПОРТ И КОНФИГУРАЦИЯ
-        // ============================================
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
-        import { 
-            getFirestore, 
-            collection, 
-            addDoc, 
-            getDocs, 
-            query, 
-            orderBy,
-            serverTimestamp,
-            doc,
-            updateDoc,
-            onSnapshot,
-            deleteDoc 
-        } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-firestore.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-analytics.js";
-
-        // Конфигурация Firebase (ВАША!)
-        const firebaseConfig = {
-            apiKey: "AIzaSyCz6c6IJUg_pqZqem1ejNEZnm_dy8uhwKE",
-            authDomain: "fl-nc-37e11.firebaseapp.com",
-            projectId: "fl-nc-37e11",
-            storageBucket: "fl-nc-37e11.firebasestorage.app",
-            messagingSenderId: "573438710014",
-            appId: "1:573438710014:web:99af07c7e3440d53bd95af",
-            measurementId: "G-3RBJDQWWCN"
-        };
-
-        // Инициализация Firebase
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const db = getFirestore(app);
-
-        // Обновляем статус подключения
-        document.getElementById('firebaseStatus').innerHTML = `
-            <p>✅ Подключено к Firebase Cloud</p>
-            <p style="font-size: 12px; color: #666;">Проект: fl-nc-37e11 | База данных: Firestore</p>
-        `;
-        document.getElementById('firebaseStatus').className = 'firebase-status connected';
-        
-        document.getElementById('dbConnectionStatus').textContent = '✅ Подключено';
-        document.getElementById('dbStatus').innerHTML = '<p>✅ Соединение с Firebase установлено</p>';
-        document.getElementById('dbStatus').className = 'firebase-status connected';
-
-        console.log('✅ Firebase инициализирован');
-    </script>
-
     <script>
         // ============================================
-        // КОНСТАНТЫ И ПЕРЕМЕННЫЕ
+        // ОСНОВНЫЕ ФУНКЦИИ СИСТЕМЫ
         // ============================================
         const GOOGLE_SHEETS_CONFIG = {
             SPREADSHEET_ID: '1LsmHG9CGSzGu98e50OLpmNsijEcq7TgToMk_3uyULNU',
@@ -587,180 +756,8 @@
         let currentEditingNS = null;
         let firebaseUnsubscribe = null;
 
-        // ============================================
-        // FIREBASE ФУНКЦИИ
-        // ============================================
-
-        // 1. Сохранить ЛН в Firestore
-        window.saveNSFirestore = async function(nsData) {
-            try {
-                console.log('Сохраняю ЛН в Firestore:', nsData.nsNumber);
-                
-                // Добавляем временную метку
-                const dataToSave = {
-                    ...nsData,
-                    createdAt: serverTimestamp(),
-                    updatedAt: serverTimestamp(),
-                    firebaseSaved: true
-                };
-                
-                // Удаляем id чтобы Firestore создал свой
-                delete dataToSave.id;
-                
-                // Сохраняем в коллекцию 'non_conformities'
-                const docRef = await addDoc(collection(db, "non_conformities"), dataToSave);
-                console.log('✅ ЛН сохранен в Firestore с ID:', docRef.id);
-                
-                return { 
-                    success: true, 
-                    id: docRef.id,
-                    nsNumber: nsData.nsNumber 
-                };
-            } catch (error) {
-                console.error('❌ Ошибка сохранения в Firestore:', error);
-                return { 
-                    success: false, 
-                    error: error.message,
-                    code: error.code 
-                };
-            }
-        };
-
-        // 2. Получить все ЛН из Firestore
-        window.getAllNSFirestore = async function() {
-            try {
-                console.log('Загружаю ЛН из Firestore...');
-                
-                // Создаем запрос с сортировкой по дате создания
-                const q = query(
-                    collection(db, "non_conformities"), 
-                    orderBy("created", "desc")
-                );
-                
-                const querySnapshot = await getDocs(q);
-                const nsList = [];
-                
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    nsList.push({
-                        firestoreId: doc.id,  // ID документа Firestore
-                        ...data,
-                        // Обрабатываем даты
-                        created: data.created ? data.created : new Date().toISOString(),
-                        // Если есть timestamp, конвертируем
-                        createdAt: data.createdAt ? 
-                            (data.createdAt.toDate ? data.createdAt.toDate().toISOString() : data.createdAt) : 
-                            new Date().toISOString()
-                    });
-                });
-                
-                console.log(`✅ Загружено ${nsList.length} ЛН из Firestore`);
-                return nsList;
-            } catch (error) {
-                console.error('❌ Ошибка загрузки из Firestore:', error);
-                return [];
-            }
-        };
-
-        // 3. Обновить статус ЛН
-        window.updateNSStatusFirestore = async function(nsId, newStatus, comment = '') {
-            try {
-                const nsRef = doc(db, "non_conformities", nsId);
-                
-                await updateDoc(nsRef, {
-                    status: newStatus,
-                    updatedAt: serverTimestamp(),
-                    lastAction: {
-                        date: new Date().toISOString(),
-                        comment: comment
-                    }
-                });
-                
-                console.log(`✅ Статус ЛН ${nsId} обновлен на: ${newStatus}`);
-                return { success: true };
-            } catch (error) {
-                console.error('❌ Ошибка обновления статуса:', error);
-                return { success: false, error: error.message };
-            }
-        };
-
-        // 4. Сохранить QR-код в Firestore
-        window.saveQRCodeFirestore = async function(qrData) {
-            try {
-                const dataToSave = {
-                    ...qrData,
-                    createdAt: serverTimestamp(),
-                    firebaseSaved: true
-                };
-                
-                const docRef = await addDoc(collection(db, "qrcodes"), dataToSave);
-                console.log('✅ QR-код сохранен в Firestore:', qrData.code);
-                return { success: true, id: docRef.id };
-            } catch (error) {
-                console.error('❌ Ошибка сохранения QR-кода:', error);
-                return { success: false, error: error.message };
-            }
-        };
-
-        // 5. Получить все QR-коды
-        window.getAllQRCodesFirestore = async function() {
-            try {
-                const querySnapshot = await getDocs(collection(db, "qrcodes"));
-                const qrCodes = [];
-                
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    qrCodes.push({
-                        firestoreId: doc.id,
-                        ...data
-                    });
-                });
-                
-                return qrCodes;
-            } catch (error) {
-                console.error('❌ Ошибка загрузки QR-кодов:', error);
-                return [];
-            }
-        };
-
-        // 6. Тест подключения к Firebase
-        window.testFirebaseConnection = async function() {
-            try {
-                showNotification('Тестирую подключение к Firebase...', 'success');
-                
-                // Пробуем прочитать тестовые данные
-                const testQuery = query(collection(db, "non_conformities"), orderBy("created", "desc"));
-                const snapshot = await getDocs(testQuery);
-                
-                showNotification(`✅ Подключение успешно! Найдено ${snapshot.size} записей`, 'success');
-                
-                document.getElementById('dbStatus').innerHTML = `
-                    <p>✅ Соединение с Firebase установлено</p>
-                    <p style="font-size: 12px;">Найдено записей: ${snapshot.size}</p>
-                `;
-                document.getElementById('dbStatus').className = 'firebase-status connected';
-                
-                return true;
-            } catch (error) {
-                console.error('❌ Ошибка подключения к Firebase:', error);
-                showNotification(`❌ Ошибка подключения: ${error.message}`, 'error');
-                
-                document.getElementById('dbStatus').innerHTML = `
-                    <p>❌ Ошибка подключения</p>
-                    <p style="font-size: 12px;">${error.message}</p>
-                `;
-                document.getElementById('dbStatus').className = 'firebase-status error';
-                
-                return false;
-            }
-        };
-
-        // ============================================
-        // ОСНОВНЫЕ ФУНКЦИИ СИСТЕМЫ
-        // ============================================
-
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
+        // Инициализация системы
+        window.initSystem = function() {
             console.log('🚀 Система ФАРМСТИЛ ISO 13485 с Firebase запускается...');
             
             // Инициализируем локальные хранилища
@@ -781,7 +778,7 @@
                 
                 console.log('✅ Система готова к работе с Firebase');
             }, 1000);
-        });
+        };
 
         function initDirectories() {
             if (!localStorage.getItem('farmstil_responsibles')) {
@@ -856,7 +853,7 @@
                 console.log('Создаем ЛН:', nsData);
                 
                 // 1. Сохраняем в Firestore (облачная база)
-                const firestoreResult = await saveNSFirestore(nsData);
+                const firestoreResult = await window.saveNSFirestore(nsData);
                 
                 if (!firestoreResult.success) {
                     throw new Error(`Ошибка сохранения в облачную базу: ${firestoreResult.error}`);
@@ -946,7 +943,7 @@
                 
                 nsListContainer.innerHTML = '<p style="text-align: center; padding: 20px;">⏳ Загружаю данные из облака Firebase...</p>';
                 
-                const nsList = await getAllNSFirestore();
+                const nsList = await window.getAllNSFirestore();
                 
                 if (nsList.length === 0) {
                     nsListContainer.innerHTML = `
@@ -990,17 +987,6 @@
                 });
                 
                 nsListContainer.innerHTML = html;
-                
-                // Настраиваем обновление в реальном времени
-                if (firebaseUnsubscribe) {
-                    firebaseUnsubscribe(); // Отписываемся от старого слушателя
-                }
-                
-                const q = query(collection(db, "non_conformities"), orderBy("created", "desc"));
-                firebaseUnsubscribe = onSnapshot(q, (snapshot) => {
-                    console.log('🔥 Получено обновление из Firestore в реальном времени');
-                    // Можно добавить автоматическое обновление списка
-                });
                 
             } catch (error) {
                 console.error('Ошибка загрузки списка ЛН:', error);
@@ -1088,7 +1074,7 @@
             };
             
             // Сохраняем в Firestore
-            const firestoreResult = await saveQRCodeFirestore(currentQRData);
+            const firestoreResult = await window.saveQRCodeFirestore(currentQRData);
             
             if (firestoreResult.success) {
                 // Сохраняем локально
@@ -1112,7 +1098,7 @@
         // Обновление статистики из Firestore
         window.updateStats = async function() {
             try {
-                const nsList = await getAllNSFirestore();
+                const nsList = await window.getAllNSFirestore();
                 const statsGrid = document.getElementById('statsGrid');
                 
                 if (statsGrid) {
@@ -1330,7 +1316,6 @@
         window.generateNSNumber = function() {
             const year = new Date().getFullYear().toString().slice(-2);
             const month = (new Date().getMonth() + 1).toString().padStart(2, '0');
-            // Для Firebase будем считать по данным в облаке
             return `ЛН-${year}${month}-${Date.now().toString().slice(-4)}`;
         };
 
@@ -1523,7 +1508,6 @@
             showNotification('Открыта страница регистрации несоответствия', 'success');
         };
 
-        // Остальные функции (sendEmailToSMKManager, loadDirectories и т.д.)
         window.sendEmailToSMKManager = async function(nsData) {
             try {
                 const formData = new FormData();
@@ -1693,7 +1677,7 @@
 
         window.loadPendingCount = async function() {
             try {
-                const nsList = await getAllNSFirestore();
+                const nsList = await window.getAllNSFirestore();
                 const pendingCount = nsList.filter(ns => ns.status === 'checking_smk').length;
                 const pendingCountEl = document.getElementById('pendingCount');
                 if (pendingCountEl) pendingCountEl.textContent = pendingCount;
@@ -1723,7 +1707,7 @@
 
         window.exportToCSV = async function() {
             try {
-                const nsList = await getAllNSFirestore();
+                const nsList = await window.getAllNSFirestore();
                 
                 if (nsList.length === 0) {
                     showNotification('Нет данных для экспорта', 'warning');
@@ -1832,7 +1816,6 @@
 
         window.showPendingNS = function() {
             showPage('listNS');
-            // Здесь можно добавить фильтрацию по статусу
         };
 
         // Заглушки для остальных функций
